@@ -73,8 +73,8 @@ public partial class MainWindow
         if (focused is Avalonia.Controls.Primitives.PopupRoot || focused is MenuItem || _openStudyFlyouts.Count>0) return;
         var isSpellingActive = _typingHost?.IsVisible == true;
 
-        var hasTopmostOverlay = _settingsDrawerOpen || _planCreatorOverlay != null
-            || _planEditDrawer?.IsOpen == true
+        var hasTopmostOverlay = _visualConfirmation!=null || _quoteEditorHost!=null || _settingsDrawerOpen || _planCreatorOverlay != null
+            || _planEditDrawer?.IsVisible == true
             || (_workspaceChooser != null && _workspaceChooser.IsVisible)
             || DialogDeleteOverlay.IsVisible
             || DialogEditOverlay.IsVisible
@@ -238,8 +238,10 @@ public partial class MainWindow
 
     private void ExecuteCloseTopmostOverlay()
     {
+        if(_visualConfirmation!=null){CloseVisualConfirmation();return;}
+        if(_quoteEditorHost!=null){TryLeaveQuoteEditor();return;}
         if (_planCreatorOverlay != null) { ClosePlanCreator(); return; }
-        if (_planEditDrawer?.IsOpen == true) { _planEditDrawer.Close(); return; }
+        if (_planEditDrawer?.IsVisible == true) { ClosePlanEditor(); return; }
         if (_settingsDrawerOpen)
         {
             CloseSettingsDrawer();

@@ -274,8 +274,8 @@ public partial class MainWindow
 
         var desc = new TextBlock
         {
-            Text = UiText.Bilingual("以下为情景练习示例，非雅思真题原文。可选中文本复制，点击 ♪ 朗读，点击 ＋ 收藏到金句本。",
-                                   "These are situational practice examples, not official IELTS passages. Select text to copy; use ♪ to listen and ＋ to save to quotes."),
+            Text = UiText.Bilingual("以下为情景练习示例，非雅思真题原文。可选中文本复制，点击扬声器图标朗读，点击 ＋ 收藏到金句本。",
+                                   "These are situational practice examples, not official IELTS passages. Select text to copy; use the speaker icon to listen and ＋ to save to quotes."),
             Classes = { "muted" },
             FontSize = 13,
             TextWrapping = TextWrapping.Wrap

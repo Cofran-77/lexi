@@ -130,7 +130,9 @@ public partial class MainWindow
         if(epoch!=_captureEpoch||_isForceClose||_restoring||!_databaseAvailable)return;
         if (activeCard==null && source!=0 && source!=TryGetPlatformHandle()?.Handle && Win32SelectionClipboard.CurrentForeground!=source) return;
         string? message=null;
-        var card=CreateQuickCard();card.Prepare(action,selected,captureMessage:message,source:sourceName);card.ShowNear(anchor);
+        var card=activeCard??CreateQuickCard();card.Prepare(action,selected,captureMessage:message,source:sourceName);
+        if(activeCard==null)card.ShowNear(anchor);
+        else {card.Activate();card.OriginalInput.Focus();}
         if(!string.IsNullOrWhiteSpace(selected))await card.RunAsync();
     }
     private QuickCardWindow CreateQuickCard()
@@ -145,20 +147,20 @@ public partial class MainWindow
     }
     internal void OpenQuoteEditor(QuoteItem? quote)
     {
-        var card=CreateQuickCard();card.Prepare(QuickAction.SaveQuote,quote?.Original,quote);card.ShowNear(new PixelPoint(Position.X+120,Position.Y+100));
+        OpenQuoteEditorPage(quote);
     }
     private void ConfigureQuotesPage()
     {
         _quotesNav=new Button {Name="NavQuotes",Content=QuickText("金句本","Quotes"),Classes={"nav"}}; LearningNavHost.Children.Add(_quotesNav);
         _quotesNav.Click+=(_,_)=>ShowPage("quotes");
         var content=new StackPanel {Spacing=16,MaxWidth=850,HorizontalAlignment=HorizontalAlignment.Stretch};
-        content.Children.Add(new TextBlock {Text=QuickText("金句本","Quotes"),FontSize=28,FontWeight=FontWeight.SemiBold});
+        content.Children.Add(new TextBlock {Text=QuickText("金句本","Quotes"),FontSize=26,FontWeight=FontWeight.SemiBold});
         var tools=new WrapPanel();_quoteSearch=new TextBox {Name="QuoteSearchInput",Watermark=QuickText("搜索原句、译文、来源或备注","Search sentences, translations, sources or notes"),Width=350,Margin=new Thickness(0,0,8,8)};tools.Children.Add(_quoteSearch);
-        var add=new Button {Name="NewQuoteBtn",Content=QuickText("添加金句","Add quote"),Margin=new Thickness(0,0,8,8)};add.Click+=(_,_)=>OpenQuoteEditor(null);tools.Children.Add(add);
-        var export=new Button {Name="ExportQuotesBtn",Content=QuickText("导出全部金句","Export all quotes"),Margin=new Thickness(0,0,8,8)};export.Click+=async(_,_)=>await ExportQuotesAsync();tools.Children.Add(export);content.Children.Add(tools);
+        var add=new Button {Name="NewQuoteBtn",Content=QuickText("添加金句","Add quote"),Classes={"secondary"},Margin=new Thickness(0,0,8,8)};add.Click+=(_,_)=>OpenQuoteEditor(null);tools.Children.Add(add);
+        var export=new Button {Name="ExportQuotesBtn",Content=QuickText("导出全部金句","Export all quotes"),Classes={"ghost"},Margin=new Thickness(0,0,8,8)};export.Click+=async(_,_)=>await ExportQuotesAsync();tools.Children.Add(export);content.Children.Add(tools);
         _quotesSummary=new TextBlock {Name="QuotesSummary",FontSize=12,Opacity=.7};content.Children.Add(_quotesSummary);
         _quotesList=new StackPanel {Name="QuotesList",Spacing=12};content.Children.Add(_quotesList);
-        var pages=new StackPanel {Orientation=Orientation.Horizontal,Spacing=12};var previous=new Button {Content=QuickText("上一页","Previous")};var next=new Button {Content=QuickText("下一页","Next")};
+        var pages=new StackPanel {Orientation=Orientation.Horizontal,Spacing=12};var previous=new Button {Name="QuotesPrevious",Classes={"ghost"},Content=QuickText("上一页","Previous")};var next=new Button {Name="QuotesNext",Classes={"ghost"},Content=QuickText("下一页","Next")};
         previous.Click+=(_,_)=>{if(_quotePageIndex>0){--_quotePageIndex;RenderQuotes();}};next.Click+=(_,_)=>{if(QuoteArchive.GetQuotes(_quoteSearch.Text??"",1,(_quotePageIndex+1)*QuotePageSize).Count>0){++_quotePageIndex;RenderQuotes();}};pages.Children.Add(previous);pages.Children.Add(next);content.Children.Add(pages);
         _quoteSearch.TextChanged+=(_,_)=>{_quotePageIndex=0;RenderQuotes();};
         _quotesPage=new ScrollViewer {Name="PageQuotes",Content=content,Margin=new Thickness(36,24),IsVisible=false,HorizontalScrollBarVisibility=Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled};
@@ -168,25 +170,23 @@ public partial class MainWindow
     {
         if(_quotesList==null)return;_quotesList.Children.Clear();var quotes=QuoteArchive.GetQuotes(_quoteSearch?.Text??"",QuotePageSize,_quotePageIndex*QuotePageSize);
         while (quotes.Count==0 && _quotePageIndex>0) { --_quotePageIndex; quotes=QuoteArchive.GetQuotes(_quoteSearch?.Text??"",QuotePageSize,_quotePageIndex*QuotePageSize); }
+        if(_quotesPage?.Content is Control content)
+        {
+            foreach(var button in Avalonia.LogicalTree.LogicalExtensions.GetLogicalDescendants(content).OfType<Button>())
+            {
+                if(button.Name=="QuotesPrevious")button.IsEnabled=_quotePageIndex>0;
+                if(button.Name=="QuotesNext")button.IsEnabled=QuoteArchive.GetQuotes(_quoteSearch?.Text??"",1,(_quotePageIndex+1)*QuotePageSize).Count>0;
+            }
+        }
         _quotesSummary!.Text=quotes.Count==0?QuickText("暂无金句。阅读时选中句子，按 Alt+S 收藏。","No quotes yet. Select a sentence while reading and press Alt+S."):QuickText($"第 {_quotePageIndex+1} 页 · {quotes.Count} 条",$"Page {_quotePageIndex+1} · {quotes.Count} quotes");
         foreach(var quote in quotes)
         {
-            var stack=new StackPanel {Spacing=10};stack.Children.Add(new SelectableTextBlock {Text=quote.Original,TextWrapping=TextWrapping.Wrap,FontSize=17,FontWeight=FontWeight.Medium});
-            stack.Children.Add(new SelectableTextBlock {Text=quote.Translation,TextWrapping=TextWrapping.Wrap,FontSize=14});
-            if(quote.Source.Length>0)stack.Children.Add(new SelectableTextBlock {Text=quote.Source,FontSize=12,Opacity=.65,TextWrapping=TextWrapping.Wrap});
-            if(quote.Notes.Length>0)stack.Children.Add(new SelectableTextBlock {Text=quote.Notes,FontSize=12,Opacity=.7,TextWrapping=TextWrapping.Wrap});
-            var actions=new StackPanel {Orientation=Orientation.Horizontal,Spacing=12};var listen=new Button {Content=QuickText("朗读","Listen")};listen.Click+=(_,_)=>GetLearningAudio().Play(quote.Original);var edit=new Button {Content=QuickText("编辑","Edit")};edit.Click+=(_,_)=>OpenQuoteEditor(quote);var delete=new Button {Content=QuickText("删除…","Delete…")};
-            delete.Click+=(_,_)=>
-            {
-                delete.IsVisible=false;
-                var confirm=new Button {Content=QuickText("确认删除","Confirm delete")};var cancel=new Button {Content=QuickText("取消","Cancel")};actions.Children.Add(confirm);actions.Children.Add(cancel);
-                cancel.Click+=(_,_)=>{actions.Children.Remove(confirm);actions.Children.Remove(cancel);delete.IsVisible=true;};
-                confirm.Click+=(_,_)=>{try{QuoteArchive.DeleteQuote(quote.Id);RenderQuotes();SetStatus(QuickText("金句已删除，可从 SQLite 备份恢复。","Quote deleted. SQLite backups can restore it."));}catch(Exception ex){SetStatus(ex.Message);}};
-            };
-            actions.Children.Add(listen);actions.Children.Add(edit);actions.Children.Add(delete);stack.Children.Add(actions);_quotesList.Children.Add(new Border {Classes={"card"},Child=stack});
+            _quotesList.Children.Add(Lexi.Features.Quotes.QuoteNotebookControl.CreateReadingRow(quote,
+                ()=>GetLearningAudio().Play(quote.Original),
+                async()=>{if(Clipboard!=null)await Clipboard.SetTextAsync(quote.Original);},
+                ()=>OpenQuoteEditor(quote),anchor=>ConfirmQuoteDelete(quote,anchor)));
         }
-    }
-    private async Task ExportQuotesAsync()
+    }    private async Task ExportQuotesAsync()
     {
         var files=await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions {Title=QuickText("导出金句","Export quotes"),SuggestedFileName="lexi-quotes.json",DefaultExtension="json"});if(files==null)return;
         try

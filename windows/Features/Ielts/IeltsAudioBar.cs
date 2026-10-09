@@ -1,10 +1,13 @@
 using System;
 using Avalonia;
+using Avalonia.Automation;
 using Avalonia.Controls;
+using Avalonia.Controls.Shapes;
 using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Threading;
+using Path = Avalonia.Controls.Shapes.Path;
 
 namespace Lexi.Features.Ielts;
 
@@ -12,9 +15,16 @@ namespace Lexi.Features.Ielts;
 /// 独立紧凑章节音频播放器：
 /// 支持播放、暂停、停止、前进/后退 10 秒、拖动进度 Seek 与时间指示。
 /// 无资源时诚实解释原因，单一播放所有者。
+/// 1.2.3：按钮统一为线条图标（Path），降低控件高度，保留现有播放/停止/Seek/时间 API。
 /// </summary>
 public sealed class IeltsAudioBar : Border, IDisposable
 {
+    private const string PlayIcon = "M 5,3 L 13,8 L 5,13 Z";
+    private const string PauseIcon = "M 4,3 L 7,3 L 7,13 L 4,13 Z M 9,3 L 12,3 L 12,13 L 9,13 Z";
+    private const string StopIcon = "M 4,4 L 12,4 L 12,12 L 4,12 Z";
+    private const string RewindIcon = "M 9,3 L 9,13 L 4,8 Z M 14,3 L 14,13 L 9,8 Z";
+    private const string ForwardIcon = "M 2,3 L 2,13 L 7,8 Z M 7,3 L 7,13 L 12,8 Z";
+
     private readonly Func<IWordAudioPlayer> _playerProvider;
     private readonly Action<string> _setStatus;
     private readonly DispatcherTimer _pollTimer;
@@ -24,6 +34,7 @@ public sealed class IeltsAudioBar : Border, IDisposable
     private readonly Button _playPauseBtn;
     private readonly Button _forwardBtn;
     private readonly Button _stopBtn;
+    private readonly Path _playPauseIcon;
     private readonly TextBlock _currentTimeBlock;
     private readonly Slider _seekSlider;
     private readonly TextBlock _durationBlock;
@@ -34,6 +45,7 @@ public sealed class IeltsAudioBar : Border, IDisposable
     private string _currentSectionTitle = "";
     private bool _isDraggingSlider;
     private bool _hasAudio;
+    private bool _isPlayingVisual;
 
     public IeltsAudioBar(Func<IWordAudioPlayer> playerProvider, Action<string> setStatus)
     {
@@ -41,8 +53,8 @@ public sealed class IeltsAudioBar : Border, IDisposable
         _setStatus = setStatus;
 
         BorderThickness = new Thickness(0, 1, 0, 0);
-        Padding = new Thickness(20, 10);
-        MinHeight = 52;
+        Padding = new Thickness(20, 6);
+        MinHeight = 40;
         Background = Brushes.Transparent;
         this.Bind(BorderBrushProperty, this.GetResourceObservable("LineBrush"));
 
@@ -64,58 +76,44 @@ public sealed class IeltsAudioBar : Border, IDisposable
         Grid.SetColumn(_titleBlock, 0);
         mainLayout.Children.Add(_titleBlock);
 
-        // 中部：播放器控件栏
+        // 中部：播放器控件栏（统一线条图标）
         _controlsGrid = new Grid
         {
-            ColumnDefinitions = new ColumnDefinitions("Auto,Auto,Auto,Auto,8,Auto,*,Auto"),
+            ColumnDefinitions = new ColumnDefinitions("Auto,Auto,Auto,Auto,6,Auto,*,Auto"),
             VerticalAlignment = VerticalAlignment.Center
         };
 
-        _rewindBtn = new Button
-        {
-            Content = "-10s",
-            Classes = { "secondary" },
-            Padding = new Thickness(10, 5),
-            Margin = new Thickness(0, 0, 6, 0),
-            FontSize = 12
-        };
-        _rewindBtn.Click += (_, _) => SeekRelative(-10);
+        _rewindBtn = CreateIconButton(RewindIcon, () => SeekRelative(-10));
         Grid.SetColumn(_rewindBtn, 0);
         _controlsGrid.Children.Add(_rewindBtn);
 
+        _playPauseIcon = new Path
+        {
+            Data = Geometry.Parse(PlayIcon),
+            StrokeThickness = 1.5,
+            StrokeLineCap = PenLineCap.Round,
+            StrokeJoin = PenLineJoin.Round,
+            Width = 15,
+            Height = 15,
+            Stretch = Stretch.Uniform
+        };
+        _playPauseIcon.Bind(Shape.StrokeProperty, this.GetResourceObservable("MutedBrush"));
         _playPauseBtn = new Button
         {
-            Content = IeltsI18n.T("播放"),
-            Classes = { "secondary" },
-            Padding = new Thickness(14, 6),
-            Margin = new Thickness(0, 0, 6, 0),
-            FontSize = 12
+            Classes = { "row-btn" },
+            Padding = new Thickness(6, 4),
+            Margin = new Thickness(0, 0, 3, 0),
+            Content = _playPauseIcon
         };
         _playPauseBtn.Click += (_, _) => TogglePlayPause();
         Grid.SetColumn(_playPauseBtn, 1);
         _controlsGrid.Children.Add(_playPauseBtn);
 
-        _forwardBtn = new Button
-        {
-            Content = "+10s",
-            Classes = { "secondary" },
-            Padding = new Thickness(10, 5),
-            Margin = new Thickness(0, 0, 6, 0),
-            FontSize = 12
-        };
-        _forwardBtn.Click += (_, _) => SeekRelative(10);
+        _forwardBtn = CreateIconButton(ForwardIcon, () => SeekRelative(10));
         Grid.SetColumn(_forwardBtn, 2);
         _controlsGrid.Children.Add(_forwardBtn);
 
-        _stopBtn = new Button
-        {
-            Content = IeltsI18n.T("停止"),
-            Classes = { "secondary" },
-            Padding = new Thickness(10, 5),
-            Margin = new Thickness(0, 0, 10, 0),
-            FontSize = 12
-        };
-        _stopBtn.Click += (_, _) => Stop();
+        _stopBtn = CreateIconButton(StopIcon, Stop);
         Grid.SetColumn(_stopBtn, 3);
         _controlsGrid.Children.Add(_stopBtn);
 
@@ -189,6 +187,9 @@ public sealed class IeltsAudioBar : Border, IDisposable
             mainLayout.ColumnDefinitions[0].Width = compact ? new GridLength(0) : GridLength.Auto;
         };
 
+        ApplyTransportLabels();
+        SetPlayPause(false);
+
         _pollTimer = new DispatcherTimer
         {
             Interval = TimeSpan.FromMilliseconds(250)
@@ -223,7 +224,7 @@ public sealed class IeltsAudioBar : Border, IDisposable
         if (player.IsPlaying)
         {
             player.TogglePause();
-            _playPauseBtn.Content = IeltsI18n.T("播放");
+            SetPlayPause(false);
         }
         else
         {
@@ -235,7 +236,7 @@ public sealed class IeltsAudioBar : Border, IDisposable
             {
                 player.Play("", _currentAudioFile);
             }
-            _playPauseBtn.Content = IeltsI18n.T("暂停");
+            SetPlayPause(true);
         }
     }
 
@@ -250,7 +251,7 @@ public sealed class IeltsAudioBar : Border, IDisposable
     {
         var player = _playerProvider();
         player.Stop();
-        _playPauseBtn.Content = IeltsI18n.T("播放");
+        SetPlayPause(false);
         _seekSlider.Value = 0;
         _currentTimeBlock.Text = "00:00";
     }
@@ -263,7 +264,7 @@ public sealed class IeltsAudioBar : Border, IDisposable
 
         if (isPlaying)
         {
-            _playPauseBtn.Content = IeltsI18n.T("暂停");
+            SetPlayPause(true);
             var pos = player.Position;
             var dur = player.Duration;
 
@@ -280,12 +281,12 @@ public sealed class IeltsAudioBar : Border, IDisposable
             // 播放完成回位
             if (dur > 0 && pos >= dur - 0.3)
             {
-                _playPauseBtn.Content = IeltsI18n.T("播放");
+                SetPlayPause(false);
             }
         }
-        else if (_playPauseBtn.Content?.ToString() == IeltsI18n.T("暂停"))
+        else if (_isPlayingVisual)
         {
-            _playPauseBtn.Content = IeltsI18n.T("播放");
+            SetPlayPause(false);
         }
     }
 
@@ -298,14 +299,63 @@ public sealed class IeltsAudioBar : Border, IDisposable
             : $"{ts.Minutes:D2}:{ts.Seconds:D2}";
     }
 
+    /// <summary>创建线条图标按钮：统一 Path 图标 + row-btn 样式，前景绑定 MutedBrush。</summary>
+    private Button CreateIconButton(string data, Action onClick)
+    {
+        var icon = new Path
+        {
+            Data = Geometry.Parse(data),
+            StrokeThickness = 1.5,
+            StrokeLineCap = PenLineCap.Round,
+            StrokeJoin = PenLineJoin.Round,
+            Width = 15,
+            Height = 15,
+            Stretch = Stretch.Uniform
+        };
+        icon.Bind(Shape.StrokeProperty, this.GetResourceObservable("MutedBrush"));
+        var btn = new Button
+        {
+            Classes = { "row-btn" },
+            Padding = new Thickness(6, 4),
+            Margin = new Thickness(0, 0, 3, 0),
+            Content = icon
+        };
+        btn.Click += (_, _) => onClick();
+        return btn;
+    }
+
+    /// <summary>切换播放/暂停图标与可访问名称。</summary>
+    private void SetPlayPause(bool playing)
+    {
+        _isPlayingVisual = playing;
+        _playPauseIcon.Data = Geometry.Parse(playing ? PauseIcon : PlayIcon);
+        var name = IeltsI18n.T(playing ? "暂停" : "播放");
+        ToolTip.SetTip(_playPauseBtn, name);
+        AutomationProperties.SetName(_playPauseBtn, name);
+    }
+
+    /// <summary>刷新后退/前进/停止按钮的可访问名称（双语）。</summary>
+    private void ApplyTransportLabels()
+    {
+        var stop = IeltsI18n.T("停止");
+        ToolTip.SetTip(_stopBtn, stop);
+        AutomationProperties.SetName(_stopBtn, stop);
+
+        var rewind = Lexi.UiText.Bilingual("后退 10 秒", "Rewind 10 seconds");
+        ToolTip.SetTip(_rewindBtn, rewind);
+        AutomationProperties.SetName(_rewindBtn, rewind);
+
+        var forward = Lexi.UiText.Bilingual("前进 10 秒", "Forward 10 seconds");
+        ToolTip.SetTip(_forwardBtn, forward);
+        AutomationProperties.SetName(_forwardBtn, forward);
+    }
+
     public void RefreshLanguage()
     {
         _titleBlock.Text = IeltsI18n.T("章节录音") + (_currentSectionTitle.Length > 0 ? " · " + _currentSectionTitle : "");
         _noAudioNotice.Text = IeltsI18n.T("当前章节暂无独立音频录音。");
-        _stopBtn.Content = IeltsI18n.T("停止");
-
-        var player = _playerProvider();
-        _playPauseBtn.Content = player.IsPlaying ? IeltsI18n.T("暂停") : IeltsI18n.T("播放");
+        ApplyTransportLabels();
+        SetPlayPause(_playerProvider().IsPlaying);
     }
 
     public void Dispose()

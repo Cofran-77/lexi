@@ -375,7 +375,7 @@ public sealed class IeltsWritingWorkspace : Grid, IDisposable
         };
         var inputHeaderRow = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto") };
         inputHeaderRow.Children.Add(_inputHeader);
-        _draftListen = new Button { Name = "WritingDraftListen", Content = "♪", Classes = { "ghost" }, Padding = new Thickness(8,4) };
+        _draftListen = new Lexi.Controls.InlineAudioButton() { Name = "WritingDraftListen" };
         _draftListen.Click += (_,_) => { if(!string.IsNullOrWhiteSpace(DraftInput.Text))_speak(DraftInput.Text); };
         Grid.SetColumn(_draftListen,1); inputHeaderRow.Children.Add(_draftListen);
         inputStack.Children.Add(inputHeaderRow);

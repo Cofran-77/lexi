@@ -23,13 +23,7 @@ public partial class MainWindow
             VerticalAlignment = VerticalAlignment.Center
         };
 
-        var speakBtn = new Button
-        {
-            Content = "♪",
-            Classes = { "row-btn", "ghost" },
-            Padding = new Thickness(6, 2),
-            Tag = english
-        };
+        var speakBtn = new Lexi.Controls.InlineAudioButton(UiText.Bilingual("朗读例句","Listen to example"),()=>{}) {Tag=english};
         ToolTip.SetTip(speakBtn, UiText.Bilingual("朗读例句", "Listen to example"));
         Avalonia.Automation.AutomationProperties.SetName(speakBtn, UiText.Bilingual("朗读例句", "Listen to example"));
         speakBtn.Click += async (_, _) => await SpeakWordAsync(english);

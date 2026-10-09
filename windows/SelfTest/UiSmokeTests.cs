@@ -42,6 +42,7 @@ public static class UiSmokeTests
             await (Task)Call("PerformLookupAsync")!;
             Check(C<TextBlock>("ResultWordText").Text == "serendipity", "offline query renders word");
             input.RaiseEvent(new Avalonia.Input.KeyEventArgs { RoutedEvent = Avalonia.Input.InputElement.KeyDownEvent, Key = Avalonia.Input.Key.Space, KeyModifiers = Avalonia.Input.KeyModifiers.Alt });
+            input.RaiseEvent(new Avalonia.Input.KeyEventArgs { RoutedEvent = Avalonia.Input.InputElement.KeyUpEvent, Key = Avalonia.Input.Key.Space, KeyModifiers = Avalonia.Input.KeyModifiers.Alt });
             Check(C<Button>("AddWordBtn").IsEnabled, "Alt+Space does not archive a word while typing");
             C<Button>("AddWordBtn").Focus();
             window.RaiseEvent(new Avalonia.Input.KeyEventArgs { RoutedEvent=Avalonia.Input.InputElement.KeyDownEvent, Key=Avalonia.Input.Key.D, KeyModifiers=Avalonia.Input.KeyModifiers.Control });
@@ -85,6 +86,7 @@ public static class UiSmokeTests
             Click("NavVocab");
             var offPageKey = new Avalonia.Input.KeyEventArgs { RoutedEvent = Avalonia.Input.InputElement.KeyDownEvent, Key = Avalonia.Input.Key.Space, KeyModifiers = Avalonia.Input.KeyModifiers.Alt };
             window.RaiseEvent(offPageKey);
+            window.RaiseEvent(new Avalonia.Input.KeyEventArgs { RoutedEvent = Avalonia.Input.InputElement.KeyUpEvent, Key = Avalonia.Input.Key.Space, KeyModifiers = Avalonia.Input.KeyModifiers.Alt });
             Check(!offPageKey.Handled, "add shortcut does not consume Alt+Space on other pages");
             var list = C<ListBox>("VocabListBox");
             Check(list.ItemCount >= 2, "two queried words appear in vocabulary");

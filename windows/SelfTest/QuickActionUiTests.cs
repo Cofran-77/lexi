@@ -96,8 +96,10 @@ public static class QuickActionUiTests
             }
 
             var oldQuote=quotes.GetQuotes("Evidence",50,0).Single();
-            Call("ShowPage","quotes");main.OpenQuoteEditor(oldQuote);
-            var oldEditor=CurrentCard();oldEditor.TranslationInput.Text="旧库编辑中";
+            Call("ShowPage","quotes");main.OpenQuoteEditor(oldQuote);await Task.Delay(100);main.UpdateLayout();
+            Border Editor()=>(Border)typeof(MainWindow).GetField("_quoteEditorHost",BindingFlags.NonPublic|BindingFlags.Instance)!.GetValue(main)!;
+            TextBox EditorInput(string name)=>Editor().GetVisualDescendants().OfType<TextBox>().Single(t=>t.Name==name);
+            var oldEditor=Editor();EditorInput("QuoteTranslationInput").Text="旧库编辑中";
             var replacementPath=Path.Combine(folder,"quick-replacement.sqlite3");
             using(var replacement=new VocabularyService(replacementPath))
             {
@@ -112,15 +114,19 @@ public static class QuickActionUiTests
                 replacement.SaveSettings(new AppSettings {Provider="custom",AiProtocol="responses",Timeout=120,BaseUrl="https://relay.example.org/agent",Model="test-model"});
             }
             Set("_pendingRestore",replacementPath);await (Task)Call("RestoreChosenBackupAsync")!;
-            Check(!oldEditor.IsVisible && typeof(MainWindow).GetField("_quickCard",BindingFlags.NonPublic|BindingFlags.Instance)!.GetValue(main)==null,"restoring closes the old quote editor and clears card ownership");
+            Check(ReferenceEquals(oldEditor,Editor()) && ((IQuoteArchive)CurrentStore()).GetQuotes().Single(q=>q.Id==oldQuote.Id).Original==oldQuote.Original,"dirty quote editor blocks restore and preserves current archive");
+            Call("CloseQuoteEditor");
+            Set("_pendingRestore",replacementPath);await (Task)Call("RestoreChosenBackupAsync")!;
+            Check(typeof(MainWindow).GetField("_quoteEditorHost",BindingFlags.NonPublic|BindingFlags.Instance)!.GetValue(main)==null,"explicit cancellation releases quote editor before restore");
             var newQuotes=(IQuoteArchive)CurrentStore();
             Check(newQuotes.GetQuotes().Single(q=>q.Id==oldQuote.Id).Original=="Replacement sentence.","same quote ID resolves to restored content");
             var rendered=(StackPanel)typeof(MainWindow).GetField("_quotesList",BindingFlags.NonPublic|BindingFlags.Instance)!.GetValue(main)!;
-            var visibleText=rendered.Children.OfType<Border>().SelectMany(b=>((StackPanel)b.Child!).Children.OfType<TextBlock>()).Select(t=>t.Text).ToList();
+            var visibleText=rendered.GetVisualDescendants().OfType<SelectableTextBlock>().Select(t=>t.Text).ToList();
             Check(visibleText.Contains("Replacement sentence.")&&!visibleText.Contains(oldQuote.Original),"quotes page refreshes to restored records without stale same-ID content");
             main.OpenQuoteEditor(newQuotes.GetQuotes().Single(q=>q.Id==oldQuote.Id));
-            Check(CurrentCard().OriginalInput.Text=="Replacement sentence." && CurrentCard().TranslationInput.Text=="恢复后的不同金句","new quote editor binds to the restored archive");
-            CurrentCard().Close();
+            await Task.Delay(100);main.UpdateLayout();
+            Check(EditorInput("QuoteOriginalInput").Text=="Replacement sentence." && EditorInput("QuoteTranslationInput").Text=="恢复后的不同金句","new quote editor binds to the restored archive");
+            Call("CloseQuoteEditor");
 
             var late=new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
             var changeCallbacks=0;var lateStore=CurrentStore();var lateQuoteArchive=(IQuoteArchive)lateStore;

@@ -36,7 +36,7 @@ public partial class App : Application
         {
             var mainWindow = new MainWindow();
             desktop.MainWindow = mainWindow;
-            if (Environment.GetCommandLineArgs().Any(a => a is "--ui-smoke" or "--visual-test" or "--learning-integration" or "--focus-integration" or "--quick-test" or "--ai-settings-test" or "--language-test" or "--redesign-test" or "--interaction-test" or "--improvement-test"))
+            if (Environment.GetCommandLineArgs().Any(a => a is "--visual123-test" or "--ui-smoke" or "--visual-test" or "--learning-integration" or "--focus-integration" or "--quick-test" or "--ai-settings-test" or "--language-test" or "--redesign-test" or "--interaction-test" or "--improvement-test"))
             {
                 var started = false;
                 mainWindow.Opened += async (_, _) =>
@@ -44,7 +44,8 @@ public partial class App : Application
                     if (started) return;
                     started = true;
                     await System.Threading.Tasks.Task.Delay(300);
-                    if (Environment.GetCommandLineArgs().Contains("--improvement-test")) await Improvement122Tests.RunAsync(mainWindow);
+                    if (Environment.GetCommandLineArgs().Contains("--visual123-test")) await Visual123Tests.RunAsync(mainWindow);
+                    else if (Environment.GetCommandLineArgs().Contains("--improvement-test")) await Improvement122Tests.RunAsync(mainWindow);
                     else if (Environment.GetCommandLineArgs().Contains("--interaction-test")) await InteractionRegressionTests.RunAsync(mainWindow);
                     else if (Environment.GetCommandLineArgs().Contains("--redesign-test")) await WindowsRedesignTests.RunAsync(mainWindow);
                     else if (Environment.GetCommandLineArgs().Contains("--language-test")) await LanguageUiTests.RunAsync(mainWindow);

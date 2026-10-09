@@ -59,7 +59,7 @@ public static class ContentActions122Tests
             Assert(buttons.Count >= 2, "操作栏包含至少两个操作按钮（朗读与收藏）");
 
             var speakBtn = buttons[0];
-            Assert(speakBtn.Content?.ToString() == "♪", "第一个按钮为小朗读按钮 (♪)");
+            Assert(speakBtn is Lexi.Controls.InlineAudioButton, "第一个按钮为共用线条朗读图标");
             Assert(speakBtn.Tag?.ToString() == testSentence, "小朗读按钮 Tag 正确绑定真实英文句子");
 
             var quoteBtn = buttons.Last();
@@ -119,12 +119,12 @@ public static class ContentActions122Tests
             var pronounceBtn = card.GetVisualDescendants().OfType<Button>().FirstOrDefault(b => b.Name == "QuickPronounceBtn");
             Assert(pronounceBtn != null, "QuickCardWindow 包含 QuickPronounceBtn 按钮");
             Assert(pronounceBtn.IsVisible, "查词模式下发音按钮可见");
-            Assert(pronounceBtn.Content?.ToString() is "读音" or "Listen", "查词模式下发音按钮文案为读音");
+            Assert(pronounceBtn is Lexi.Controls.InlineAudioButton && !string.IsNullOrWhiteSpace(Avalonia.Automation.AutomationProperties.GetName(pronounceBtn)), "查词使用带可访问名称的统一朗读图标");
 
             // 3.2 翻译模式：句子朗读按钮保持可见
             card.Prepare(QuickAction.Translate, "Translation sentence audio test.");
             Assert(pronounceBtn.IsVisible, "翻译模式下句子朗读按钮保持可见");
-            Assert(pronounceBtn.Content?.ToString() is "朗读" or "Listen", "翻译模式下发音按钮文案切换为朗读");
+            Assert(pronounceBtn.Content is Avalonia.Controls.Shapes.Path, "翻译模式保留统一矢量朗读图标");
 
             // 3.3 收藏金句模式：句子朗读按钮保持可见
             card.Prepare(QuickAction.SaveQuote, "Quote sentence audio test.");
@@ -158,7 +158,7 @@ public static class ContentActions122Tests
 
                 // 校验包含朗读按钮
                 var actionRow = firstCardStack.Children.OfType<StackPanel>().LastOrDefault();
-                Assert(actionRow != null && actionRow.Children.OfType<Button>().Any(b => b.Content?.ToString() is "朗读" or "Listen"),
+                Assert(actionRow != null && actionRow.Children.OfType<Button>().Any(b => b is Lexi.Controls.InlineAudioButton),
                     "金句卡片操作行中包含独立的朗读按钮");
             }
 
@@ -192,7 +192,7 @@ public static class ContentActions122Tests
             Assert(selectableTexts.Count > 0, "听力资料中包含 SelectableTextBlock 控件，支持鼠标自由选中文本与复制");
 
             var speakButtons = resourceView.GetVisualDescendants().OfType<Button>()
-                .Where(b => b.Content?.ToString() is "♪" || (b.Content?.ToString()?.Contains("朗读") ?? false))
+                .Where(b => b is Lexi.Controls.InlineAudioButton || b.Content?.ToString() is "♪" || (b.Content?.ToString()?.Contains("朗读") ?? false))
                 .ToList();
             Assert(speakButtons.Count > 0, "听力资料中包含实际可点击的英文朗读按钮");
 

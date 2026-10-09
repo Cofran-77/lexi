@@ -67,6 +67,7 @@ public partial class MainWindow : Window
         BindAppearanceEvents();
         ConfigureQuickActions();
         ConfigureInteractionWorkspace();
+        ConfigureVisual123();
         BindLanguageEvents();
         LoadSettingsToUi();
         RefreshWords();
@@ -194,7 +195,7 @@ public partial class MainWindow : Window
     private void OnWindowClosing(object? sender, WindowClosingEventArgs e)
     {
         if (_restoring) { e.Cancel = true; return; }
-        if (!TryFlushWritingDraft()) { e.Cancel = true; return; }
+        if (!TryFlushWritingDraft() || !TryLeaveQuoteEditor()) { e.Cancel = true; return; }
         if (!_isForceClose)
         {
             e.Cancel = true;
@@ -261,6 +262,7 @@ public partial class MainWindow : Window
         if (!_databaseAvailable) return;
         if (!TryFlushWritingDraft()) return;
         if (page == "settings") { OpenSettingsDrawer(); return; }
+        if(!TryLeaveQuoteEditor())return;
         CloseSettingsDrawer();
         if (_globalFocusActive) SetGlobalFocusChrome(false);
         PersistPausedSurfaces();

@@ -1,5 +1,6 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="using:Lexi.Controls"
         x:Class="Lexi.MainWindow"
         Title="lexi"
         Width="1100" Height="760" MinWidth="760" MinHeight="520" CanResize="True"
@@ -148,7 +149,7 @@
                       <WrapPanel Orientation="Horizontal" VerticalAlignment="Bottom">
                         <SelectableTextBlock Name="ResultWordText" FontSize="30" TextWrapping="Wrap" FontWeight="Bold" Foreground="{DynamicResource InkBrush}"/>
                         <SelectableTextBlock Name="ResultPhoneticText" Classes="muted" FontSize="14" VerticalAlignment="Bottom" Margin="12,0,0,5"/>
-                        <Button Name="LookupSpeakButton" Tag="{Binding #ResultWordText.Text}" Click="OnContentSpeakClick" Content="♪" Classes="row-btn" ToolTip.Tip="朗读单词" AutomationProperties.Name="朗读单词" Margin="8,0,0,4"/>
+                        <controls:InlineAudioButton Name="LookupSpeakButton" Tag="{Binding #ResultWordText.Text}" Click="OnContentSpeakClick" ToolTip.Tip="朗读单词" AutomationProperties.Name="朗读单词" Margin="8,0,0,4"/>
                       </WrapPanel>
                     </StackPanel>
                     <Border Grid.Column="1" Background="{DynamicResource TintBrush}" CornerRadius="12" Padding="10,4" VerticalAlignment="Top">
@@ -344,7 +345,7 @@
 
                             <!-- Row Actions -->
                             <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
-                              <Button Tag="{Binding Word}" Click="OnContentSpeakClick" Classes="row-btn" Content="♪" ToolTip.Tip="朗读单词" AutomationProperties.Name="朗读单词"/>
+                              <controls:InlineAudioButton Tag="{Binding Word}" Click="OnContentSpeakClick" ToolTip.Tip="朗读单词" AutomationProperties.Name="朗读单词"/>
                               <Button Tag="{Binding Id}" Click="OnEditWordClick" Classes="row-btn" ToolTip.Tip="编辑词汇档案" AutomationProperties.Name="编辑词汇档案">
                                 <Path Data="M 3,11 L 11,3 L 13,5 L 5,13 L 2,14 Z" Stroke="{DynamicResource MutedBrush}" StrokeThickness="1.2" Width="14" Height="14"/>
                               </Button>
@@ -395,7 +396,7 @@
                                   <Border Classes="example-card" Margin="0,0,0,6"><StackPanel Spacing="4">
                                     <SelectableTextBlock Text="{Binding English}" FontSize="15" LineHeight="24" TextWrapping="Wrap"/>
                                     <SelectableTextBlock Text="{Binding Chinese}" Classes="muted" FontSize="13" LineHeight="21" TextWrapping="Wrap"/>
-                                    <StackPanel Orientation="Horizontal" Spacing="6"><Button Tag="{Binding English}" Click="OnContentSpeakClick" Classes="row-btn" Content="♪" ToolTip.Tip="朗读例句"/><Button Click="OnExampleQuoteClick" Classes="row-btn" Content="＋" ToolTip.Tip="收藏到金句本" AutomationProperties.Name="收藏例句到金句本"/></StackPanel>
+                                    <StackPanel Orientation="Horizontal" Spacing="6"><controls:InlineAudioButton Tag="{Binding English}" Click="OnContentSpeakClick" ToolTip.Tip="朗读例句"/><Button Click="OnExampleQuoteClick" Classes="row-btn" Content="＋" ToolTip.Tip="收藏到金句本" AutomationProperties.Name="收藏例句到金句本"/></StackPanel>
                                   </StackPanel></Border>
                                 </DataTemplate></ItemsControl.ItemTemplate>
                               </ItemsControl>
@@ -663,7 +664,7 @@
       <Border Grid.Row="2" Background="{DynamicResource TintBrush}" Padding="20,0">
         <Grid ColumnDefinitions="*,Auto">
           <TextBlock Name="GlobalStatusText" Text="本地查词不调用 AI。关闭窗口后可通过快捷键或托盘重新打开。" VerticalAlignment="Center" FontSize="11"/>
-          <TextBlock Grid.Column="1" Text="Lexi 1.2.2" Classes="muted" VerticalAlignment="Center" FontSize="11"/>
+          <TextBlock Grid.Column="1" Text="Lexi 1.2.3" Classes="muted" VerticalAlignment="Center" FontSize="11"/>
         </Grid>
       </Border>
     </Grid>

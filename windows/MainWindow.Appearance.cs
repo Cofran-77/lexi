@@ -39,6 +39,7 @@ public partial class MainWindow
 
     private void ApplyAppearance()
     {
+        if(_glassHost!=null){_glassHost.ForceSolid=_settings.OpaqueMaterial||_settings.HighContrast;_glassHost.Refresh();}
         foreach (var key in AppearanceBrushes) Resources.Remove(key);
         var dark = _settings.Theme == "Dark";
         if (_settings.HighContrast)

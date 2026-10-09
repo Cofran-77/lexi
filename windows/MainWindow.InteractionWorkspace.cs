@@ -22,6 +22,7 @@ public partial class MainWindow
     {
         flyout.Opened+=(_,_)=>_openStudyFlyouts.Add(flyout);
         flyout.Closed+=(_,_)=>_openStudyFlyouts.Remove(flyout);
+        flyout.Opened+=(_,_)=>{ if(_glassHost!=null)_glassHost.TrackOnce(flyout); };
     }
 
     private void ConfigureInteractionWorkspace()
@@ -81,6 +82,7 @@ public partial class MainWindow
 
     private void OpenSettingsDrawer()
     {
+        if(!TryLeaveQuoteEditor())return;
         if (_settingsDrawer == null || _settingsDrawerOpen) return;
         if (!TryFlushWritingDraft()) return;
         PersistPausedSurfaces();
@@ -160,7 +162,7 @@ public partial class MainWindow
 
     private void ShowFocusSourceChooser()
     {
-        if (_workspaceChooser != null) ((Grid)RootWindowBorder.Child!).Children.Remove(_workspaceChooser);
+        if (_workspaceChooser != null) { _workspaceChooser.IsVisible=false;_glassHost?.Unregister(_workspaceChooser);((Grid)RootWindowBorder.Child!).Children.Remove(_workspaceChooser); }
         var choices = new StackPanel { Spacing = 14, MaxWidth = 460 };
         choices.Children.Add(LearningText(UiText.Text("选择专注内容"), 24));
         choices.Children.Add(LearningText(UiText.Text("继续已有学习，或选择词汇来源。"), 13));
@@ -171,10 +173,12 @@ public partial class MainWindow
         choices.Children.Add(LearningButton("浏览 IELTS 教材", () => { _workspaceChooser!.IsVisible=false; ShowIeltsCatalog(); }));
         choices.Children.Add(LearningButton("取消", () => _workspaceChooser!.IsVisible=false));
         var card = new Border { Padding=new Thickness(28), CornerRadius=new CornerRadius(16), Child=choices, HorizontalAlignment=HorizontalAlignment.Center, VerticalAlignment=VerticalAlignment.Center, MaxHeight=Math.Max(280,Bounds.Height-90) };
+        Lexi.Shell.GlassOverlayHost.Decorate(card);
         card.Bind(Border.BackgroundProperty,this.GetResourceObservable("CardBrush"));
         _workspaceChooser = new Border { Background=new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#660F172A")), Child=new ScrollViewer { Content=card } };
         _workspaceChooser.SetValue(Panel.ZIndexProperty,220);
         ((Grid)RootWindowBorder.Child!).Children.Add(_workspaceChooser);
+        _glassHost!.Register(_workspaceChooser);_glassHost.Refresh();
     }
 
     private void ExecuteArchiveMenuAction(ArchiveActionKind action)

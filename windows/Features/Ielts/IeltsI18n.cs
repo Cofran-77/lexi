@@ -31,6 +31,7 @@ public static class IeltsI18n
         ["开始练习"] = "Start Practice",
         ["开始学习"] = "Start Learning",
         ["提示拼写"] = "Guided Spelling",
+        ["拼写练习"] = "Spelling practice",
         ["无提示默写"] = "Dictation",
         ["创建每日计划"] = "Create Daily Plan",
         ["同义替换听写"] = "Synonyms Dictation",

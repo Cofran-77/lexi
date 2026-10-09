@@ -1,4 +1,4 @@
-param([string]$Nsis = 'C:\Program Files (x86)\NSIS\makensis.exe', [string]$Version = '1.2.2', [string]$TestDirectory = 'installer-acceptance-verified')
+param([string]$Nsis = 'C:\Program Files (x86)\NSIS\makensis.exe', [string]$Version = '1.2.3', [string]$TestDirectory = 'installer-acceptance-verified')
 $ErrorActionPreference = 'Stop'
 $project = Split-Path $PSScriptRoot -Parent
 $workspace = Split-Path (Split-Path $project -Parent) -Parent
@@ -52,9 +52,16 @@ $interactionReport = Get-Content (Join-Path $env:LEXI_DATA_DIR 'interaction-resu
 Check (($interactionReport | Where-Object {$_ -like 'PASS *'}).Count -ge 70 -and !($interactionReport | Where-Object {$_ -like 'FAIL *'})) 'installed interaction report contains complete successful assertions'
 $env:LEXI_DATA_DIR = Join-Path $testRoot 'runtime-improvement'
 $improvement = Start-Process -FilePath (Join-Path $appDir 'Lexi.exe') -ArgumentList '--improvement-test' -WindowStyle Hidden -Wait -PassThru
-Check ($improvement.ExitCode -eq 0) 'installed app passes 1.2.2 theme, spelling, quotes, copy and writing acceptance'
+Check ($improvement.ExitCode -eq 0) 'installed app passes 1.2.3 theme, spelling, quotes, copy and writing acceptance'
 $improvementReport = Get-Content (Join-Path $env:LEXI_DATA_DIR 'improvement-test-result.txt')
 Check (($improvementReport | Where-Object {$_ -like 'PASS *'}).Count -ge 180 -and !($improvementReport | Where-Object {$_ -like 'FAIL *'})) 'installed improvement report contains complete successful assertions'
+foreach($case in @(@('visual123-test','visual123-result.txt',95),@('quick-test','quick-test-result.txt',40))) {
+  $env:LEXI_DATA_DIR = Join-Path $testRoot ('runtime-'+$case[0])
+  $verified = Start-Process -FilePath (Join-Path $appDir 'Lexi.exe') -ArgumentList ('--'+$case[0]) -WindowStyle Hidden -Wait -PassThru
+  Check ($verified.ExitCode -eq 0) ('installed app passes '+$case[0])
+  $lines=Get-Content (Join-Path $env:LEXI_DATA_DIR $case[1])
+  Check (($lines | Where-Object {$_ -like 'PASS *'}).Count -ge $case[2] -and !($lines | Where-Object {$_ -match '^(FAIL|ERROR)'})) ('installed report verified: '+$case[0])
+}
 $uninstaller = Join-Path $appDir 'Uninstall.exe'
 # NSIS treats all remaining text after _?= as the directory, including spaces.
 # Quoting the entire token bypasses this special parser and spawns a child copy.

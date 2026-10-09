@@ -10,39 +10,36 @@ using Avalonia.Media;
 namespace Lexi.Features.Settings;
 
 /// <summary>
-/// 1.2.2 全页面手风琴设置组件：
-/// - 完整页面呈现，最大宽度 960 DIP，内边距 24 DIP，单 ScrollViewer 滚动
-/// - 手风琴 5 大分类（外观、学习与快捷键、AI 服务、数据与备份、关于），一次仅展开一类
-/// - 标题字号 24，正文默认 14-16，文本自适应换行，窄窗及大字号不裁切
-/// - 兼容原有 SettingsDrawerControl 全部公开 API 与事件，支持现有设置控件迁入
+/// 1.2.3 全页面横向分类设置组件：
+/// - 完整页面呈现，最大宽度 960 DIP，单 ScrollViewer 纵向正文滚动
+/// - 顶部简约 Header：设置标题 (24)、状态提示、关闭/返回按键；移除大宣传卡、离线标语和手风琴说明
+/// - 横向可滚动分类栏：分类文字中性，当前类别底线或轻底指示
+/// - 正文同 PaperBrush 统一底色，消除嵌套白卡
+/// - 注册原控件迁入逻辑继续工作，语言切换不丢失表单输入
+/// - ShowCategories 直接切换至 Appearance 分类
 /// </summary>
 public class SettingsPageControl : UserControl
 {
-    private sealed class SectionCardSlot
+    private sealed class CategoryTabSlot
     {
         public SettingsSection Section { get; init; }
-        public Border Container { get; init; } = null!;
-        public Button HeaderButton { get; init; } = null!;
-        public TextBlock IconBlock { get; init; } = null!;
+        public Border IndicatorBorder { get; init; } = null!;
+        public Button TabButton { get; init; } = null!;
         public TextBlock TitleBlock { get; init; } = null!;
-        public TextBlock SummaryBlock { get; init; } = null!;
-        public TextBlock ArrowBlock { get; init; } = null!;
-        public Border ContentSectionBorder { get; init; } = null!;
-        public ContentControl ContentHost { get; init; } = null!;
-        public Border FooterBar { get; init; } = null!;
-        public ContentControl FooterHost { get; init; } = null!;
     }
 
-    private readonly TextBlock _headerEyebrowBlock;
     private readonly TextBlock _headerTitleBlock;
-    private readonly TextBlock _headerSubtitleBlock;
     private readonly TextBlock _statusMessageBlock;
     private readonly Button _closeButton;
 
-    private readonly StackPanel _accordionStack;
-    private readonly Dictionary<SettingsSection, SectionCardSlot> _slots = new();
+    private readonly StackPanel _categoryTabsStack;
+    private readonly Dictionary<SettingsSection, CategoryTabSlot> _tabs = new();
     private readonly Dictionary<SettingsSection, Control> _sectionContents = new();
     private readonly Dictionary<SettingsSection, Control?> _sectionFooters = new();
+
+    private readonly ContentControl _contentHost;
+    private readonly Border _footerBar;
+    private readonly ContentControl _footerHost;
 
     public ScrollViewer BodyScroller { get; }
 
@@ -57,7 +54,7 @@ public class SettingsPageControl : UserControl
     {
         IsVisible = false;
 
-        // 顶层单滚动容器
+        // 顶层单滚动容器：禁用横向滚动，纵向正文自适应单滚动
         BodyScroller = new ScrollViewer
         {
             HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
@@ -68,62 +65,34 @@ public class SettingsPageControl : UserControl
         var pageContainer = new StackPanel
         {
             MaxWidth = 960,
-            HorizontalAlignment = HorizontalAlignment.Stretch,
+            HorizontalAlignment = HorizontalAlignment.Center,
             Margin = new Thickness(24),
-            Spacing = 20
+            Spacing = 16
         };
 
-        // 1. 顶部 Header 区域（标题 24，状态提示，关闭按键）
-        var headerCard = new Border
-        {
-            Padding = new Thickness(20, 16),
-            CornerRadius = new CornerRadius(12),
-            BorderThickness = new Thickness(1)
-        };
-        headerCard.Bind(Border.BackgroundProperty, this.GetResourceObservable("CardBrush"));
-        headerCard.Bind(Border.BorderBrushProperty, this.GetResourceObservable("LineBrush"));
-
+        // 1. 顶部 Header 区域（仅标题 24、就近状态提示、关闭/返回键，无大宣传卡）
         var headerGrid = new Grid
         {
-            ColumnDefinitions = new ColumnDefinitions("*,Auto,Auto")
+            ColumnDefinitions = new ColumnDefinitions("Auto,*,Auto"),
+            Margin = new Thickness(0, 4, 0, 8)
         };
-
-        var titleStack = new StackPanel { Spacing = 4 };
-
-        _headerEyebrowBlock = new TextBlock
-        {
-            FontSize = 12,
-            FontWeight = FontWeight.Medium,
-            TextWrapping = TextWrapping.Wrap
-        };
-        _headerEyebrowBlock.Bind(TextBlock.ForegroundProperty, this.GetResourceObservable("MutedBrush"));
-        titleStack.Children.Add(_headerEyebrowBlock);
 
         _headerTitleBlock = new TextBlock
         {
             FontSize = 24,
             FontWeight = FontWeight.Bold,
+            VerticalAlignment = VerticalAlignment.Center,
             TextWrapping = TextWrapping.Wrap
         };
         _headerTitleBlock.Bind(TextBlock.ForegroundProperty, this.GetResourceObservable("InkBrush"));
-        titleStack.Children.Add(_headerTitleBlock);
-
-        _headerSubtitleBlock = new TextBlock
-        {
-            FontSize = 14,
-            TextWrapping = TextWrapping.Wrap
-        };
-        _headerSubtitleBlock.Bind(TextBlock.ForegroundProperty, this.GetResourceObservable("MutedBrush"));
-        titleStack.Children.Add(_headerSubtitleBlock);
-
-        Grid.SetColumn(titleStack, 0);
-        headerGrid.Children.Add(titleStack);
+        Grid.SetColumn(_headerTitleBlock, 0);
+        headerGrid.Children.Add(_headerTitleBlock);
 
         _statusMessageBlock = new TextBlock
         {
             FontSize = 14,
             VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Thickness(12, 0, 12, 0),
+            Margin = new Thickness(16, 0, 16, 0),
             TextWrapping = TextWrapping.Wrap,
             IsVisible = false
         };
@@ -135,25 +104,67 @@ public class SettingsPageControl : UserControl
             Content = "✕",
             Classes = { "ghost" },
             Padding = new Thickness(12, 8),
-            VerticalAlignment = VerticalAlignment.Top
+            VerticalAlignment = VerticalAlignment.Center
         };
         _closeButton.Click += (_, _) => Close();
         Grid.SetColumn(_closeButton, 2);
         headerGrid.Children.Add(_closeButton);
 
-        headerCard.Child = headerGrid;
-        pageContainer.Children.Add(headerCard);
+        pageContainer.Children.Add(headerGrid);
 
-        // 2. 手风琴 5 大分类列表（一次展开一类）
-        _accordionStack = new StackPanel { Spacing = 14 };
+        // 2. 横向分类栏（可滚动分类条，中性文字，当前类别底线或轻底指示）
+        var categoryScroller = new ScrollViewer
+        {
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Disabled,
+            HorizontalAlignment = HorizontalAlignment.Stretch
+        };
 
-        CreateAccordionSlot(SettingsSection.Appearance, "🎨");
-        CreateAccordionSlot(SettingsSection.StudyAndShortcuts, "⌨️");
-        CreateAccordionSlot(SettingsSection.AiService, "✨");
-        CreateAccordionSlot(SettingsSection.DataAndBackup, "💾");
-        CreateAccordionSlot(SettingsSection.About, "ℹ️");
+        _categoryTabsStack = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 8
+        };
 
-        pageContainer.Children.Add(_accordionStack);
+        CreateCategoryTab(SettingsSection.Appearance);
+        CreateCategoryTab(SettingsSection.StudyAndShortcuts);
+        CreateCategoryTab(SettingsSection.AiService);
+        CreateCategoryTab(SettingsSection.DataAndBackup);
+        CreateCategoryTab(SettingsSection.About);
+
+        categoryScroller.Content = _categoryTabsStack;
+
+        var categoryBarBorder = new Border
+        {
+            BorderThickness = new Thickness(0, 0, 0, 1),
+            Padding = new Thickness(0, 0, 0, 4)
+        };
+        categoryBarBorder.Bind(Border.BorderBrushProperty, this.GetResourceObservable("LineBrush"));
+        categoryBarBorder.Child = categoryScroller;
+
+        pageContainer.Children.Add(categoryBarBorder);
+
+        // 3. 正文内容承载区（与 PaperBrush 同底色，无嵌套白卡）
+        _contentHost = new ContentControl
+        {
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            HorizontalContentAlignment = HorizontalAlignment.Stretch,
+            Margin = new Thickness(0, 12, 0, 0)
+        };
+        pageContainer.Children.Add(_contentHost);
+
+        // 4. 底部动作区
+        _footerBar = new Border
+        {
+            BorderThickness = new Thickness(0, 1, 0, 0),
+            Padding = new Thickness(0, 16, 0, 0),
+            Margin = new Thickness(0, 16, 0, 0),
+            IsVisible = false
+        };
+        _footerBar.Bind(Border.BorderBrushProperty, this.GetResourceObservable("LineBrush"));
+        _footerHost = new ContentControl();
+        _footerBar.Child = _footerHost;
+        pageContainer.Children.Add(_footerBar);
 
         BodyScroller.Content = pageContainer;
         Content = BodyScroller;
@@ -161,142 +172,47 @@ public class SettingsPageControl : UserControl
         RefreshLanguage();
     }
 
-    private void CreateAccordionSlot(SettingsSection section, string icon)
+    private void CreateCategoryTab(SettingsSection section)
     {
-        var slotBorder = new Border
+        var indicatorBorder = new Border
         {
-            CornerRadius = new CornerRadius(12),
-            BorderThickness = new Thickness(1)
-        };
-        slotBorder.Bind(Border.BackgroundProperty, this.GetResourceObservable("CardBrush"));
-        slotBorder.Bind(Border.BorderBrushProperty, this.GetResourceObservable("LineBrush"));
-
-        var slotLayout = new StackPanel();
-
-        // 卡片 Header 按钮（自适应窄窗与大字号）
-        var headerBtn = new Button
-        {
-            HorizontalAlignment = HorizontalAlignment.Stretch,
-            HorizontalContentAlignment = HorizontalAlignment.Stretch,
-            Padding = new Thickness(20, 16)
-        };
-        headerBtn.Classes.Add("ghost");
-        headerBtn.Classes.Add("settings-section-card");
-
-        var btnGrid = new Grid
-        {
-            ColumnDefinitions = new ColumnDefinitions("Auto,*,Auto")
-        };
-
-        var iconBlock = new TextBlock
-        {
-            Text = icon,
-            FontSize = 24,
-            VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Thickness(0, 0, 16, 0)
-        };
-        btnGrid.Children.Add(iconBlock);
-
-        var textStack = new StackPanel
-        {
-            Spacing = 4,
-            VerticalAlignment = VerticalAlignment.Center
+            BorderThickness = new Thickness(0, 0, 0, 2),
+            BorderBrush = Brushes.Transparent,
+            CornerRadius = new CornerRadius(4, 4, 0, 0),
+            Padding = new Thickness(2, 0, 2, 4)
         };
 
         var titleBlock = new TextBlock
         {
-            FontSize = 16,
-            FontWeight = FontWeight.SemiBold,
-            TextWrapping = TextWrapping.Wrap
-        };
-        titleBlock.Bind(TextBlock.ForegroundProperty, this.GetResourceObservable("InkBrush"));
-        textStack.Children.Add(titleBlock);
-
-        var summaryBlock = new TextBlock
-        {
             FontSize = 14,
-            TextWrapping = TextWrapping.Wrap
+            FontWeight = FontWeight.Medium,
+            VerticalAlignment = VerticalAlignment.Center
         };
-        summaryBlock.Bind(TextBlock.ForegroundProperty, this.GetResourceObservable("MutedBrush"));
-        textStack.Children.Add(summaryBlock);
+        titleBlock.Bind(TextBlock.ForegroundProperty, this.GetResourceObservable("MutedBrush"));
 
-        Grid.SetColumn(textStack, 1);
-        btnGrid.Children.Add(textStack);
-
-        var arrowBlock = new TextBlock
+        var tabBtn = new Button
         {
-            Text = "›",
-            FontSize = 22,
-            VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Thickness(12, 0, 0, 0)
+            Classes = { "ghost" },
+            Padding = new Thickness(14, 8),
+            Content = titleBlock,
+            CornerRadius = new CornerRadius(6)
         };
-        arrowBlock.Bind(TextBlock.ForegroundProperty, this.GetResourceObservable("MutedBrush"));
-        Grid.SetColumn(arrowBlock, 2);
-        btnGrid.Children.Add(arrowBlock);
+        tabBtn.Click += (_, _) => ShowSection(section);
 
-        headerBtn.Content = btnGrid;
-        headerBtn.Click += (_, _) =>
-        {
-            if (CurrentSection == section)
-            {
-                ShowCategories(); // 若已展开则收起
-            }
-            else
-            {
-                ShowSection(section); // 展开目标分类，自动折叠其余类
-            }
-        };
-        slotLayout.Children.Add(headerBtn);
+        indicatorBorder.Child = tabBtn;
+        _categoryTabsStack.Children.Add(indicatorBorder);
 
-        // 展开后的内容区（手风琴展开体）
-        var contentSectionBorder = new Border
-        {
-            BorderThickness = new Thickness(0, 1, 0, 0),
-            Padding = new Thickness(20, 18),
-            IsVisible = false
-        };
-        contentSectionBorder.Bind(Border.BorderBrushProperty, this.GetResourceObservable("LineBrush"));
-
-        var contentLayout = new StackPanel { Spacing = 16 };
-
-        var contentHost = new ContentControl();
-        contentLayout.Children.Add(contentHost);
-
-        var footerBar = new Border
-        {
-            BorderThickness = new Thickness(0, 1, 0, 0),
-            Padding = new Thickness(0, 12, 0, 0),
-            IsVisible = false
-        };
-        footerBar.Bind(Border.BorderBrushProperty, this.GetResourceObservable("LineBrush"));
-        var footerHost = new ContentControl();
-        footerBar.Child = footerHost;
-        contentLayout.Children.Add(footerBar);
-
-        contentSectionBorder.Child = contentLayout;
-        slotLayout.Children.Add(contentSectionBorder);
-
-        slotBorder.Child = slotLayout;
-        _accordionStack.Children.Add(slotBorder);
-
-        _slots[section] = new SectionCardSlot
+        _tabs[section] = new CategoryTabSlot
         {
             Section = section,
-            Container = slotBorder,
-            HeaderButton = headerBtn,
-            IconBlock = iconBlock,
-            TitleBlock = titleBlock,
-            SummaryBlock = summaryBlock,
-            ArrowBlock = arrowBlock,
-            ContentSectionBorder = contentSectionBorder,
-            ContentHost = contentHost,
-            FooterBar = footerBar,
-            FooterHost = footerHost
+            IndicatorBorder = indicatorBorder,
+            TabButton = tabBtn,
+            TitleBlock = titleBlock
         };
     }
 
     /// <summary>
-    /// 打开全页面设置。默认展开外观分类。
+    /// 打开全页面设置。默认切换至外观分类。
     /// </summary>
     public void Open(SettingsSection section = SettingsSection.Appearance)
     {
@@ -331,89 +247,80 @@ public class SettingsPageControl : UserControl
         _sectionContents[section] = content;
         _sectionFooters[section] = footerActions;
 
-        if (_slots.TryGetValue(section, out var slot))
-        {
-            slot.ContentHost.Content = content;
-            if (footerActions != null)
-            {
-                slot.FooterHost.Content = footerActions;
-                slot.FooterBar.IsVisible = true;
-            }
-            else
-            {
-                slot.FooterHost.Content = null;
-                slot.FooterBar.IsVisible = false;
-            }
-        }
-
         if (CurrentSection == section)
         {
-            ShowSection(section);
+            MountActiveContent(section);
         }
     }
 
     /// <summary>
-    /// 展开指定手风琴分类，并自动折叠其余所有分类（五类一次展开一类）。
+    /// 切换横向分类，更新指示样式并挂载正文控件。
     /// </summary>
     public void ShowSection(SettingsSection section)
     {
         CurrentSection = section;
 
-        foreach (var (sec, slot) in _slots)
+        // 更新横向分类选项卡的高亮与底线指示
+        foreach (var (sec, tab) in _tabs)
         {
             if (sec == section && section != SettingsSection.None)
             {
-                // 展开目标分类
-                slot.ContentSectionBorder.IsVisible = true;
-                slot.ArrowBlock.Text = "⌄";
-
-                // 挂载内容
-                if (_sectionContents.TryGetValue(sec, out var content))
-                {
-                    slot.ContentHost.Content = content;
-                }
-                else
-                {
-                    slot.ContentHost.Content = CreateEmptySectionPlaceholder(sec);
-                }
-
-                if (_sectionFooters.TryGetValue(sec, out var footer) && footer != null)
-                {
-                    slot.FooterHost.Content = footer;
-                    slot.FooterBar.IsVisible = true;
-                }
-                else
-                {
-                    slot.FooterHost.Content = null;
-                    slot.FooterBar.IsVisible = false;
-                }
+                tab.IndicatorBorder.Bind(Border.BorderBrushProperty, this.GetResourceObservable("PrimaryGreen"));
+                tab.TabButton.Bind(Button.BackgroundProperty, this.GetResourceObservable("SelectionBrush"));
+                tab.TitleBlock.Bind(TextBlock.ForegroundProperty, this.GetResourceObservable("InkBrush"));
+                tab.TitleBlock.FontWeight = FontWeight.SemiBold;
             }
             else
             {
-                // 折叠其他所有分类
-                slot.ContentSectionBorder.IsVisible = false;
-                slot.ArrowBlock.Text = "›";
+                tab.IndicatorBorder.BorderBrush = Brushes.Transparent;
+                tab.TabButton.Background = Brushes.Transparent;
+                tab.TitleBlock.Bind(TextBlock.ForegroundProperty, this.GetResourceObservable("MutedBrush"));
+                tab.TitleBlock.FontWeight = FontWeight.Normal;
             }
         }
+
+        MountActiveContent(section);
 
         SectionChanged?.Invoke(this, section);
     }
 
     /// <summary>
-    /// 收起所有手风琴分类，回到全类别列表总览状态。
+    /// 1.2.3 替代旧手风琴收起：直接选择默认外观 (Appearance) 分类。
     /// </summary>
     public void ShowCategories()
     {
-        CurrentSection = SettingsSection.None;
+        ShowSection(SettingsSection.Appearance);
+    }
 
-        foreach (var slot in _slots.Values)
+    private void MountActiveContent(SettingsSection section)
+    {
+        if (section == SettingsSection.None)
         {
-            slot.ContentSectionBorder.IsVisible = false;
-            slot.ArrowBlock.Text = "›";
+            _contentHost.Content = null;
+            _footerHost.Content = null;
+            _footerBar.IsVisible = false;
+            return;
         }
 
-        _statusMessageBlock.IsVisible = false;
-        SectionChanged?.Invoke(this, SettingsSection.None);
+        if (_sectionContents.TryGetValue(section, out var content))
+        {
+            _contentHost.Content = content;
+        }
+        else
+        {
+            _contentHost.Content = CreateEmptySectionPlaceholder(section);
+        }
+
+        if (_sectionFooters.TryGetValue(section, out var footer) && footer != null)
+        {
+            _footerHost.Content = footer;
+            _footerBar.IsVisible = true;
+        }
+        else
+        {
+            _footerHost.Content = null;
+            _footerBar.IsVisible = false;
+        }
     }
 
     /// <summary>
@@ -440,7 +347,7 @@ public class SettingsPageControl : UserControl
     }
 
     /// <summary>
-    /// 全局按键处理：Esc 键优先收起当前手风琴或关闭设置。
+    /// 全局按键处理：Esc 键退出设置页面。
     /// </summary>
     public bool HandleKeyDown(KeyEventArgs e)
     {
@@ -448,14 +355,7 @@ public class SettingsPageControl : UserControl
 
         if (e.Key == Key.Escape)
         {
-            if (CurrentSection != SettingsSection.None)
-            {
-                ShowCategories();
-            }
-            else
-            {
-                Close();
-            }
+            Close();
             return true;
         }
 
@@ -463,27 +363,22 @@ public class SettingsPageControl : UserControl
     }
 
     /// <summary>
-    /// 刷新双语界面文本，确保中英切换即时生效。
+    /// 刷新双语界面文本，确保中英切换即时生效且不丢弃已有表单输入。
     /// </summary>
     public void RefreshLanguage()
     {
-        _headerEyebrowBlock.Text = UiText.Bilingual("系统偏好 · 保持离线", "SYSTEM PREFERENCES · OFFLINE FIRST");
         _headerTitleBlock.Text = UiText.Bilingual("设置", "Settings");
-        _headerSubtitleBlock.Text = UiText.Bilingual(
-            "基础释义始终离线。手风琴式分类管理外观、按键、AI与数据偏好。",
-            "Offline dictionary always works. Manage appearance, shortcuts, AI, and data preferences.");
-
         _closeButton.Content = "✕";
 
-        foreach (var (section, slot) in _slots)
+        foreach (var (section, tab) in _tabs)
         {
-            slot.TitleBlock.Text = GetSectionTitle(section);
-            slot.SummaryBlock.Text = GetSectionSummary(section);
+            tab.TitleBlock.Text = GetSectionTitle(section);
+        }
 
-            if (!_sectionContents.ContainsKey(section) && slot.ContentSectionBorder.IsVisible)
-            {
-                slot.ContentHost.Content = CreateEmptySectionPlaceholder(section);
-            }
+        // 若当前展示的是空占位符，刷新占位文本
+        if (CurrentSection != SettingsSection.None && !_sectionContents.ContainsKey(CurrentSection))
+        {
+            _contentHost.Content = CreateEmptySectionPlaceholder(CurrentSection);
         }
     }
 
@@ -492,7 +387,7 @@ public class SettingsPageControl : UserControl
         var panel = new StackPanel
         {
             Spacing = 12,
-            Margin = new Thickness(0, 20, 0, 20),
+            Margin = new Thickness(0, 32, 0, 32),
             HorizontalAlignment = HorizontalAlignment.Center
         };
 

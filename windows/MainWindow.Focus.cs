@@ -153,7 +153,7 @@ public partial class MainWindow
         });
         PersistLearningSurface("focus");
         _focusFeedback!.Text = _focusRound.IsFinished ? "本轮已完成。你可以退出专注。" : _focusRound.CurrentStep == StudyStep.Learn ? "学习卡：看过释义后开始回忆。" : _focusRated ? (_focusLastRating == StudyRating.Known ? "已记为认识。" : "稍后会再次出现。") : "先自己回忆，再揭晓释义。";
-        _focusTopActions.Children.Add(FocusButton("朗读", () => GetLearningAudio().Play(FocusDisplayWord(current),sourceWord==null?null:IeltsCatalog.ResolveAsset(sourceWord.AudioPath))));
+        if(_focusCanvas!=null)_focusCanvas.Speak=()=>GetLearningAudio().Play(FocusDisplayWord(current),sourceWord==null?null:IeltsCatalog.ResolveAsset(sourceWord.AudioPath));
         if (_focusRound.HasCurrent && !_focusRated)
         {
             _focusTopActions.Children.Add(FocusButton("收藏", SaveFocusCurrent));

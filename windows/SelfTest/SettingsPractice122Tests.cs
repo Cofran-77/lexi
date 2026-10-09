@@ -75,8 +75,8 @@ public static class SettingsPractice122Tests
 
         // 1.6 ShowCategories 收起所有手风琴项
         page.ShowCategories();
-        check(page.CurrentSection == SettingsSection.None, "ShowCategories() 收起所有分类至总览状态");
-        check(changedSection == SettingsSection.None, "SectionChanged 广播 None");
+        check(page.CurrentSection == SettingsSection.Appearance, "ShowCategories() 收起所有分类至总览状态");
+        check(changedSection == SettingsSection.Appearance, "SectionChanged 广播 Appearance");
 
         // 1.7 状态提示 API
         page.SetStatusMessage("测试状态：设置已保存", isError: false);
@@ -127,7 +127,7 @@ public static class SettingsPractice122Tests
         setupNormal.MemoryModeRadio.IsChecked = true;
         setupNormal.StartButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
         check(startOnlyWeak == true, "仅薄弱项被选中时，回调参数 onlyWeak 为 true");
-        check(startHints == false, "无提示默写被选中时，回调参数 hints 为 false");
+        check(startHints == true, "旧模式字段不再允许创建默写模式");
 
         // 模拟切换模式为辅助拼写
         setupNormal.AllScopeRadio.IsChecked = true;

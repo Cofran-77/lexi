@@ -72,7 +72,11 @@ public sealed class IeltsWorkspaceControl : Grid, IDisposable
     private readonly CheckBox _practiceAllCheck;
     private readonly CheckBox _practiceRandomCheck;
     private readonly Button _startPracticeBtn;
+    private readonly Button _toggleSettingsBtn;
+    private readonly Button _createPlanBtn;
     private readonly MenuFlyout _practiceMenu;
+    private readonly MenuItem _itemHinted;
+    private readonly MenuItem _itemSynonyms;
 
     // 顶部题型切换标签
     private readonly StackPanel _topNavPanel;
@@ -304,7 +308,7 @@ public sealed class IeltsWorkspaceControl : Grid, IDisposable
         Grid.SetColumn(titlePanel, 0);
         toolbarGrid.Children.Add(titlePanel);
 
-        // 右上角动作区域：开始练习菜单与设置面板开关
+        // 右上角动作区域：计划（低强调独立入口）、练习设置、开始练习菜单
         var actionGroup = new StackPanel
         {
             Orientation = Orientation.Horizontal,
@@ -312,40 +316,42 @@ public sealed class IeltsWorkspaceControl : Grid, IDisposable
             VerticalAlignment = VerticalAlignment.Center
         };
 
-        var toggleSettingsBtn = new Button
+        // 创建每日计划：从练习菜单拆出，作为独立低强调入口
+        _createPlanBtn = new Button
+        {
+            Content = IeltsI18n.T("创建每日计划"),
+            Classes = { "ghost" },
+            Padding = new Thickness(12, 7),
+            FontSize = 12
+        };
+        _createPlanBtn.Click += (_, _) =>
+        {
+            if (_selectedSection != null) _createPlan(_selectedSection);
+        };
+        actionGroup.Children.Add(_createPlanBtn);
+
+        _toggleSettingsBtn = new Button
         {
             Content = "⚙ " + IeltsI18n.T("练习设置"),
             Classes = { "secondary" },
             Padding = new Thickness(12, 7),
             FontSize = 12
         };
-        toggleSettingsBtn.Click += (_, _) =>
+        _toggleSettingsBtn.Click += (_, _) =>
         {
             if (_settingsDrawer != null)
                 _settingsDrawer.IsVisible = !_settingsDrawer.IsVisible;
         };
-        actionGroup.Children.Add(toggleSettingsBtn);
+        actionGroup.Children.Add(_toggleSettingsBtn);
 
-        // 开始练习下拉菜单（主动作）
+        // 开始练习菜单：仅提示拼写（hints=true）；同义替换听写仅在对应专题可用。
+        // 不再提供无提示默写。菜单项前景显式绑定 InkBrush，避免继承 primary 按钮的 OnPrimary 白字。
         _practiceMenu = new MenuFlyout();
 
-        var itemHinted = new MenuItem { Header = IeltsI18n.T("提示拼写") };
-        itemHinted.Click += (_, _) => ExecuteTypingPractice(true);
-        _practiceMenu.Items.Add(itemHinted);
+        _itemHinted = CreatePracticeMenuItem(IeltsI18n.T("拼写练习"), () => ExecuteTypingPractice(true));
+        _practiceMenu.Items.Add(_itemHinted);
 
-        var itemDictation = new MenuItem { Header = IeltsI18n.T("无提示默写") };
-        itemDictation.Click += (_, _) => ExecuteTypingPractice(false);
-        _practiceMenu.Items.Add(itemDictation);
-
-        var itemPlan = new MenuItem { Header = IeltsI18n.T("创建每日计划") };
-        itemPlan.Click += (_, _) =>
-        {
-            if (_selectedSection != null) _createPlan(_selectedSection);
-        };
-        _practiceMenu.Items.Add(itemPlan);
-
-        var itemSynonyms = new MenuItem { Header = IeltsI18n.T("同义替换听写") };
-        itemSynonyms.Click += (_, _) =>
+        _itemSynonyms = CreatePracticeMenuItem(IeltsI18n.T("同义替换听写"), () =>
         {
             var targetWords = GetTargetPracticeWords().Where(w => w.Synonyms.Count > 0).ToList();
             if (targetWords.Count > 0)
@@ -360,8 +366,8 @@ public sealed class IeltsWorkspaceControl : Grid, IDisposable
             {
                 _startSynonyms(GetTargetPracticeWords());
             }
-        };
-        _practiceMenu.Items.Add(itemSynonyms);
+        });
+        _practiceMenu.Items.Add(_itemSynonyms);
 
         _startPracticeBtn = new Button
         {
@@ -934,6 +940,7 @@ public sealed class IeltsWorkspaceControl : Grid, IDisposable
             _batchSelectedCountBlock.Text = IeltsI18n.SelectedCountFormat(count, _selectionStore.DistinctChapterCount);
             _batchViewSelectedBtn.Content = _wordFilterType == IeltsFilterType.SelectedOnly ? IeltsI18n.T("查看全部") : IeltsI18n.T("仅看已选");
         }
+        UpdatePracticeMenuAvailability();
     }
 
     private void SetWordFilter(IeltsFilterType filterType)
@@ -981,6 +988,27 @@ public sealed class IeltsWorkspaceControl : Grid, IDisposable
             Random.Shared.Next());
 
         _startTyping(roundWords, hints);
+    }
+
+    /// <summary>
+    /// 创建练习菜单项：前景显式绑定 InkBrush，不继承 primary 按钮的 OnPrimary 白色，
+    /// 避免浅色主题下菜单白底白字。
+    /// </summary>
+    private MenuItem CreatePracticeMenuItem(string header, Action onClick)
+    {
+        var item = new MenuItem { Header = header };
+        item.Bind(MenuItem.ForegroundProperty, this.GetResourceObservable("InkBrush"));
+        item.Click += (_, _) => onClick();
+        return item;
+    }
+
+    /// <summary>
+    /// 同义替换听写仅在对应专题（当前训练范围存在同义替换考点）可用。
+    /// </summary>
+    private void UpdatePracticeMenuAvailability()
+    {
+        if (_itemSynonyms != null)
+            _itemSynonyms.IsVisible = GetTargetPracticeWords().Any(w => w.Synonyms.Count > 0);
     }
 
     private Button CreateNavTab(string label, bool active, Action onClick)
@@ -1047,6 +1075,10 @@ public sealed class IeltsWorkspaceControl : Grid, IDisposable
         _practiceAllCheck.Content = IeltsI18n.T("全部词");
         _practiceRandomCheck.Content = IeltsI18n.T("随机练习");
         _startPracticeBtn.Content = IeltsI18n.T("开始练习") + " ▾";
+        _toggleSettingsBtn.Content = "⚙ " + IeltsI18n.T("练习设置");
+        _createPlanBtn.Content = IeltsI18n.T("创建每日计划");
+        _itemHinted.Header = IeltsI18n.T("拼写练习");
+        _itemSynonyms.Header = IeltsI18n.T("同义替换听写");
 
         _batchArchiveBtn.Content = IeltsI18n.T("收藏到档案");
         _batchClearBtn.Content = IeltsI18n.T("清空");

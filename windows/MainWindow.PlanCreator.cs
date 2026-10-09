@@ -321,7 +321,7 @@ public partial class MainWindow
             CornerRadius = new CornerRadius(8),
             Background = Brushes.Transparent
         };
-        step2SummaryCard.Bind(Border.BackgroundProperty, this.GetResourceObservable("CardBrush"));
+        step2SummaryCard.Background=Brushes.Transparent;
         var step2SummaryText = new TextBlock
         {
             Text = "",
@@ -342,56 +342,15 @@ public partial class MainWindow
         };
         var step2Form = new StackPanel { Spacing = 14, MaxWidth = 640, HorizontalAlignment = HorizontalAlignment.Stretch };
 
-        var nameLabel = new TextBlock { Text = "计划名称", FontSize = 13, FontWeight = FontWeight.Medium };
-        var defaultPlanName = source == DailyStudyPlanSource.Ielts ? "我的 IELTS 计划" : "我的词汇计划";
-        var planNameInput = new TextBox
-        {
-            Name = "PlanCreatorName",
-            Watermark = "请输入计划名称",
-            Text = defaultPlanName
-        };
-        step2Form.Children.Add(nameLabel);
-        step2Form.Children.Add(planNameInput);
-
-        var quotaLabel = new TextBlock { Text = "每日学习词数", FontSize = 13, FontWeight = FontWeight.Medium };
-        var quotaInput = new NumericUpDown
-        {
-            Name = "PlanCreatorQuota",
-            Minimum = 1,
-            Maximum = 10000,
-            Value = 20,
-            Increment = 1,
-            FormatString = "0",
-            HorizontalAlignment = HorizontalAlignment.Left,
-            Width = 140
-        };
-        step2Form.Children.Add(quotaLabel);
-        step2Form.Children.Add(quotaInput);
-
-        var randomCheckbox = new CheckBox
-        {
-            Name = "PlanCreatorRandom",
-            Content = "随机打乱顺序（在创建时生成固定乱序并持久化）",
-            IsChecked = false
-        };
-        step2Form.Children.Add(randomCheckbox);
-
-        // Estimate Card
-        var estimateCard = new Border
-        {
-            Padding = new Thickness(14),
-            CornerRadius = new CornerRadius(8),
-            Background = Brushes.Transparent
-        };
-        estimateCard.Bind(Border.BackgroundProperty, this.GetResourceObservable("CardBrush"));
-        var estimateLayout = new StackPanel { Spacing = 6 };
-        var estimateHeader = new TextBlock { Text = "学习排期估算", FontSize = 14, FontWeight = FontWeight.SemiBold };
-        var estimateBody = new TextBlock { Text = "", FontSize = 13, Opacity = 0.85, TextWrapping = TextWrapping.Wrap };
-        estimateLayout.Children.Add(estimateHeader);
-        estimateLayout.Children.Add(estimateBody);
-        estimateCard.Child = estimateLayout;
-        step2Form.Children.Add(estimateCard);
-
+        var defaultPlanName=source==DailyStudyPlanSource.Ielts?"我的 IELTS 计划":"我的词汇计划";
+        var planEditor=new PlanEditorControl(new PlanEditorModel(defaultPlanName,20,false,selected.Count),_=>{},()=>{});
+        planEditor.FutureBatchNoticeBlock.IsVisible=false;
+        planEditor.SaveButton.IsVisible=false;planEditor.CancelButton.IsVisible=false;
+        var planNameInput=planEditor.NameInput;planNameInput.Name="PlanCreatorName";
+        var quotaInput=planEditor.DailyQuotaInput;quotaInput.Name="PlanCreatorQuota";
+        var randomCheckbox=planEditor.ShuffleCheckbox;randomCheckbox.Name="PlanCreatorRandom";
+        var estimateBody=planEditor.SummaryBlock;
+        step2Form.Children.Add(planEditor);
         // Conflict Warning Panel (Explicit Confirmation Area)
         var conflictPanel = new Border
         {
@@ -459,6 +418,7 @@ public partial class MainWindow
         };
         var footer2Grid = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto") };
         var btnBackToStep1 = LearningButton("← 上一步：重新选词", () => { });
+        btnBackToStep1.HorizontalAlignment=HorizontalAlignment.Left;
         footer2Grid.Children.Add(btnBackToStep1);
 
         var step2Buttons = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10 };
@@ -548,77 +508,12 @@ public partial class MainWindow
             var pageWords = filtered.Skip(page * pageSize).Take(pageSize).ToList();
             foreach (var word in pageWords)
             {
-                var rowBorder = new Border
+                var row=new PlanWordRowControl(PlanWordItemModel.FromDailyStudyPlanWord(word),selected.Contains(word.Id),isSelected=>
                 {
-                    CornerRadius = new CornerRadius(6),
-                    Padding = new Thickness(8, 6),
-                    Background = Brushes.Transparent
-                };
-                void UpdateSelectionPaint()
-                {
-                    if (selected.Contains(word.Id)) rowBorder.Bind(Border.BackgroundProperty, dialog.GetResourceObservable("SelectionBrush"));
-                    else rowBorder.Background = Brushes.Transparent;
-                }
-                UpdateSelectionPaint();
-
-                var rowGrid = new Grid { ColumnDefinitions = new ColumnDefinitions("44,180,*") };
-                var check = new CheckBox
-                {
-                    IsChecked = selected.Contains(word.Id),
-                    VerticalAlignment = VerticalAlignment.Center
-                };
-
-                check.IsCheckedChanged += (_, _) =>
-                {
-                    if (check.IsChecked == true) selected.Add(word.Id);
-                    else selected.Remove(word.Id);
-
-                    UpdateSelectionPaint();
-
-                    conflictPanel.IsVisible = false;
-                    formErrorText.Text = "";
-                    RefreshStep1Summary();
-                };
-
-                rowGrid.Children.Add(check);
-
-                var wordStack = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
-                wordStack.Children.Add(new SelectableTextBlock
-                {
-                    Text = word.Word,
-                    FontWeight = FontWeight.SemiBold,
-                    FontSize = 16,
-                    TextWrapping = TextWrapping.Wrap
+                    if(isSelected)selected.Add(word.Id);else selected.Remove(word.Id);
+                    conflictPanel.IsVisible=false;formErrorText.Text="";RefreshStep1Summary();
                 });
-                if (!string.IsNullOrWhiteSpace(word.Phonetic))
-                {
-                    wordStack.Children.Add(new TextBlock
-                    {
-                        Text = $"/{word.Phonetic}/",
-                        FontSize = 11,
-                        Opacity = 0.65
-                    });
-                }
-                Grid.SetColumn(wordStack, 1);
-                rowGrid.Children.Add(wordStack);
-
-                var meaningBlock = new SelectableTextBlock
-                {
-                    Text = word.Meaning + (string.IsNullOrWhiteSpace(word.Definition) ? "" : $" · {word.Definition}"),
-                    FontSize = 13,
-                    VerticalAlignment = VerticalAlignment.Center,
-                    TextWrapping = TextWrapping.Wrap,
-                    MaxLines = 2,
-                    TextTrimming = TextTrimming.CharacterEllipsis,
-                    Opacity = 0.9
-                };
-                var fullMeaning = new Expander { Header = meaningBlock,
-                    Content = new SelectableTextBlock { Text = meaningBlock.Text, TextWrapping = TextWrapping.Wrap, FontSize = 14, Margin = new Thickness(0,8) } };
-                Grid.SetColumn(fullMeaning, 2);
-                rowGrid.Children.Add(fullMeaning);
-
-                rowBorder.Child = rowGrid;
-                rowsPanel.Children.Add(rowBorder);
+                rowsPanel.Children.Add(row);
             }
 
             if (filtered.Count == 0)

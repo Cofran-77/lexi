@@ -34,7 +34,7 @@ internal sealed class QuickCardWindow : Window
     private readonly Button _cancel = new() { Name = "QuickCancelBtn" };
     private readonly Button _copy = new() { Name = "QuickCopyBtn" };
     private readonly Button _detail = new() { Name = "QuickDetailsBtn" };
-    private readonly Button _pronounce = new() { Name = "QuickPronounceBtn" };
+    private readonly Button _pronounce = new Lexi.Controls.InlineAudioButton() { Name = "QuickPronounceBtn" };
     private readonly Button _allow = new() { Name = "QuickAllowBtn" };
     private QuickAction _mode;
     private LookupResult? _lookup;
@@ -63,7 +63,7 @@ internal sealed class QuickCardWindow : Window
         ExtendClientAreaChromeHints = Avalonia.Platform.ExtendClientAreaChromeHints.NoChrome;
         ExtendClientAreaTitleBarHeightHint = 32; Background = Brushes.Transparent;
         RequestedThemeVariant = settings.Theme == "Dark" ? ThemeVariant.Dark : ThemeVariant.Light;
-        Foreground = new SolidColorBrush(Color.Parse(settings.Theme == "Dark" ? "#ECF5FD" : "#172E43"));
+        this.Bind(ForegroundProperty,this.GetResourceObservable("InkBrush"));
 
         // Single window close control on top-right: compact Windows caption style, neutral default, hover red
         var close = new Button
@@ -154,13 +154,11 @@ internal sealed class QuickCardWindow : Window
                 Content = body,
                 HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled,
                 VerticalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Hidden
-            },
-            Background = new SolidColorBrush(Color.Parse(settings.Theme == "Dark" ? "#CC152332" : "#DDF1F7FC"))
+            }
         };
-        if (settings.OpaqueMaterial || settings.HighContrast) surface.Background = new SolidColorBrush(Color.Parse(settings.Theme == "Dark" ? "#152332" : "#F7FAFD"));
-        if (settings.HighContrast) { surface.Background = settings.Theme == "Dark" ? Brushes.Black : Brushes.White; Foreground = settings.Theme == "Dark" ? Brushes.White : Brushes.Black; }
         _surface = surface;
         Content = surface;
+        ApplySettings(settings);
 
         _run.Click += async (_, _) => await RunAsync();
         _save.Click += (_, _) => Save();
@@ -194,8 +192,13 @@ internal sealed class QuickCardWindow : Window
         _appearance = settings; RequestedThemeVariant = settings.Theme == "Dark" ? ThemeVariant.Dark : ThemeVariant.Light;
         if (_surface != null)
         {
-            _surface.Background = settings.Theme == "Dark" ? new SolidColorBrush(Color.Parse("#152332")) : new SolidColorBrush(Color.Parse("#F7FAFD"));
-            Foreground = settings.HighContrast ? (settings.Theme == "Dark" ? Brushes.White : Brushes.Black) : new SolidColorBrush(Color.Parse(settings.Theme == "Dark" ? "#ECF5FD" : "#172E43"));
+            var transparent=Lexi.Services.OverlayMaterialPolicy.TransparencyEnabled && !settings.OpaqueMaterial && !settings.HighContrast;
+            TransparencyLevelHint=transparent ? [WindowTransparencyLevel.AcrylicBlur,WindowTransparencyLevel.Blur,WindowTransparencyLevel.None] : [WindowTransparencyLevel.None];
+            _surface.Bind(Border.BackgroundProperty,this.GetResourceObservable(transparent?"GlassSurfaceBrush":"DialogSurfaceBrush"));
+            _surface.Bind(Border.BorderBrushProperty,this.GetResourceObservable("GlassEdgeBrush"));
+            _surface.BorderThickness=new Thickness(1);
+            this.Bind(ForegroundProperty,this.GetResourceObservable("InkBrush"));
+            if(settings.HighContrast){_surface.Background=settings.Theme=="Dark"?Brushes.Black:Brushes.White;Foreground=settings.Theme=="Dark"?Brushes.White:Brushes.Black;}
         }
     }
 
@@ -223,7 +226,8 @@ internal sealed class QuickCardWindow : Window
         _save.Content = mode == QuickAction.Lookup ? L("加入生词本", "Save word") : L("保存金句", "Save quote");
         _copy.Content = L("复制译文", "Copy"); _cancel.Content = L("取消生成", "Cancel");
         _detail.Content = mode == QuickAction.Lookup ? L("完整档案", "Open word") : L("金句本", "Quotes");
-        _pronounce.Content = mode == QuickAction.Lookup ? L("读音", "Listen") : L("朗读", "Listen");
+        ToolTip.SetTip(_pronounce,L("朗读原文","Listen to original"));
+        Avalonia.Automation.AutomationProperties.SetName(_pronounce,L("朗读原文","Listen to original"));
 
         // Exactly one primary solid blue action per task; neutral secondary for other actions
         if (mode == QuickAction.Lookup)

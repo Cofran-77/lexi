@@ -1,3 +1,4 @@
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Layout;
 using Lexi.Controls;
@@ -53,7 +54,9 @@ public partial class MainWindow
         ReviewCard.Bind(Border.BorderBrushProperty, this.GetResourceObservable("LineBrush"));
         ReviewCard.BoxShadow = default;
         ReviewBackOne.Bind(Border.BackgroundProperty, this.GetResourceObservable("LineBrush"));
-        ReviewBackTwo.Bind(Border.BackgroundProperty, this.GetResourceObservable("MutedBrush"));
+        ReviewBackTwo.Bind(Border.BackgroundProperty, this.GetResourceObservable("TintBrush"));
+        ReviewBackOne.Opacity=0.65; ReviewBackTwo.Opacity=0.6;
+        ReviewBackOne.Margin=new Thickness(4,4,-4,-4);ReviewBackTwo.Margin=new Thickness(8,8,-8,-8);
         ReviewWordText.Bind(TextBlock.ForegroundProperty, this.GetResourceObservable("InkBrush"));
         ReviewPhoneticText.Bind(TextBlock.ForegroundProperty, this.GetResourceObservable("MutedBrush"));
         ReviewMeaningText.Bind(TextBlock.ForegroundProperty, this.GetResourceObservable("InkBrush"));

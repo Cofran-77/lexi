@@ -6,6 +6,7 @@
     <FluentTheme />
     <StyleInclude Source="avares://Lexi/Styles/VisualTheme.axaml" />
     <StyleInclude Source="avares://Lexi/Styles/InteractionControls.axaml" />
+    <StyleInclude Source="avares://Lexi/Styles/OverlaySurfaces.axaml" />
   </Application.Styles>
 
 

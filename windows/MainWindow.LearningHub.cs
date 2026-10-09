@@ -510,7 +510,7 @@ public partial class MainWindow
 
         if (plan.CurrentBatchWordIds.Count > 0)
         {
-            actions.Children.Add(LearningButton("最近批次拼写 / 默写", () => ShowLastPlanBatch(plan)));
+            actions.Children.Add(LearningButton("最近批次拼写练习", () => ShowLastPlanBatch(plan)));
         }
 
         panel.Children.Add(actions);
@@ -540,28 +540,16 @@ public partial class MainWindow
         var words = plan.CurrentBatchWordIds.Select(id => plan.Words.Single(w => w.Id == id)).ToList();
         var forgotWords = words.Where(w => plan.ForgotWordIds.Contains(w.Id)).ToList();
 
-        var dialog = new Window
-        {
-            Title = plan.Name + " · 最近批次拼写训练",
-            Width = 620,
-            Height = 540,
-            WindowStartupLocation = WindowStartupLocation.CenterOwner,
-            Background = RootWindowBorder.Background,
-            RequestedThemeVariant = RequestedThemeVariant
-        };
-
-        var content = new StackPanel { Spacing = 16, Margin = new Thickness(24) };
-        content.Children.Add(new TextBlock { Text = plan.Name + " · 批次拼写强化", FontSize = 18, FontWeight = FontWeight.SemiBold });
-        content.Children.Add(new TextBlock { Text = $"本批全部词汇共 {words.Count} 词，曾忘记词共 {forgotWords.Count} 词。", Opacity = 0.8, TextWrapping = TextWrapping.Wrap });
-
-        // 复用既有 PracticeSetupControl：范围/模式单选 + 唯一开始键，替代四个大按钮。
-        var setup = new PracticeSetupControl(words.Count, forgotWords.Count,
-            (onlyWeak, hints) => { dialog.Close(); StartLearningTyping((onlyWeak ? forgotWords : words).Select(ToTypingWord).ToList(), hints); },
-            dialog.Close);
-        content.Children.Add(setup);
-
-        dialog.Content = content;
-        _ = dialog.ShowDialog(this);
+        ShowPage("learning");
+        _managementHost.IsVisible=false;
+        _studyWorkspaceHost.IsVisible=true;
+        _studyWorkspaceHost.Children.Clear();
+        var content=new StackPanel {Spacing=20,Margin=new Thickness(24),MaxWidth=680,HorizontalAlignment=HorizontalAlignment.Center};
+        content.Children.Add(LearningText(plan.Name,24));
+        content.Children.Add(new PracticeSetupControl(words.Count,forgotWords.Count,
+            (onlyWeak,_)=>StartLearningTyping((onlyWeak?forgotWords:words).Select(ToTypingWord).ToList(),true),
+            ()=>{_studyWorkspaceHost.IsVisible=false;_managementHost.IsVisible=true;RenderLearningPlans();}));
+        _studyWorkspaceHost.Children.Add(new ScrollViewer {Content=content,HorizontalScrollBarVisibility=Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled});
     }
 
     private void StartDailyLearning(DailyStudyPlan plan)
@@ -842,11 +830,11 @@ public partial class MainWindow
                 Spacing = 10,
                 HorizontalAlignment = HorizontalAlignment.Center
             };
-            pronounceRow.Children.Add(LearningButton("朗读 🔊", () => GetLearningAudio().Play(word.Word, IeltsCatalog.ResolveAsset(word.AudioPath))));
-            cardCenterContainer.Children.Add(pronounceRow);
+            
 
             // 统一内容组件：纯色背景上的单词 / 音标 / 释义 / 定义 / 例句，全部 SelectableTextBlock。
             var planCanvas = CreateStudyCanvas();
+            planCanvas.Speak=()=>GetLearningAudio().Play(word.Word,IeltsCatalog.ResolveAsset(word.AudioPath));
             planCanvas.Render(new StudyCanvasModel
             {
                 Word = word.Word,
@@ -1041,9 +1029,9 @@ public partial class MainWindow
     {
         var row = new WrapPanel { Orientation = Orientation.Horizontal };
         row.Children.Add(LearningText($"{label} · {words.Count} 词"));
-        foreach (var hints in new[] { true, false })
+        foreach (var hints in new[] { true })
         {
-            var button = LearningButton(hints ? "有提示拼写" : "无提示默写", () => StartLearningTyping(words.Select(ToTypingWord).ToList(), hints));
+            var button = LearningButton("拼写练习", () => StartLearningTyping(words.Select(ToTypingWord).ToList(), hints));
             button.IsEnabled = words.Count > 0;
             row.Children.Add(button);
         }
@@ -1066,7 +1054,7 @@ public partial class MainWindow
 
         _lastTypingWords = words;
         _learningTypingSession = new TypingSession();
-        _learningTypingSession.Reset(words, hints);
+        _learningTypingSession.Reset(words, true);
         RenderLearningTyping();
         _typingHost!.IsVisible = true;
     }
@@ -1087,158 +1075,53 @@ public partial class MainWindow
         if (_typingPreviousPage != "learning") ShowPage(_typingPreviousPage);
     }
 
+    private Lexi.Features.Learning.SpellingPracticeControl? _spellingPractice;
     private void RenderLearningTyping()
     {
-        var session = _learningTypingSession;
-        if (session == null) return;
-
-        var surface = new Border
+        var session=_learningTypingSession;
+        if(session==null)return;
+        if(session.Current==null)
         {
-            CornerRadius = new CornerRadius(8),
-            Padding = new Thickness(28),
-            MinHeight = Math.Max(450, Bounds.Height - 185)
-        };
-        surface.Bind(Border.BackgroundProperty, this.GetResourceObservable("PaperBrush"));
-
-        var layout = new Grid { RowDefinitions = new RowDefinitions("Auto,*,Auto"), RowSpacing = 20 };
-        var top = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*,Auto") };
-        top.Children.Add(LearningText($"{session.Cursor}/{session.Count}", 15));
-
-        var mode = LearningText(session.Hints ? "淡写" : "默写", 14);
-        Grid.SetColumn(mode, 2);
-        top.Children.Add(mode);
-
-        _learningTypingStats = LearningText("");
-        _learningTypingStats.FontSize = 12;
-        _learningTypingStats.HorizontalAlignment = HorizontalAlignment.Center;
-        Grid.SetColumn(_learningTypingStats, 1);
-        top.Children.Add(_learningTypingStats);
-
-        Grid.SetRow(top, 0);
-        layout.Children.Add(top);
-
-        var center = new StackPanel
-        {
-            Spacing = 20,
-            HorizontalAlignment = HorizontalAlignment.Center,
-            VerticalAlignment = VerticalAlignment.Center,
-            MaxWidth = 670
-        };
-
-        if (session.Current == null)
-        {
-            center.Children.Add(LearningText("本轮完成", 30));
-            center.Children.Add(LearningText($"练习 {session.Count} 词 · 错误词 {session.ErrorIds.Count} · 重试 {session.Retries} 次", 17));
-            var errors = _lastTypingWords.Where(w => session.ErrorIds.Contains(w.Id)).ToList();
-            if (errors.Count > 0)
-            {
-                center.Children.Add(LearningText("本次错误词：" + string.Join("、", errors.Select(w => w.Word))));
-                center.Children.Add(LearningButton("再练错误词", () => StartLearningTyping(errors, session.Hints), primary: true));
-            }
+            var completed=new StackPanel {Spacing=16,MaxWidth=680,Margin=new Thickness(24),HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center};
+            completed.Children.Add(LearningText("本轮完成",26));
+            completed.Children.Add(LearningText($"练习 {session.Count} 词 · 重试 {session.Retries} 次 · 提示辅助 {session.AssistedCount}"));
+            var errors=_lastTypingWords.Where(w=>session.ErrorIds.Contains(w.Id)).ToList();
+            if(errors.Count>0)completed.Children.Add(LearningButton("再练错误词",()=>StartLearningTyping(errors,true),true));
+            completed.Children.Add(LearningButton("返回",ExitLearningTyping));
+            _typingHost!.Child=completed;_typingHost.IsVisible=true;return;
         }
-        else
-        {
-            var word = session.Current;
-            if (session.Hints)
-            {
-                // 辅助拼写：仅显示已揭示字母（下划线占位），绝不直接显示答案；逐字提示由 RevealHint 推进。
-                var hintText = session.Outcome == TypingOutcome.Correct ? TypingSession.Normalize(word.Word) : session.HintText;
-                _learningTypingHint = new SelectableTextBlock
-                {
-                    Text = hintText,
-                    FontSize = Math.Max(27, 54 - Math.Max(0, word.Word.Length - 14) * 1.5),
-                    FontFamily = new FontFamily("Consolas, Menlo, monospace"),
-                    HorizontalAlignment = HorizontalAlignment.Center,
-                    TextWrapping = TextWrapping.Wrap
-                };
-                _learningTypingHint.Bind(TextBlock.ForegroundProperty, this.GetResourceObservable("MutedBrush"));
-                center.Children.Add(_learningTypingHint);
-
-                // 渐进提示（逐字）与查看答案（查看答案会加入重练）。
-                var hintActions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10, HorizontalAlignment = HorizontalAlignment.Center };
-                hintActions.Children.Add(LearningButton("提示下一字母", () =>
-                {
-                    if (session.RevealHint() && _learningTypingHint != null)
-                    {
-                        _learningTypingHint.Text = session.HintText;
-                        _learningTypingInput?.Focus();
-                    }
-                }));
-                hintActions.Children.Add(LearningButton("查看答案", () =>
-                {
-                    session.RevealAnswer();
-                    if (_learningTypingHint != null) _learningTypingHint.Text = session.HintText;
-                    UpdateTypingStats();
-                    _learningTypingInput?.Focus();
-                }));
-                center.Children.Add(hintActions);
-            }
-            else
-            {
-                center.Children.Add(LearningText($"{TypingSession.Normalize(word.Word).Length} 个字母", 14));
-            }
-
-            var meaning = LearningText(string.IsNullOrWhiteSpace(word.Meaning) ? "该词暂无释义" : word.Meaning, 22);
-            meaning.HorizontalAlignment = HorizontalAlignment.Center;
-            center.Children.Add(meaning);
-
-            _learningTypingLetters = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 3, HorizontalAlignment = HorizontalAlignment.Center };
-            center.Children.Add(_learningTypingLetters);
-
-            _learningTypingInput = new TextBox
-            {
-                Name = "LearningTypingInput",
-                Watermark = "输入英文",
-                FontSize = 30,
-                FontFamily = new FontFamily("Consolas, Menlo, monospace"),
-                MaxWidth = 620,
-                HorizontalAlignment = HorizontalAlignment.Stretch,
-                HorizontalContentAlignment = HorizontalAlignment.Center
-            };
-            _learningTypingInput.KeyDown += (_, e) => { if (e.Key == Key.Enter) { e.Handled = true; SubmitLearningTyping(); } };
-            _learningTypingInput.TextChanged += (_, _) => RenderTypingLetters(false);
-            center.Children.Add(_learningTypingInput);
-
-            _learningTypingResult = LearningText("");
-            _learningTypingResult.HorizontalAlignment = HorizontalAlignment.Center;
-            center.Children.Add(_learningTypingResult);
-        }
-
-        Grid.SetRow(center, 1);
-        layout.Children.Add(center);
-
-        var bottom = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*,Auto") };
-        bottom.Children.Add(LearningButton("退出练习", ExitLearningTyping));
-
-        var centerActions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10, HorizontalAlignment = HorizontalAlignment.Center };
-        if (session.Current is { } current)
-        {
-            centerActions.Children.Add(LearningButton("朗读", () => GetLearningAudio().Play(current.Word, IeltsCatalog.ResolveAsset(current.AudioPath))));
-            if (!string.IsNullOrWhiteSpace(current.Example))
-            {
-                centerActions.Children.Add(LearningButton("例句", () => GetLearningAudio().Play(current.Example)));
-            }
-        }
-        Grid.SetColumn(centerActions, 1);
-        bottom.Children.Add(centerActions);
-
-        if (session.Current != null)
-        {
-            var submit = LearningButton("确认 ↵", SubmitLearningTyping, primary: true);
-            Grid.SetColumn(submit, 2);
-            bottom.Children.Add(submit);
-        }
-
-        Grid.SetRow(bottom, 2);
-        layout.Children.Add(bottom);
-
-        surface.Child = layout;
-        _typingHost!.Child = surface;
-        _typingHost.IsVisible = true;
-        UpdateTypingStats();
-        Avalonia.Threading.Dispatcher.UIThread.Post(() => { if (_learningTypingSession == session) _learningTypingInput?.Focus(); });
+        var word=session.Current;
+        _spellingPractice=new Lexi.Features.Learning.SpellingPracticeControl {Name="SpellingPractice"};
+        _learningTypingInput=_spellingPractice.InputBox;_learningTypingInput.Name="LearningTypingInput";
+        _learningTypingHint=_spellingPractice.HintBlock;
+        _learningTypingResult=_spellingPractice.FeedbackBlock;
+        _learningTypingLetters=new StackPanel {IsVisible=false};
+        _learningTypingStats=new TextBlock();
+        _spellingPractice.OnSubmit=_=>SubmitLearningTyping();
+        _spellingPractice.OnNext=SubmitLearningTyping;
+        _spellingPractice.OnHint=()=>{session.RevealHint();UpdateSpellingSurface();};
+        _spellingPractice.OnRevealAnswer=()=>{session.RevealAnswer();UpdateSpellingSurface();};
+        _spellingPractice.OnCancel=ExitLearningTyping;
+        _spellingPractice.OnSpeak=()=>GetLearningAudio().Play(word.Word,IeltsCatalog.ResolveAsset(word.AudioPath));
+        _typingHost!.Child=_spellingPractice;_typingHost.IsVisible=true;
+        UpdateTypingStats();UpdateSpellingSurface();
+        Avalonia.Threading.Dispatcher.UIThread.Post(()=>{if(ReferenceEquals(session,_learningTypingSession))_spellingPractice?.FocusInput();});
     }
 
+    private void UpdateSpellingSurface()
+    {
+        var s=_learningTypingSession;if(s?.Current==null || _spellingPractice==null)return;
+        _spellingPractice.Update(new Lexi.Features.Learning.SpellingPracticeModel
+        {
+            Meaning=string.IsNullOrWhiteSpace(s.Current.Meaning)?UiText.Bilingual("暂无释义","No meaning available"):s.Current.Meaning,
+            Phonetic=s.Current.Phonetic,
+            Hint=s.Hints && !string.IsNullOrWhiteSpace(s.HintText.Replace("_","").Trim())?s.HintText:UiText.Bilingual($"{s.Current.Word.Length} 个字母",$"{s.Current.Word.Length} letters"),
+            Feedback=_learningTypingResult?.Text??"",
+            IsCorrect=s.Outcome==TypingOutcome.Correct?true:s.Outcome==TypingOutcome.Retry?false:null,
+            AnswerRevealed=s.Outcome==TypingOutcome.Correct,
+            ProgressText=$"{s.Cursor}/{s.Count} · {UiText.Bilingual("重试","Retries")} {s.Retries} · {UiText.Bilingual("提示辅助","Assisted")} {s.AssistedCount}"
+        });
+    }
     private void SubmitLearningTyping()
     {
         if (_restoring || !_databaseAvailable) { SetStatus("词库正在恢复或不可用。"); return; }
@@ -1269,7 +1152,7 @@ public partial class MainWindow
 
         if (outcome == TypingOutcome.Retry)
         {
-            _learningTypingResult!.Text = "有错字，请重新输入。红色为错字，绿色为正确字母。";
+            _learningTypingResult!.Text = "有错字，请修改后重试。";
             _learningTypingInput.SelectAll();
             SystemFeedbackSound(false);
         }
@@ -1283,6 +1166,7 @@ public partial class MainWindow
         {
             _learningTypingResult!.Text = "输入尚不完整，请继续输入。";
         }
+        UpdateSpellingSurface();
     }
 
     private void UpdateTypingStats()
@@ -1290,6 +1174,7 @@ public partial class MainWindow
         var s = _learningTypingSession;
         if (s != null && _learningTypingStats != null)
         {
+            UpdateSpellingSurface();
             _learningTypingStats.Text = $"完成 {s.Cursor}/{s.Count} · 字符准确率 {s.Accuracy:F1}% · 重试 {s.Retries} 次 · 提示辅助 {s.AssistedCount} · {s.Wpm} WPM";
         }
     }

@@ -20,18 +20,19 @@ public partial class MainWindow
 
     private void ConfigureGlobalStudySurface()
     {
-        var layout = new Grid { RowDefinitions = new RowDefinitions("Auto,*,Auto"), Margin = new Thickness(24,16,24,20), RowSpacing = 16 };
+        var layout = new Grid { RowDefinitions = new RowDefinitions("Auto,*"), Margin = new Thickness(24,16,24,20), RowSpacing = 16 };
         _globalStudyToolbar = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
         _globalStudyProgress = new TextBlock { FontSize = 14, TextWrapping = TextWrapping.Wrap, VerticalAlignment = VerticalAlignment.Center, TextAlignment = TextAlignment.Right };
         _globalStudyProgress.Bind(TextBlock.ForegroundProperty, this.GetResourceObservable("MutedBrush"));
         var header = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*"), ColumnSpacing = 20 };
         header.Children.Add(_globalStudyToolbar); Grid.SetColumn(_globalStudyProgress,1); header.Children.Add(_globalStudyProgress); layout.Children.Add(header);
         _globalStudyCanvas = new StudyCanvasControl();
-        _globalStudyContent = new Border { Child = _globalStudyCanvas, HorizontalAlignment = HorizontalAlignment.Stretch, VerticalAlignment = VerticalAlignment.Center };
-        var scroll = new ScrollViewer { Content = _globalStudyContent, HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled, VerticalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Auto };
-        Grid.SetRow(scroll,1);layout.Children.Add(scroll);
-        _globalStudyActions = new WrapPanel { HorizontalAlignment = HorizontalAlignment.Center };
-        Grid.SetRow(_globalStudyActions,2);layout.Children.Add(_globalStudyActions);
+        _globalStudyActions = new WrapPanel { HorizontalAlignment = HorizontalAlignment.Center, Margin=new Thickness(0,24,0,0) };
+        var reading=new Grid {RowDefinitions=new RowDefinitions("*,Auto"),VerticalAlignment=VerticalAlignment.Center};
+        var textScroll=new ScrollViewer {Content=_globalStudyCanvas,HorizontalScrollBarVisibility=Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled,VerticalScrollBarVisibility=Avalonia.Controls.Primitives.ScrollBarVisibility.Auto};
+        reading.Children.Add(textScroll);Grid.SetRow(_globalStudyActions,1);reading.Children.Add(_globalStudyActions);
+        _globalStudyContent = new Border { Child = reading, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+        Grid.SetRow(_globalStudyContent,1);layout.Children.Add(_globalStudyContent);
         _globalStudySurface = new Border { Name = "UnifiedFocusSurface", Child = layout, IsVisible = false };
         _globalStudySurface.Bind(Border.BackgroundProperty, this.GetResourceObservable("PaperBrush"));
         Grid.SetRow(_globalStudySurface,1); _globalStudySurface.SetValue(Panel.ZIndexProperty,150);
@@ -54,9 +55,10 @@ public partial class MainWindow
     private void ResizeGlobalStudyContent()
     {
         if(_globalStudySurface==null || _globalStudyContent==null || _globalStudyCanvas==null)return;
-        _globalStudyContent.MaxWidth=Math.Min(1000,Math.Max(260,_globalStudySurface.Bounds.Width*.78));
+        _globalStudyContent.Width=_globalStudyContent.MaxWidth=Math.Min(680,Math.Max(260,_globalStudySurface.Bounds.Width-64));
+        _globalStudyContent.MaxHeight=Math.Max(180,_globalStudySurface.Bounds.Height-100);
         var word=_globalStudyCanvas.GetVisualDescendants().OfType<SelectableTextBlock>().FirstOrDefault();
-        if(word!=null)word.FontSize=Math.Clamp(_globalStudySurface.Bounds.Width*.049,36,56);
+        if(word!=null)word.FontSize=Math.Clamp(48-word.Text?.Length*.4??40,36,44);
     }
 
     private void RefreshGlobalStudySurface()
@@ -107,10 +109,10 @@ public partial class MainWindow
         }
         if(!hasWord){model.Word=UiText.Bilingual("本轮完成","Session complete");model.MeaningVisible=false;}
         model.Placeholder=hasWord&&!model.MeaningVisible?UiText.Bilingual("先回忆，再揭晓释义。","Recall first, then reveal the meaning."):"";
-        _globalStudyCanvas!.Render(model);ResizeGlobalStudyContent();
+        _globalStudyCanvas!.Speak=ExecuteSpeakCurrent;_globalStudyCanvas.Render(model);ResizeGlobalStudyContent();
         if(hasWord)
         {
-            _globalStudyActions.Children.Add(Button(UiText.Bilingual("♪ 朗读","♪ Listen"),ExecuteSpeakCurrent));
+            _globalStudyCanvas.Speak=ExecuteSpeakCurrent;
             if(phase==StudyPhase.Learn)_globalStudyActions.Children.Add(Button(UiText.Bilingual("开始回忆","Start recall"),ExecuteAdvanceLearn));
             else if(phase==StudyPhase.RecallHidden)_globalStudyActions.Children.Add(Button(UiText.Bilingual("揭晓释义","Reveal meaning"),ExecuteRevealHidden));
             else if(phase==StudyPhase.RecallRated)_globalStudyActions.Children.Add(Button(UiText.Bilingual("下一词","Next word"),ExecuteNextWord));

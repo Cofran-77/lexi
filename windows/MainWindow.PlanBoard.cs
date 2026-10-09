@@ -8,7 +8,7 @@ namespace Lexi;
 
 public partial class MainWindow
 {
-    private SettingsDrawerControl? _planEditDrawer;
+    private Border? _planEditDrawer;
 
     private void RenderPlanBoardGroup(IEnumerable<DailyStudyPlan> plans)
     {
@@ -47,38 +47,35 @@ public partial class MainWindow
         if(plan.Status==DailyStudyPlanStatus.Active)
         { Item("调整计划",()=>OpenPlanEditor(plan)); Item("停止计划",()=>SetLearningPlanStopped(plan)); }
         else if(plan.Status==DailyStudyPlanStatus.Stopped) Item("恢复计划",()=>ResumeLearningPlan(plan));
-        if(plan.CurrentBatchWordIds.Count>0) Item("最近批次拼写 / 默写",()=>ShowLastPlanBatch(plan));
+        if(plan.CurrentBatchWordIds.Count>0) Item("最近批次拼写练习",()=>ShowLastPlanBatch(plan));
         if(plan.Status!=DailyStudyPlanStatus.Active) Item("删除计划…",()=>ConfirmDeletePlan(plan,anchor));
         menu.ShowAt(anchor);
     }
 
-    private void OpenPlanEditor(DailyStudyPlan plan)
+    private void ClosePlanEditor()
     {
-        if(_planEditDrawer!=null) ((Grid)RootWindowBorder.Child!).Children.Remove(_planEditDrawer);
-        _planEditDrawer=new SettingsDrawerControl();
-        _planEditDrawer.SetValue(Panel.ZIndexProperty,210);
-        ((Grid)RootWindowBorder.Child!).Children.Add(_planEditDrawer);
-        var content=new StackPanel {Spacing=12};
-        var name=new TextBox {Text=plan.Name,Watermark=UiText.Text("计划名称")};
-        var quota=new TextBox {Text=plan.DailyWordCount.ToString(),Watermark=UiText.Text("每日词数")};
-        var random=new CheckBox {Content=UiText.Text("未来批次随机"),IsChecked=plan.RandomOrder};
-        content.Children.Add(LearningText(UiText.Text("调整计划"),22));
-        content.Children.Add(name); content.Children.Add(quota); content.Children.Add(random);
-        var error=new TextBlock {TextWrapping=Avalonia.Media.TextWrapping.Wrap}; content.Children.Add(error);
-        content.Children.Add(LearningText(UiText.Text("调整在未来批次生效，已完成词保留。"),12));
-        content.Children.Add(LearningButton("保存调整",()=>
-        {
-            if(string.IsNullOrWhiteSpace(name.Text)||!int.TryParse(quota.Text,out var count)||count<1||count>10000)
-            {error.Text=UiText.Text("请填写名称，每日词数为 1–10000。 ");return;}
-            var original=_learningPlans;
-            AdjustLearningPlan(plan,name.Text,count,random.IsChecked==true);
-            if(!ReferenceEquals(original,_learningPlans)) _planEditDrawer.Close();
-            else error.Text=GlobalStatusText.Text;
-        },true));
-        _planEditDrawer.RegisterSectionContent(SettingsSection.StudyAndShortcuts,content);
-        _planEditDrawer.Open(SettingsSection.StudyAndShortcuts);
+        if(_planEditDrawer?.Parent is Panel parent) parent.Children.Remove(_planEditDrawer);
+        _planEditDrawer=null;
     }
 
+    private void OpenPlanEditor(DailyStudyPlan plan)
+    {
+        ClosePlanEditor();
+        var main=(Grid)((Grid)RootWindowBorder.Child!).Children[0];
+        PlanEditorControl? editor=null;
+        editor=new PlanEditorControl(new PlanEditorModel(plan.Name,plan.DailyWordCount,plan.RandomOrder,plan.Words.Count-plan.CompletedWordIds.Count),model=>
+        {
+            if(_restoring || !_databaseAvailable) {editor!.SetError(UiText.Bilingual("词库暂不可用。","Archive unavailable."));return;}
+            var original=_learningPlans;
+            AdjustLearningPlan(plan,model.Name,model.DailyCount,model.Shuffle);
+            if(!ReferenceEquals(original,_learningPlans)) ClosePlanEditor();
+            else editor!.SetError(GlobalStatusText.Text??UiText.Text("保存失败"));
+        },ClosePlanEditor);
+        editor.Name="PlanEditor";
+        _planEditDrawer=new Border {Name="PlanEditorPage",Child=new ScrollViewer {Content=editor,HorizontalScrollBarVisibility=Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled},Padding=new Thickness(24,16),IsVisible=true};
+        _planEditDrawer.Bind(Border.BackgroundProperty,this.GetResourceObservable("PaperBrush"));
+        _planEditDrawer.SetValue(Panel.ZIndexProperty,210);Grid.SetRow(_planEditDrawer,1);main.Children.Add(_planEditDrawer);
+    }
     private void ConfirmDeletePlan(DailyStudyPlan plan,Control anchor)
     {
         var body=new StackPanel {Spacing=12};

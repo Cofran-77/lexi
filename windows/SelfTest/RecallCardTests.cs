@@ -49,6 +49,7 @@ public static class RecallCardTests
             check(store.GetAllWords().Single(x => x.Id == before.Id).Stage == before.Stage, "rating before reveal does not write progress");
             await Snapshot("review-front");
             C<Grid>("PageReview").RaiseEvent(new KeyEventArgs { RoutedEvent = InputElement.KeyDownEvent, Key = Key.Space });
+            C<Grid>("PageReview").RaiseEvent(new KeyEventArgs { RoutedEvent = InputElement.KeyUpEvent, Key = Key.Space });
             check(C<Border>("ReviewAnswer").IsVisible && C<TextBlock>("ReviewMeaningText").Text == before.Translation, "Space reveals current answer");
             await Snapshot("review-back-long");
             var button = C<Button>("ReviewRememberBtn"); var corner = button.TranslatePoint(new Point(button.Bounds.Width, button.Bounds.Height), w);

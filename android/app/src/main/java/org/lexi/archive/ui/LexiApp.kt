@@ -58,20 +58,24 @@ private val PageIcons: List<ImageVector> = listOf(Icons.Outlined.Search, Icons.O
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun LexiApp(vm: LexiViewModel, onExport: (String, Set<Long>?) -> Unit, onImport: (Boolean) -> Unit, onPrint: (Set<Long>?) -> Unit) {
+fun LexiApp(vm: LexiViewModel, onExport: (String, Set<Long>?) -> Unit, onImport: (Boolean) -> Unit, onPrint: (Set<Long>?) -> Unit, onOpenPdf: () -> Unit, onSharePdf: () -> Unit) {
     val dark = when (vm.theme) { "dark" -> true; "light" -> false; else -> isSystemInDarkTheme() }
     val colors = if (dark) darkColorScheme(primary = Sage, onPrimary = Color(0xFF102B20), background = Color(0xFF101714), surface = Color(0xFF19221E), surfaceVariant = Color(0xFF25332C), secondaryContainer = Color(0xFF2B4437))
         else lightColorScheme(primary = Color(0xFF3F755D), onPrimary = Color.White, background = Color(0xFFF3F5F0), surface = Color(0xFFFCFDF9), surfaceVariant = Color(0xFFE5ECE3), secondaryContainer = Color(0xFFDCEBDD))
     MaterialTheme(colorScheme = colors, typography = LexiTypography, shapes = Shapes(small = RoundedCornerShape(8.dp), medium = RoundedCornerShape(14.dp), large = RoundedCornerShape(18.dp))) {
         var page by rememberSaveable { mutableIntStateOf(0) }
         val pages = rememberSaveableStateHolder()
-        val snackbar = remember { SnackbarHostState() }
-        LaunchedEffect(vm.status) { if (vm.status.isNotBlank()) snackbar.showSnackbar(vm.status) }
+        var notice by remember { mutableStateOf("") }
+        LaunchedEffect(vm.statusVersion) {
+            notice = vm.status
+            kotlinx.coroutines.delay(4500)
+            notice = ""
+        }
         BackHandler(enabled = page != 0) { page = 0 }
         LaunchedEffect(vm.incomingVersion) { if (vm.incomingVersion > 0) page = 0 }
         BoxWithConstraints(Modifier.fillMaxSize().background(colors.background)) {
             val wide = maxWidth >= 840.dp
-            Scaffold(containerColor = colors.background, snackbarHost = { SnackbarHost(snackbar) }, topBar = {
+            Scaffold(containerColor = colors.background, topBar = {
                 TopAppBar(title = { Text(if (page == 0) "Lexi · 查词" else Pages[page], style = MaterialTheme.typography.titleLarge) }, actions = {
                     Text(if (page == 2) "${vm.due.size} 待重逢" else "${vm.entries.size} 词", Modifier.padding(end = 20.dp), style = MaterialTheme.typography.labelMedium, color = colors.onSurfaceVariant)
                 }, colors = TopAppBarDefaults.topAppBarColors(containerColor = colors.background))
@@ -88,6 +92,27 @@ fun LexiApp(vm: LexiViewModel, onExport: (String, Set<Long>?) -> Unit, onImport:
                         Pages.forEachIndexed { i, title -> NavigationRailItem(selected = page == i, onClick = { page = i }, icon = { Icon(PageIcons[i], null) }, label = { Text(if (i == 2) "$title ${vm.due.size}" else title) }) }
                     }
                     Column(Modifier.weight(1f).fillMaxHeight().padding(horizontal = if (wide) 24.dp else 16.dp).padding(bottom = 8.dp)) {
+                        androidx.compose.animation.AnimatedVisibility(notice.isNotBlank()) {
+                            Surface(Modifier.fillMaxWidth().padding(bottom = 8.dp), shape = RoundedCornerShape(12.dp), color = colors.secondaryContainer) {
+                                Row(Modifier.padding(start = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    Text(notice, Modifier.weight(1f), style = MaterialTheme.typography.bodySmall, color = colors.onSecondaryContainer)
+                                    IconButton(onClick = { notice = "" }) { Icon(Icons.Outlined.Close, "关闭提示", Modifier.size(16.dp)) }
+                                }
+                            }
+                        }
+                        vm.savedPdf?.let { pdf ->
+                            Surface(Modifier.fillMaxWidth().padding(bottom = 8.dp), shape = RoundedCornerShape(12.dp), color = colors.surfaceVariant) {
+                                Column(Modifier.padding(12.dp)) {
+                                    Text(pdf.name, style = MaterialTheme.typography.labelMedium, maxLines = 1)
+                                    Row {
+                                        TextButton(onClick = onOpenPdf) { Text("打开 PDF") }
+                                        TextButton(onClick = onSharePdf) { Text("分享 PDF") }
+                                        Spacer(Modifier.weight(1f))
+                                        IconButton(onClick = vm::dismissPdf) { Icon(Icons.Outlined.Close, "收起文件操作", Modifier.size(16.dp)) }
+                                    }
+                                }
+                            }
+                        }
                         if (vm.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
                         Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
                           pages.SaveableStateProvider(page) {
@@ -251,7 +276,7 @@ fun LexiApp(vm: LexiViewModel, onExport: (String, Set<Long>?) -> Unit, onImport:
                             DropdownMenuItem(text = { Text("置入今日重逢") }, onClick = { vm.today(selected); batchMenu = false })
                             DropdownMenuItem(text = { Text("标记已掌握") }, onClick = { vm.master(selected); batchMenu = false })
                             DropdownMenuItem(text = { Text("调整阶段") }, onClick = { stageDialog = true; batchMenu = false })
-                            DropdownMenuItem(text = { Text("导出 JSON") }, onClick = { onExport("json", selected); batchMenu = false })
+                            DropdownMenuItem(text = { Text("导出 CSV") }, onClick = { onExport("csv", selected); batchMenu = false })
                             DropdownMenuItem(text = { Text("打印所选") }, onClick = { onPrint(selected); batchMenu = false })
                             DropdownMenuItem(text = { Text("删除所选") }, onClick = { deleting = selected; batchMenu = false })
                         }
@@ -310,7 +335,8 @@ fun LexiApp(vm: LexiViewModel, onExport: (String, Set<Long>?) -> Unit, onImport:
                 if (entry.archive.tags.isNotEmpty()) Text(entry.archive.tags.joinToString("  ") { "#$it" }, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
             }
             AiControls(vm, entry)
-            entry.aiResult?.let { AIContent(it, vm::handleIncoming) }
+            (vm.aiDrafts[entry.id] ?: entry.aiResult)?.let { AIContent(it, vm::handleIncoming) }
+            if (vm.aiDrafts.containsKey(entry.id)) OutlinedButton(onClick = { vm.saveEntryAI(entry) }, enabled = !vm.busy) { Text("保存本次 AI 内容到档案") }
             Section("复习与遇见", "遇见 ${entry.archive.encounterCount} 次 · 复习 ${entry.reviewCount} 次") {
                 TextButton(onClick = { vm.encounter(entry.id) }, enabled = !vm.busy && !vm.aiBusy) { Text("记录再次遇见") }
                 TextButton(onClick = { vm.today(setOf(entry.id)) }, enabled = !vm.busy) { Text("置入今日重逢") }
@@ -362,7 +388,6 @@ fun LexiApp(vm: LexiViewModel, onExport: (String, Set<Long>?) -> Unit, onImport:
                 OutlinedButton(onClick = { vm.encounter(entry.id) }, enabled = !dirty && !vm.busy && !vm.aiBusy) { Text("记录再次遇见") }
             }
             if (dirty) Text("有未保存的修改。请先保存，再生成 AI 内容或调整复习记录。", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
-            AiControls(vm, entry, enabled = !dirty)
             entry.aiResult?.let { AIContent(it, vm::handleIncoming) }
             var editingAI by rememberSaveable(entry.id) { mutableStateOf(false) }
             TextButton(onClick = { editingAI = !editingAI }) { Text(if (editingAI) "收起 AI 内容编辑" else "编辑 / 清除 AI 内容") }
@@ -453,7 +478,7 @@ fun LexiApp(vm: LexiViewModel, onExport: (String, Set<Long>?) -> Unit, onImport:
 @Composable private fun SettingsPage(vm: LexiViewModel, onExport: (String, Set<Long>?) -> Unit, onImport: (Boolean) -> Unit, onPrint: (Set<Long>?) -> Unit) {
     var restoreConfirm by remember { mutableStateOf(false) }
     var providerMenu by remember { mutableStateOf(false) }
-    if (restoreConfirm) AlertDialog(onDismissRequest = { restoreConfirm = false }, title = { Text("恢复 Android 完整备份") }, text = { Text("恢复会替换当前全部词条与复习记录。建议先导出当前完整备份。请选择由 Lexi Android 创建的备份；Windows 词库请使用 JSON 导入。") }, confirmButton = { TextButton(onClick = { restoreConfirm = false; onImport(true) }) { Text("选择备份文件") } }, dismissButton = { TextButton(onClick = { restoreConfirm = false }) { Text("取消") } })
+    if (restoreConfirm) AlertDialog(onDismissRequest = { restoreConfirm = false }, title = { Text("恢复 Android 完整备份") }, text = { Text("恢复会替换当前全部词条与复习记录。建议先导出当前完整备份。请选择由 Lexi Android 创建的备份；词条迁移请使用 CSV 导入。") }, confirmButton = { TextButton(onClick = { restoreConfirm = false; onImport(true) }) { Text("选择备份文件") } }, dismissButton = { TextButton(onClick = { restoreConfirm = false }) { Text("取消") } })
     Column(Modifier.fillMaxSize()) {
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             SettingsGroup("外观与体验", "主题 · 动效") {
@@ -483,17 +508,19 @@ fun LexiApp(vm: LexiViewModel, onExport: (String, Set<Long>?) -> Unit, onImport:
                 Text("请求超时：${vm.config.timeoutSeconds} 秒", style = MaterialTheme.typography.labelLarge)
                 Slider(value = vm.config.timeoutSeconds.toFloat().coerceIn(10f, 120f), onValueChange = { vm.config = vm.config.copy(timeoutSeconds = it.toInt()) }, valueRange = 10f..120f, steps = 10)
             }
-            SettingsGroup("数据与导出", "PDF 词表 · JSON 迁移 · 完整备份") {
-                Button(onClick = { onExport("pdf", null) }, enabled = !vm.busy && vm.initialized, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Outlined.PictureAsPdf, null, Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)); Text("导出 PDF 词表") }
-                OutlinedButton(onClick = { onImport(false) }, enabled = !vm.busy && vm.initialized, modifier = Modifier.fillMaxWidth()) { Text("导入通用 JSON") }
-                OutlinedButton(onClick = { onExport("json", null) }, enabled = !vm.busy && vm.initialized, modifier = Modifier.fillMaxWidth()) { Text("导出全部词条 · JSON") }
+            SettingsGroup("数据与导出", "PDF 复习表 · CSV 迁移 · 完整备份") {
+                Button(onClick = { onExport("pdf", null) }, enabled = !vm.busy && vm.initialized, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Outlined.PictureAsPdf, null, Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)); Text("导出艾宾浩斯 PDF 复习表") }
+                Text("PDF 默认保存在 下载 / Lexi词汇库，保存后可直接打开或分享。", style = MaterialTheme.typography.bodySmall)
+                OutlinedButton(onClick = { onExport("archive_pdf", null) }, enabled = !vm.busy && vm.initialized, modifier = Modifier.fillMaxWidth()) { Text("导出完整档案 PDF（含备注与 AI）") }
+                OutlinedButton(onClick = { onImport(false) }, enabled = !vm.busy && vm.initialized, modifier = Modifier.fillMaxWidth()) { Text("导入 CSV 词表") }
+                OutlinedButton(onClick = { onExport("csv", null) }, enabled = !vm.busy && vm.initialized, modifier = Modifier.fillMaxWidth()) { Text("导出全部词条 · CSV") }
                 OutlinedButton(onClick = { onExport("backup", null) }, enabled = !vm.busy && vm.initialized, modifier = Modifier.fillMaxWidth()) { Text("保存 Android 完整备份") }
                 OutlinedButton(onClick = { restoreConfirm = true }, enabled = !vm.busy, modifier = Modifier.fillMaxWidth()) { Text("恢复 Android 完整备份…") }
                 OutlinedButton(onClick = { onPrint(null) }, enabled = !vm.busy && vm.initialized, modifier = Modifier.fillMaxWidth()) { Text("系统打印") }
                 Text("私人档案位置", style = MaterialTheme.typography.labelLarge)
                 Text(vm.dataLocation, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            SettingsGroup("关于 Lexi", "0.2.0 · Android Alpha") {
+            SettingsGroup("关于 Lexi", "0.2.1 · Android Alpha") {
                 Text("为日常阅读留下一本私人词汇档案。\n本地保存 · 无需账户 · 无自动同步", style = MaterialTheme.typography.bodyMedium)
                 Text("离线词典：ECDICT（MIT License）。手机与平板根据窗口宽度自动适配。", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }

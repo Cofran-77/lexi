@@ -12,7 +12,8 @@ import java.io.OutputStream
 
 /** Native, paginated A4 export. No HTML, network or print-service dependency. */
 object PdfExporter {
-    fun write(entries: List<Entry>, output: OutputStream) {
+    fun write(entries: List<Entry>, output: OutputStream, archive: Boolean = false) {
+        if (!archive) { writeReview(entries, output); return }
         val document = PdfDocument()
         var page: PdfDocument.Page? = null
         var number = 0
@@ -72,6 +73,58 @@ object PdfExporter {
                 }
                 y += 29
                 page!!.canvas.drawLine(40f, y, 555f, y, pen); y += 16
+            }
+            finish(); document.writeTo(output)
+        } finally { document.close() }
+    }
+
+    /** Paper-first review grid. AI, notes and sources belong only in the optional archive PDF. */
+    private fun writeReview(entries: List<Entry>, output: OutputStream) {
+        val document = PdfDocument()
+        val text = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(35, 45, 40); textSize = 10f; typeface = Typeface.create("sans-serif", Typeface.NORMAL) }
+        val line = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(197, 208, 201); strokeWidth = .5f; style = Paint.Style.STROKE }
+        val fill = Paint().apply { color = Color.rgb(238, 243, 239) }
+        var page: PdfDocument.Page? = null; var count = 0; var y = 0f
+        val edges = floatArrayOf(40f, 194f, 395f, 427f, 459f, 491f, 523f, 555f)
+        fun finish() { page?.let(document::finishPage); page = null }
+        fun next() {
+            finish(); count++; page = document.startPage(PdfDocument.PageInfo.Builder(595, 842, count).create())
+            val canvas = page!!.canvas
+            canvas.drawText("Lexi · 艾宾浩斯单词复习表", 40f, 33f, text)
+            canvas.drawText("学习日期：____________    按第 1、2、4、7、15 天复习并打卡", 40f, 52f, text)
+            canvas.drawText("$count", 540f, 814f, text)
+            canvas.drawRect(40f, 64f, 555f, 91f, fill)
+            listOf("单词 / 音标", "释义", "1天", "2天", "4天", "7天", "15天").forEachIndexed { i, label -> canvas.drawText(label, edges[i] + 6f, 81f, text) }
+            canvas.drawRect(40f, 64f, 555f, 91f, line); y = 91f
+        }
+        fun layout(value: String, width: Int): StaticLayout = StaticLayout.Builder.obtain(value, 0, value.length, text, width).setIncludePad(false).setLineSpacing(3f, 1f).build()
+        try {
+            next()
+            if(entries.isEmpty()) page!!.canvas.drawText("暂无词条", 46f, y + 25f, text)
+            entries.forEach { entry ->
+                val word = layout(listOf(entry.word, entry.phonetic).filter(String::isNotBlank).joinToString("\n"), 142)
+                val meaning = layout(listOf(entry.translation, entry.definition).filter(String::isNotBlank).joinToString("\n"), 189)
+                val layouts = listOf(word, meaning); val indexes = intArrayOf(0,0); var first = true
+                while(first || indexes.indices.any { indexes[it] < layouts[it].lineCount }) {
+                    if(y + 40f > 784f) next()
+                    val available = 784f - y - 12f; val ends = indexes.copyOf(); var contentHeight = 0f
+                    layouts.forEachIndexed { i, l ->
+                        val start = indexes[i]; val top = l.getLineTop(start)
+                        while(ends[i] < l.lineCount && l.getLineBottom(ends[i]) - top <= available) ends[i]++
+                        if(ends[i] > start) contentHeight = maxOf(contentHeight, (l.getLineBottom(ends[i]-1) - top).toFloat())
+                    }
+                    val height = maxOf(40f, contentHeight + 12f); val canvas = page!!.canvas
+                    layouts.forEachIndexed { i, l ->
+                        if(ends[i] > indexes[i]) {
+                            canvas.save(); canvas.clipRect(edges[i] + 6f, y + 6f, edges[i+1] - 6f, y + 6f + contentHeight)
+                            canvas.translate(edges[i] + 6f, y + 6f - l.getLineTop(indexes[i])); l.draw(canvas); canvas.restore()
+                        }
+                    }
+                    canvas.drawRect(40f, y, 555f, y + height, line)
+                    edges.drop(1).dropLast(1).forEach { canvas.drawLine(it,y,it,y+height,line) }
+                    if(first) (2..6).forEach { val x = edges[it]+11f; canvas.drawRect(x,y+15f,x+10f,y+25f,line) }
+                    y += height; ends.copyInto(indexes); first = false
+                }
             }
             finish(); document.writeTo(output)
         } finally { document.close() }

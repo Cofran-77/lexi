@@ -36,7 +36,7 @@ class AcceptanceTest {
         repo.delete(setOf(e.id)); repo.restore(backup)
         assertTrue(repo.all().any { it.id == e.id })
         val pdf = File(context.filesDir,"acceptance-long.pdf")
-        pdf.outputStream().use { PdfExporter.write(listOf(e.copy(definition=("A long sentence with 中文释义 and IPA /ˈriːzən/.\n").repeat(160), aiResult=AIResult(examples=listOf(Example("There is no reason to worry.","没有理由担心。"))))),it) }
+        pdf.outputStream().use { PdfExporter.write(listOf(e.copy(definition=("A long sentence with 中文释义 and IPA /ˈriːzən/.\n").repeat(160), aiResult=AIResult(examples=listOf(Example("There is no reason to worry.","没有理由担心。"))))),it, archive = true) }
         PdfRenderer(ParcelFileDescriptor.open(pdf, ParcelFileDescriptor.MODE_READ_ONLY)).use { renderer ->
             assertTrue("long text paginated", renderer.pageCount > 1)
             for (i in 0 until renderer.pageCount) renderer.openPage(i).use { page ->

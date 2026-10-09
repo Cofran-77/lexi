@@ -20,8 +20,15 @@ class LexiViewModel(app: Application) : AndroidViewModel(app) {
     var busy by mutableStateOf(false); private set
     var aiBusy by mutableStateOf(false); private set
     var initialized by mutableStateOf(false); private set
-    var status by mutableStateOf("正在打开私人词汇档案…"); private set
+    var statusVersion by mutableIntStateOf(0); private set
+    private var statusText by mutableStateOf("正在打开私人词汇档案…")
+    var status: String
+        get() = statusText
+        private set(value) { statusText = value; statusVersion++ }
     var ai by mutableStateOf<AIResult?>(null); private set
+    var savedPdf by mutableStateOf<SavedPdf?>(null); private set
+    val aiDrafts = mutableStateMapOf<Long, AIResult>()
+    fun dismissPdf() { savedPdf = null }
     var config by mutableStateOf(AIConfig())
     var apiKey by mutableStateOf("")
     var rememberKey by mutableStateOf(false)
@@ -92,10 +99,13 @@ class LexiViewModel(app: Application) : AndroidViewModel(app) {
     fun addCurrent() {
         val r = lookup ?: return
         if (entries.any { it.word.equals(r.word, true) }) { report("已加入词汇档案"); return }
-        val expansion = ai
-        mutate("已收藏，首次重逢安排在明天。") { repo.save(Entry(word = r.word, phonetic = r.phonetic, translation = r.translation, definition = r.definition, aiResult = expansion)) }
+        mutate("已收藏，首次重逢安排在明天。") { repo.save(Entry(word = r.word, phonetic = r.phonetic, translation = r.translation, definition = r.definition)) }
     }
     fun save(entry: Entry) { cancelAI(); mutate("档案已保存") { repo.save(entry) } }
+    fun saveEntryAI(entry: Entry) {
+        val draft = aiDrafts[entry.id] ?: return
+        mutate("AI 内容已保存") { repo.save(entry.copy(aiResult = draft)); aiDrafts.remove(entry.id) }
+    }
     fun saveLookupAI() {
         val word = lookup?.word ?: return
         val entry = entries.firstOrNull { it.word.equals(word, true) } ?: return
@@ -127,7 +137,7 @@ class LexiViewModel(app: Application) : AndroidViewModel(app) {
                 if (entry != null) {
                     val latest = repo.all().firstOrNull { it.id == entry.id }
                     if (latest?.archive?.revision != entry.archive.revision) { report("档案已修改，本次生成未覆盖它。"); return@launch }
-                    repo.save(latest.copy(aiResult = result)); entries = repo.all()
+                    aiDrafts[entry.id] = result
                 } else ai = result
                 status = "AI 扩展完成 · 仅生成所选内容"
             } catch (_: CancellationException) { }
@@ -158,9 +168,21 @@ class LexiViewModel(app: Application) : AndroidViewModel(app) {
                 } ?: error("无法读取文件")
             }
             if (restore) repo.restore(data) else {
-                val result = repo.importJSON(data)
+                val result = withContext(Dispatchers.IO) {
+                    // Keep existing desktop transfer files readable, while CSV is the public default.
+                    val legacy = data.toString(Charsets.UTF_8).trimStart().startsWith("{")
+                    repo.importJSON(if (legacy) data else ArchiveJson.encode(ArchiveCsv.decode(data)))
+                }
                 withContext(Dispatchers.Main) { report(result) }
             }
+        }
+    }
+    fun savePdf(kind: String, ids: Set<Long>?) {
+        val selected = entries.filter { ids == null || it.id in ids }.toList()
+        if (selected.isEmpty()) { report("请先收藏或选择要导出的词条"); return }
+        mutate("") {
+            savedPdf = withContext(Dispatchers.IO) { PdfStorage.save(getApplication(), selected, kind == "archive_pdf") }
+            report("PDF 已保存到 下载 / Lexi词汇库")
         }
     }
     fun writeFile(uri: Uri, kind: String, ids: Set<Long>? = null) {
@@ -172,7 +194,7 @@ class LexiViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 return@mutate
             }
-            val data = when (kind) { "backup" -> repo.backup(); "html" -> printHtml(ids).toByteArray(Charsets.UTF_8); else -> repo.exportJSON(ids) }
+            val data = when (kind) { "backup" -> repo.backup(); "html" -> printHtml(ids).toByteArray(Charsets.UTF_8); else -> ArchiveCsv.encode(entries.filter { ids == null || it.id in ids }) }
             withContext(Dispatchers.IO) { getApplication<Application>().contentResolver.openOutputStream(uri, "wt")?.use { it.write(data) } ?: error("无法写入所选位置") }
         }
     }

@@ -26,10 +26,12 @@ Lexi 面向希望持续积累英语词汇的学习者，将离线词典、个人
 | 平台 | 当前应用版本 | 运行要求 | 发布状态 |
 | --- | --- | --- | --- |
 | Windows | 1.2.4 | Windows 10 / 11，x64 | 桌面版；提供自包含安装程序 |
-| Android | 0.2.2-alpha | Android 8.0 及以上 | 原生预览版；当前提供源码，自行构建 APK |
+| Android | 0.2.2-alpha | Android 8.0 及以上 | 原生预览版；提供可直接安装的 APK |
 | macOS | 尚未接入 | 待合作作者补充 | 本目录暂无源码或安装包 |
 
-在 [Releases](https://github.com/Cofran-77/lexi/releases) 选择当前发布。Windows 安装包包含 .NET 运行环境，无需额外安装；更新前请完全退出托盘并备份档案。Android 当前提供源码，构建步骤见平台文档。自行构建的 APK 可能与已安装版本签名不同，迁移前请先导出档案；卸载会删除应用私有数据。
+在 [Releases](https://github.com/Cofran-77/lexi/releases) 选择当前发布。Windows 安装包包含 .NET 运行环境，无需额外安装；更新前请完全退出托盘并备份档案。Android 提供沿用原开发签名的 APK；安装前请备份，卸载会删除应用私有数据。构建与签名说明见平台文档。
+
+**直接下载：[Windows 安装程序](https://github.com/Cofran-77/lexi/releases/download/windows-v1.2.4-nc.1/Lexi-1.2.4-nc.1-x64-setup.exe) · [Android APK](https://github.com/Cofran-77/lexi/releases/download/android-v0.2.2-nc.1/Lexi-Android-0.2.2-alpha.apk)**。无需自行编译。各包适用许可见独立许可说明。
 
 本次许可修订不改变应用版本或学习功能。最新版包含个人学习所需的完整程序实现与离线词典；第三方教材数据不随包分发，详见下方资源说明。
 

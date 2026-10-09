@@ -81,8 +81,7 @@ public static class LearningIntegrationTests
         check(plans.Count == 1 && plans[0].DailyWordCount == 1, "UI creates and saves archive plan");
         Call("OpenPlanCreator", DailyStudyPlanSource.Archive, null!);
         await Task.Delay(150);
-        var creator = ((IClassicDesktopStyleApplicationLifetime)Application.Current!.ApplicationLifetime!)
-            .Windows.Single(w => w != window);
+        var creator = Field<ContentControl>("_planCreatorContent");
         check(creator.GetLogicalDescendants().OfType<TextBox>().Any(b => b.Name == "PlanCreatorSearch") &&
               creator.GetLogicalDescendants().OfType<NumericUpDown>().FirstOrDefault(b => b.Name == "PlanCreatorQuota")?.Value == 20,
             "plan creator exposes searchable selection and bounded daily quota");
@@ -91,7 +90,7 @@ public static class LearningIntegrationTests
             creatorBitmap.Render(creator);
             creatorBitmap.Save(Path.Combine(Environment.GetEnvironmentVariable("LEXI_DATA_DIR")!, "plan-creator.png"));
         }
-        creator.Close();
+        Call("ClosePlanCreator");
         var plan = plans[0];
         Call("SetLearningPlanStopped", plan);
         plan = Field<List<DailyStudyPlan>>("_learningPlans")[0];

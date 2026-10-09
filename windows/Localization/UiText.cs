@@ -11,6 +11,8 @@ internal static class UiText
 {
     internal static string Language { get; private set; } = "zh-CN";
     private static readonly Dictionary<string, (string Chinese, string English)> Rendered = new(StringComparer.Ordinal);
+    private sealed class Caption { public string Source = ""; public string Last = ""; }
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<Control, Caption> Captions = new();
     internal static string Normalize(string? language) => language == "en" ? "en" : "zh-CN";
     internal static string Text(string chinese)
     {
@@ -40,6 +42,16 @@ internal static class UiText
         if (rendered == null) return "";
         if (Rendered.TryGetValue(rendered, out var pair)) return Language == "en" ? pair.English : pair.Chinese;
         return Text(rendered);
+    }
+    internal static string RedisplayFor(Control owner, string rendered)
+    {
+        var caption = Captions.GetOrCreateValue(owner);
+        // Keep each control's source: several Chinese captions can legitimately
+        // share an English translation, so a global reverse map is ambiguous.
+        if (caption.Source.Length == 0 || rendered != caption.Last && rendered != Text(caption.Source))
+            caption.Source = UiCatalog.English.ContainsKey(rendered) ? rendered
+                : Rendered.TryGetValue(rendered, out var pair) ? pair.Chinese : rendered;
+        return caption.Last = Text(caption.Source);
     }
     internal static void Apply(string? language)
     {

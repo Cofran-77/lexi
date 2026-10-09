@@ -84,6 +84,7 @@ public sealed class IeltsWorkspaceControl : Grid, IDisposable
     private readonly HashSet<string> _sharedSelection;
     private readonly HashSet<string> _expandedWords = new(StringComparer.Ordinal);
     public event Action? ProgressChanged;
+    public event Action<string>? SaveExampleRequested;
 
     // 筛选胶囊按钮
     private readonly Button _filterAllBtn;
@@ -850,6 +851,7 @@ public sealed class IeltsWorkspaceControl : Grid, IDisposable
             };
 
             _wordListPanel.Children.Add(row);
+            row.SaveExampleRequested += (_, english) => SaveExampleRequested?.Invoke(english);
         }
 
         UpdateBatchBar();

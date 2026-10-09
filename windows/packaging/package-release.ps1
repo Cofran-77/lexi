@@ -1,5 +1,5 @@
 param(
-  [string]$Version = '1.2.1',
+  [string]$Version = '1.2.2',
   [string]$OutputDir = '',
   [switch]$CopyToDesktop
 )
@@ -92,3 +92,4 @@ if ($CopyToDesktop) {
 }
 
 Get-ChildItem -LiteralPath $targetDir -File | Where-Object { $_.Name -match "^(Lexi-$Version|SHA256SUMS\.txt)" } | Select-Object FullName, Length
+

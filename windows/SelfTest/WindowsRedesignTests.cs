@@ -156,7 +156,7 @@ public static class WindowsRedesignTests
             var section = IeltsCatalog.Load().Sections.Where(s => s.Kind == "vocabulary").MaxBy(s => s.Entries.Count)!;
             Call("OpenPlanCreator", DailyStudyPlanSource.Ielts, section);
             await Task.Delay(200);
-            var creator = ((IClassicDesktopStyleApplicationLifetime)App.Current!.ApplicationLifetime!).Windows.Single(w => w != window);
+            var creator = (ContentControl)Field("_planCreatorContent")!;
             Check(creator.GetVisualDescendants().OfType<CheckBox>().Count(c => c.IsEffectivelyVisible) <= 12,
                 "large chapter " + section.Entries.Count + " words uses paginated visible selection");
             await Snapshot(creator, "plan-large-step1");
@@ -164,7 +164,7 @@ public static class WindowsRedesignTests
             Check(next.IsEffectivelyVisible && next.IsEnabled && next.TranslatePoint(default, creator)!.Value.Y < creator.Bounds.Height,
                 "large plan retains visible fixed next action");
             next.RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); await Snapshot(creator, "plan-large-step2");
-            creator.Width = 520; creator.Height = 480; await Snapshot(creator, "plan-narrow-step2"); creator.Close();
+            window.Width = 760; window.Height = 520; await Snapshot(creator, "plan-narrow-step2"); Call("ClosePlanCreator");
             exit = 0;
         }
         catch (Exception ex) { report.Add("FAIL " + (ex.InnerException ?? ex)); }

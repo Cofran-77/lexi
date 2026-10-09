@@ -50,6 +50,8 @@ public static class LanguageUiTests
             var combo = main.FindControl<ComboBox>("SettingsLanguageCombo")!;
             combo.SelectedIndex = 0;
             Check(main.FindControl<Button>("LookupBtn")!.Content?.ToString() == "查询 ↵", "actual selector returns to Chinese");
+            var reviewCaption=main.FindControl<Button>("NavReview")!.GetVisualDescendants().OfType<TextBlock>().First().Text;
+            Check(reviewCaption=="今日重逢","Chinese review navigation keeps its own label after language round trips");
         }
         catch (Exception ex) { report.Add(ex.ToString()); exit = 1; }
         finally

@@ -45,7 +45,7 @@ public static class PlanDrawerInteractionTests
             window.RequestedThemeVariant=ThemeVariant.Dark;
             await Snapshot("plans-760-dark");
             Call("OpenSettingsDrawer");
-            var drawer=Field<SettingsDrawerControl>("_settingsDrawer");
+            var drawer=Field<SettingsPageControl>("_settingsDrawer");
             await Snapshot("settings-categories-dark");
             drawer.ShowSection(SettingsSection.Appearance);
             await Snapshot("settings-appearance-dark");

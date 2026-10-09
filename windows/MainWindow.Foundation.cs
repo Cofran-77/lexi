@@ -233,6 +233,7 @@ public partial class MainWindow
     private async Task RestoreChosenBackupAsync()
     {
         if (_pendingRestore == null || _restoring) return;
+        if (!TryFlushWritingDraft()) return;
         _restoring = true;
         ++_captureEpoch; _quickCard?.Close(); _quickCard = null; ExitFocus(); _learningAudio?.Stop(); StopWindowsLearningAudio();
         _filterTimer.Stop();

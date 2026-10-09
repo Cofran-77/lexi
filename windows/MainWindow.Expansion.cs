@@ -19,8 +19,8 @@ public partial class MainWindow
             Spacing = 4,
             Children =
             {
-                new TextBlock { Text = english, FontSize = 15, LineHeight = 24, TextWrapping = TextWrapping.Wrap },
-                new TextBlock { Text = chinese, FontSize = 13, LineHeight = 21, TextWrapping = TextWrapping.Wrap, Classes = { "muted" } }
+                new SelectableTextBlock { Text = english, FontSize = 15, LineHeight = 24, TextWrapping = TextWrapping.Wrap },
+                new SelectableTextBlock { Text = chinese, FontSize = 14, LineHeight = 23, TextWrapping = TextWrapping.Wrap, Classes = { "muted" } }
             }
         }
     };

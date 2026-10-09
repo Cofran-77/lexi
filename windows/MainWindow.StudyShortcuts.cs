@@ -73,7 +73,7 @@ public partial class MainWindow
         if (focused is Avalonia.Controls.Primitives.PopupRoot || focused is MenuItem || _openStudyFlyouts.Count>0) return;
         var isSpellingActive = _typingHost?.IsVisible == true;
 
-        var hasTopmostOverlay = _settingsDrawerOpen
+        var hasTopmostOverlay = _settingsDrawerOpen || _planCreatorOverlay != null
             || _planEditDrawer?.IsOpen == true
             || (_workspaceChooser != null && _workspaceChooser.IsVisible)
             || DialogDeleteOverlay.IsVisible
@@ -238,6 +238,7 @@ public partial class MainWindow
 
     private void ExecuteCloseTopmostOverlay()
     {
+        if (_planCreatorOverlay != null) { ClosePlanCreator(); return; }
         if (_planEditDrawer?.IsOpen == true) { _planEditDrawer.Close(); return; }
         if (_settingsDrawerOpen)
         {

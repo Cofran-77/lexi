@@ -39,10 +39,11 @@ public static class VisualAcceptanceTests
             Check(themeToggle.IsEffectivelyVisible && w.RequestedThemeVariant != previousTheme, "visible title-bar theme button switches theme");
             using (var store = new VocabularyService()) Check(store.LoadSettings().Theme == w.RequestedThemeVariant!.Key.ToString(), "title-bar theme button persists without API settings");
             Click(C<Button>("NavSettings"));
-            ((Lexi.Features.Settings.SettingsDrawerControl)typeof(MainWindow).GetField("_settingsDrawer",BindingFlags.NonPublic|BindingFlags.Instance)!.GetValue(w)!).ShowSection(Lexi.Features.Settings.SettingsSection.Appearance);
+            ((Lexi.Features.Settings.SettingsPageControl)typeof(MainWindow).GetField("_settingsDrawer",BindingFlags.NonPublic|BindingFlags.Instance)!.GetValue(w)!).ShowSection(Lexi.Features.Settings.SettingsSection.Appearance);
             await Task.Delay(100);
             var themeCard = C<Border>("ThemeSettingsCard");
-            Check(themeCard.IsEffectivelyVisible && themeCard.Bounds.Width <= 440, "theme settings visible inside the bounded appearance drawer");
+            var settingsPage=(Lexi.Features.Settings.SettingsPageControl)typeof(MainWindow).GetField("_settingsDrawer",BindingFlags.NonPublic|BindingFlags.Instance)!.GetValue(w)!;
+            Check(themeCard.IsEffectivelyVisible && themeCard.Bounds.Width <= settingsPage.BodyScroller.Viewport.Width && themeCard.Bounds.Width>440, "theme settings use a complete page within its scroll viewport");
             await Snapshot("theme-settings");
             Click(C<Button>("NavLookup"));
             var input = C<TextBox>("LookupInput");

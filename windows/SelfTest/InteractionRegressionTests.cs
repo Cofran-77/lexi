@@ -35,7 +35,7 @@ public static class InteractionRegressionTests
             Call("ToggleGlobalFocus");
             Check(window.FindControl<Border>("SidebarBorder")!.IsVisible && ReferenceEquals(session,Field("_dailyLearningSession")),"focus exits without losing plan session");
             window.FindControl<Button>("NavSettings")!.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
-            Check((bool)Field("_settingsDrawerOpen")! && (string)Field("_currentPage")! == "learning","settings opens as drawer over the current task");
+            Check((bool)Field("_settingsDrawerOpen")! && (string)Field("_currentPage")! == "settings" && window.FindControl<ScrollViewer>("PageSettings")!.IsVisible,"settings opens as a full page");
             Call("CloseSettingsDrawer");
             Check(!(bool)Field("_settingsDrawerOpen")! && ReferenceEquals(session,Field("_dailyLearningSession")),"closing settings preserves the task session");
             await PlanDrawerInteractionTests.RunAsync(window,Check);

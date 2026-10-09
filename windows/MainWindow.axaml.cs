@@ -194,6 +194,7 @@ public partial class MainWindow : Window
     private void OnWindowClosing(object? sender, WindowClosingEventArgs e)
     {
         if (_restoring) { e.Cancel = true; return; }
+        if (!TryFlushWritingDraft()) { e.Cancel = true; return; }
         if (!_isForceClose)
         {
             e.Cancel = true;
@@ -210,6 +211,7 @@ public partial class MainWindow : Window
     public void ForceClose()
     {
         if (_restoring) return;
+        if (!TryFlushWritingDraft()) return;
         if (_databaseAvailable) PersistPausedSurfaces();
         _memoryLifetime.Cancel();
         _aiCts?.Cancel();
@@ -257,6 +259,7 @@ public partial class MainWindow : Window
     private void ShowPage(string page)
     {
         if (!_databaseAvailable) return;
+        if (!TryFlushWritingDraft()) return;
         if (page == "settings") { OpenSettingsDrawer(); return; }
         CloseSettingsDrawer();
         if (_globalFocusActive) SetGlobalFocusChrome(false);
@@ -591,7 +594,7 @@ public partial class MainWindow : Window
                                             Classes = { "example-quote" },
                                             Margin = new Thickness(0, -2, 6, 0)
                                         },
-                                        new TextBlock
+                                        new SelectableTextBlock
                                         {
                                             [Grid.ColumnProperty] = 1,
                                             Text = eg.English,
@@ -603,7 +606,7 @@ public partial class MainWindow : Window
                                         }
                                     }
                                 },
-                                new TextBlock
+                                new SelectableTextBlock
                                 {
                                     Text = eg.Chinese,
                                     FontSize = 13,
@@ -615,6 +618,7 @@ public partial class MainWindow : Window
                             }
                         }
                     };
+                    ((StackPanel)card.Child!).Children.Add(CreateExampleActions(eg.English, eg.Chinese, "查词 · " + ResultWordText.Text));
                     AiResultExamplesContainer.Children.Add(card);
                 }
             }

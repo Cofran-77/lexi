@@ -3,8 +3,10 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Layout;
+using Avalonia.Media;
 using Lexi.Features.Ielts;
 
 namespace Lexi;
@@ -30,12 +32,13 @@ public partial class MainWindow
         }
 
         // 切换到子页面展示
-        ShowIeltsSubPage(bounded: false);
+        if (!ShowIeltsSubPage(bounded: false)) return;
         RenderIeltsSynonym();
     }
 
-    private void ShowIeltsSubPage(bool bounded = false)
+    private bool ShowIeltsSubPage(bool bounded = false)
     {
+        if (!TryFlushWritingDraft()) return false;
         ShowPage("ielts");
         if (_ieltsWorkspace != null) _ieltsWorkspace.IsVisible = false;
         if (_ieltsSubContentPage != null)
@@ -46,11 +49,12 @@ public partial class MainWindow
                 : Avalonia.Controls.Primitives.ScrollBarVisibility.Auto;
         }
         _ieltsSubContent?.Children.Clear();
+        return true;
     }
 
     private void ShowIeltsSynonymsBrowser(LearningSection? currentSection = null)
     {
-        ShowIeltsSubPage(bounded: true);
+        if (!ShowIeltsSubPage(bounded: true)) return;
         if (_ieltsSubContent == null || _ieltsCatalog == null) return;
 
         var browser = new IeltsSynonymBrowser(
@@ -160,7 +164,7 @@ public partial class MainWindow
 
     private void ShowIeltsResources()
     {
-        ShowIeltsSubPage(bounded: true);
+        if (!ShowIeltsSubPage(bounded: true)) return;
         if (_ieltsSubContent == null || _ieltsCatalog == null) return;
 
         var view = new IeltsResourceView(
@@ -169,6 +173,7 @@ public partial class MainWindow
             onOpenResource: OpenIeltsResource,
             onBack: ShowIeltsCatalog
         );
+        EnhanceListeningResources(view);
         _ieltsSubContent.Children.Add(view);
     }
 
@@ -186,59 +191,155 @@ public partial class MainWindow
 
     private void ShowIeltsWriting()
     {
-        ShowIeltsSubPage(bounded: false);
-        if (_ieltsSubContent == null) return;
+        if (!ShowIeltsSubPage(bounded: true)) return;
+        if (_ieltsSubContent == null || _ieltsCatalog == null) return;
 
-        var body = new StackPanel { Name = "IeltsWritingPanel", Spacing = 14 };
+        var workspace = new IeltsWritingWorkspace(
+            catalog: _ieltsCatalog,
+            drafts: _ieltsProgress.WritingDrafts,
+            save: () =>
+            {
+                if (_restoring || !_databaseAvailable || _ieltsProgressBlocked)
+                    throw new InvalidOperationException(UiText.Bilingual("数据库不可用或学习记录被锁定", "Database unavailable or progress locked"));
+                var path = Path.Combine(Path.GetDirectoryName(_vocabService.DatabasePath)!, "learning-progress.json");
+                _ieltsProgress.Save(path);
+            },
+            speak: text => GetLearningAudio().Play(text),
+            back: ShowIeltsCatalog
+        );
+        _ieltsSubContent.Children.Add(workspace);
+    }
 
-        var topBar = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto") };
-        var title = LearningText(IeltsI18n.T("100 句翻译练习"), 22);
-        Grid.SetColumn(title, 0);
-        topBar.Children.Add(title);
-
-        var backBtn = LearningButton(IeltsI18n.T("返回 IELTS 目录"), ShowIeltsCatalog);
-        Grid.SetColumn(backBtn, 1);
-        topBar.Children.Add(backBtn);
-        body.Children.Add(topBar);
-
-        var rows = new StackPanel { Spacing = 14 };
-        foreach (var sentence in _ieltsCatalog!.Sentences)
+    private void EnhanceListeningResources(IeltsResourceView view)
+    {
+        try
         {
-            var card = new StackPanel { Spacing = 10 };
-            card.Children.Add(LearningText($"{sentence.Number:00} · {sentence.Category} · {sentence.Chinese}", 16));
-
-            var draft = new TextBox
+            if (view.Children.Count > 2 && view.Children[2] is Border notesCard && notesCard.Child is Grid notesStack)
             {
-                Name = "WritingDraft" + sentence.Number,
-                Text = _ieltsProgress.WritingDrafts.GetValueOrDefault(sentence.Number, ""),
-                AcceptsReturn = true,
-                TextWrapping = Avalonia.Media.TextWrapping.Wrap,
-                MinHeight = 65,
-                Watermark = IeltsI18n.T("输入你的英文翻译，自动保存")
-            };
-            draft.TextChanged += (_, _) =>
+                if (notesStack.Children.Count > 1 && notesStack.Children[1] is ScrollViewer notesScroll)
+                {
+                    var notesPath = IeltsCatalog.ResolveAsset("listening-notes.txt");
+                    var notesText = (notesPath != null && File.Exists(notesPath)) ? File.ReadAllText(notesPath) : "";
+                    var selectableNotes = new SelectableTextBlock
+                    {
+                        Text = notesText,
+                        FontSize = 13,
+                        LineHeight = 22,
+                        TextWrapping = TextWrapping.Wrap
+                    };
+                    notesScroll.Content = selectableNotes;
+                }
+            }
+
+            if (view.Children.Count > 1 && view.Children[1] is ScrollViewer mainScroll && mainScroll.Content is StackPanel contentStack)
             {
-                _ieltsProgress.WritingDrafts[sentence.Number] = draft.Text ?? "";
-                SaveIeltsProgress();
-            };
-            card.Children.Add(draft);
-
-            var answer = LearningText(
-                IeltsI18n.T("书中答案：") + sentence.BookAnswer + "\n" +
-                IeltsI18n.T("备用译文：") + sentence.AlternateAnswer + "\n" +
-                sentence.Remark);
-            answer.IsVisible = false;
-
-            var buttonRow = new WrapPanel { Orientation = Orientation.Horizontal };
-            buttonRow.Children.Add(LearningButton(IeltsI18n.T("显示 / 隐藏答案"), () => answer.IsVisible = !answer.IsVisible));
-            buttonRow.Children.Add(LearningButton(IeltsI18n.T("朗读参考译文"), () => GetLearningAudio().Play(sentence.BookAnswer)));
-            card.Children.Add(buttonRow);
-            card.Children.Add(answer);
-
-            rows.Children.Add(LearningCard(card));
+                var passagesCard = CreateListeningPassagesCard();
+                if (contentStack.Children.Count > 0)
+                    contentStack.Children.Insert(1, passagesCard);
+                else
+                    contentStack.Children.Add(passagesCard);
+            }
         }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[EnhanceListeningResources Error] {ex.Message}");
+        }
+    }
 
-        body.Children.Add(new ScrollViewer { Content = rows, MaxHeight = 620 });
-        _ieltsSubContent.Children.Add(LearningCard(body));
+    private Border CreateListeningPassagesCard()
+    {
+        var card = new Border
+        {
+            Classes = { "card" },
+            Padding = new Thickness(20, 16)
+        };
+        var stack = new StackPanel { Spacing = 10 };
+
+        var header = new Grid { ColumnDefinitions = new ColumnDefinitions("*") };
+        var titleStack = new StackPanel { Spacing = 3 };
+        titleStack.Children.Add(new TextBlock { Text = UiText.Bilingual("听力练习示例", "Listening practice examples"), Classes = { "eyebrow" }, FontSize = 12 });
+        var title = new TextBlock
+        {
+            Text = UiText.Bilingual("情景句子与朗读", "Situational sentences & audio"),
+            FontSize = 16,
+            FontWeight = FontWeight.Medium,
+            TextWrapping = TextWrapping.Wrap
+        };
+        title.Bind(TextBlock.ForegroundProperty, this.GetResourceObservable("InkBrush"));
+        titleStack.Children.Add(title);
+        Grid.SetColumn(titleStack, 0);
+        header.Children.Add(titleStack);
+
+        stack.Children.Add(header);
+
+        var desc = new TextBlock
+        {
+            Text = UiText.Bilingual("以下为情景练习示例，非雅思真题原文。可选中文本复制，点击 ♪ 朗读，点击 ＋ 收藏到金句本。",
+                                   "These are situational practice examples, not official IELTS passages. Select text to copy; use ♪ to listen and ＋ to save to quotes."),
+            Classes = { "muted" },
+            FontSize = 13,
+            TextWrapping = TextWrapping.Wrap
+        };
+        stack.Children.Add(desc);
+
+        var passages = new (string Section, string English, string Chinese)[]
+        {
+            ("Section 1 · 租房日常咨询 (Dialogue: Accommodation Enquiry)",
+             "Good morning, I'm calling about the apartment advertised on Bridge Street. Could you tell me if water and heating are included in the monthly rent?",
+             "早上好，我打电话咨询布里奇街广告上的那套公寓。请问月租金里包含水费和暖气费吗？"),
+            ("Section 2 · 景区导览介绍 (Monologue: Tourism & Heritage Park)",
+             "Welcome to the heritage park. Before we begin the tour, please note that photography is strictly prohibited inside the historical exhibition hall.",
+             "欢迎来到文化遗产公园。在开始游览之前，请注意历史展览馆内严禁拍照。"),
+            ("Section 3 · 学术导师研讨 (Tutorial: Research Methodology)",
+             "We need to analyze the survey responses thoroughly before submitting our research proposal to the supervisor next Monday.",
+             "在下周一向导师提交研究方案之前，我们需要彻底分析问卷调查结果。"),
+            ("Section 4 · 环境科学讲座 (Lecture: Environmental Adaptation)",
+             "Recent archaeological findings suggest that early human settlements adapted remarkably well to severe climate fluctuations.",
+             "最新的考古发现表明，早期人类定居点对剧烈的气候波动展现出了非凡的适应能力。")
+        };
+
+        var passageList = new StackPanel { Spacing = 12, Margin = new Thickness(0, 4, 0, 0) };
+        foreach (var (sec, en, zh) in passages)
+        {
+            var pBox = new Border
+            {
+                Background = new SolidColorBrush(Color.Parse("#08808080")),
+                CornerRadius = new CornerRadius(8),
+                Padding = new Thickness(14, 10)
+            };
+            var pStack = new StackPanel { Spacing = 6 };
+            pStack.Children.Add(new TextBlock { Text = sec, FontSize = 12, FontWeight = FontWeight.SemiBold, Opacity = 0.8 });
+
+            var enBlock = new SelectableTextBlock
+            {
+                Text = en,
+                FontSize = 14,
+                FontWeight = FontWeight.Medium,
+                TextWrapping = TextWrapping.Wrap,
+                LineHeight = 22
+            };
+            pStack.Children.Add(enBlock);
+
+            var zhBlock = new SelectableTextBlock
+            {
+                Text = zh,
+                FontSize = 13,
+                Opacity = 0.75,
+                TextWrapping = TextWrapping.Wrap,
+                LineHeight = 20
+            };
+            pStack.Children.Add(zhBlock);
+
+            var actions = CreateExampleActions(en, zh);
+            pStack.Children.Add(actions);
+
+            pBox.Child = pStack;
+            passageList.Children.Add(pBox);
+        }
+        stack.Children.Add(passageList);
+
+        card.Child = stack;
+        return card;
     }
 }
+

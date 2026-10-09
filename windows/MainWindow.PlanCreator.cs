@@ -12,8 +12,19 @@ namespace Lexi;
 
 public partial class MainWindow
 {
+    private Border? _planCreatorOverlay;
+    private ContentControl? _planCreatorContent;
+
+    private void ClosePlanCreator()
+    {
+        if (_planCreatorOverlay != null)
+            ((Grid)((Grid)RootWindowBorder.Child!).Children[0]).Children.Remove(_planCreatorOverlay);
+        _planCreatorOverlay = null; _planCreatorContent = null;
+    }
+
     private void OpenPlanCreator(DailyStudyPlanSource source, LearningSection? initialSection = null)
     {
+        if (_planCreatorOverlay != null) return;
         if (_learningPlansLoadFailed || !_databaseAvailable || _restoring)
         {
             SetStatus("计划数据暂不可用，请先完成词库恢复。");
@@ -98,19 +109,13 @@ public partial class MainWindow
             }
         }
 
-        var dialog = new Window
+        var dialog = new ContentControl
         {
-            Title = "创建每日学习计划",
-            Width = 720,
-            Height = 600,
-            MinWidth = 520,
-            MinHeight = 480,
-            MaxWidth = 840,
-            MaxHeight = 720,
-            WindowStartupLocation = WindowStartupLocation.CenterOwner,
-            CanResize = true,
-            Background = RootWindowBorder.Background,
-            RequestedThemeVariant = RequestedThemeVariant
+            Name = "PlanCreatorContent", MaxWidth = 1040,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            VerticalAlignment = VerticalAlignment.Stretch,
+            HorizontalContentAlignment = HorizontalAlignment.Stretch,
+            VerticalContentAlignment = VerticalAlignment.Stretch
         };
 
         var rootGrid = new Grid();
@@ -180,15 +185,19 @@ public partial class MainWindow
             Name = "PlanCreatorOnlySelected",
             Content = "仅看已选",
             IsChecked = false,
-            Margin = new Thickness(12, 0, 0, 0),
+            Margin = new Thickness(12, 0, 12, 0),
             VerticalAlignment = VerticalAlignment.Center
         };
 
         selectionToolbar.Children.Add(btnSelectPage);
-        selectionToolbar.Children.Add(btnSelectFiltered);
-        selectionToolbar.Children.Add(btnClearFiltered);
-        selectionToolbar.Children.Add(btnClearAll);
         selectionToolbar.Children.Add(chkOnlySelected);
+        var moreActions = new StackPanel { Spacing = 8 };
+        moreActions.Children.Add(btnSelectFiltered); moreActions.Children.Add(btnClearFiltered); moreActions.Children.Add(btnClearAll);
+        var moreFlyout = new Flyout { Content = moreActions };
+        var moreButton = LearningButton("更多…", () => { });
+        moreButton.Flyout = moreFlyout;
+        foreach (var action in moreActions.Children.OfType<Button>()) action.Click += (_, _) => moreFlyout.Hide();
+        selectionToolbar.Children.Add(moreButton);
         step1Header.Children.Add(selectionToolbar);
 
         Grid.SetRow(step1Header, 0);
@@ -271,7 +280,7 @@ public partial class MainWindow
         footerGrid.Children.Add(selectedCountText);
 
         var step1Buttons = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10 };
-        var btnCancel1 = LearningButton("取消", dialog.Close);
+        var btnCancel1 = LearningButton("取消", ClosePlanCreator);
         var btnNextToStep2 = LearningButton("下一步：安排计划 →", () => { }, primary: true);
         step1Buttons.Children.Add(btnCancel1);
         step1Buttons.Children.Add(btnNextToStep2);
@@ -453,7 +462,7 @@ public partial class MainWindow
         footer2Grid.Children.Add(btnBackToStep1);
 
         var step2Buttons = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10 };
-        var btnCancel2 = LearningButton("取消", dialog.Close);
+        var btnCancel2 = LearningButton("取消", ClosePlanCreator);
         var btnSubmitPlan = LearningButton("创建计划", () => { }, primary: true);
         step2Buttons.Children.Add(btnCancel2);
         step2Buttons.Children.Add(btnSubmitPlan);
@@ -574,11 +583,12 @@ public partial class MainWindow
                 rowGrid.Children.Add(check);
 
                 var wordStack = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
-                wordStack.Children.Add(new TextBlock
+                wordStack.Children.Add(new SelectableTextBlock
                 {
                     Text = word.Word,
                     FontWeight = FontWeight.SemiBold,
-                    FontSize = 14
+                    FontSize = 16,
+                    TextWrapping = TextWrapping.Wrap
                 });
                 if (!string.IsNullOrWhiteSpace(word.Phonetic))
                 {
@@ -592,16 +602,20 @@ public partial class MainWindow
                 Grid.SetColumn(wordStack, 1);
                 rowGrid.Children.Add(wordStack);
 
-                var meaningBlock = new TextBlock
+                var meaningBlock = new SelectableTextBlock
                 {
                     Text = word.Meaning + (string.IsNullOrWhiteSpace(word.Definition) ? "" : $" · {word.Definition}"),
                     FontSize = 13,
                     VerticalAlignment = VerticalAlignment.Center,
                     TextWrapping = TextWrapping.Wrap,
+                    MaxLines = 2,
+                    TextTrimming = TextTrimming.CharacterEllipsis,
                     Opacity = 0.9
                 };
-                Grid.SetColumn(meaningBlock, 2);
-                rowGrid.Children.Add(meaningBlock);
+                var fullMeaning = new Expander { Header = meaningBlock,
+                    Content = new SelectableTextBlock { Text = meaningBlock.Text, TextWrapping = TextWrapping.Wrap, FontSize = 14, Margin = new Thickness(0,8) } };
+                Grid.SetColumn(fullMeaning, 2);
+                rowGrid.Children.Add(fullMeaning);
 
                 rowBorder.Child = rowGrid;
                 rowsPanel.Children.Add(rowBorder);
@@ -733,7 +747,7 @@ public partial class MainWindow
                 _learningPlans = updated;
                 RenderLearningPlans();
                 SetStatus($"计划「{planToCreate.Name}」已成功创建，共 {wordCount} 词。");
-                dialog.Close();
+                ClosePlanCreator();
             }
             catch (Exception ex)
             {
@@ -822,7 +836,12 @@ public partial class MainWindow
         };
 
         RenderStep1Page();
-        _ = dialog.ShowDialog(this);
+        _planCreatorContent = dialog;
+        _planCreatorOverlay = new Border { Child = dialog };
+        _planCreatorOverlay.Bind(Border.BackgroundProperty, this.GetResourceObservable("PaperBrush"));
+        Grid.SetRow(_planCreatorOverlay, 1); _planCreatorOverlay.SetValue(Panel.ZIndexProperty, 230);
+        ((Grid)((Grid)RootWindowBorder.Child!).Children[0]).Children.Add(_planCreatorOverlay);
+        searchBox.Focus();
     }
 
     private static DailyStudyPlanWord ToPlanWord(LearningWord word) => new()

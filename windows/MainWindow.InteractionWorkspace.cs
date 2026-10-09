@@ -8,7 +8,10 @@ namespace Lexi;
 
 public partial class MainWindow
 {
-    private SettingsDrawerControl? _settingsDrawer;
+    private SettingsPageControl? _settingsDrawer;
+    private string _settingsPreviousPage = "lookup";
+    private readonly Dictionary<Control, bool> _settingsPageVisibility = [];
+    private bool _settingsPreviousFocusChrome;
     private bool _settingsDrawerOpen;
     private bool _globalFocusActive;
     private ArchiveActionsMenu? _archiveActions;
@@ -24,12 +27,9 @@ public partial class MainWindow
     private void ConfigureInteractionWorkspace()
     {
         GlobalFocusButton.Click += (_, _) => ToggleGlobalFocus();
-        _settingsDrawer = new SettingsDrawerControl { Name = "SettingsDrawer" };
-        Grid.SetRow(_settingsDrawer, 1);
-        _settingsDrawer.SetValue(Panel.ZIndexProperty, 210);
+        _settingsDrawer = new SettingsPageControl { Name = "SettingsPage" };
         var main = (Grid)((Grid)RootWindowBorder.Child!).Children[0];
-        main.Children.Add(_settingsDrawer);
-        _settingsDrawer.Closed += (_, _) => { _settingsDrawerOpen = false; NavSettings.Classes.Set("active", false); };
+        _settingsDrawer.Closed += (_, _) => RestoreSettingsSource();
 
         Control Move(string name)
         {
@@ -41,6 +41,10 @@ public partial class MainWindow
             return card;
         }
         _settingsDrawer.RegisterSectionContent(SettingsSection.Appearance, Move("ThemeSettingsCard"));
+        if (this.FindControl<Border>("ThemeSettingsCard")!.Child is StackPanel appearance)
+        {
+            appearance.Children.Add(new TextBlock { Text = UiText.Bilingual("专注背景：跟随应用主题", "Focus background: follows app theme"), Margin = new Thickness(0,12,0,0) });
+        }
         _settingsDrawer.RegisterSectionContent(SettingsSection.AiService, Move("AiSettingsCard"));
         _settingsDrawer.RegisterSectionContent(SettingsSection.DataAndBackup, Move("DataSettingsCard"));
         _settingsDrawer.RegisterSectionContent(SettingsSection.About, Move("AboutSettingsCard"));
@@ -51,6 +55,9 @@ public partial class MainWindow
         { SettingsContent.Children.Remove(card); studySettings.Children.Add(card); _settingsRoots.Add(card); }
         AddStudyShortcutSettings(studySettings);
         _settingsDrawer.RegisterSectionContent(SettingsSection.StudyAndShortcuts, studySettings);
+        PageSettings.Margin = new Thickness(0);
+        PageSettings.VerticalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled;
+        PageSettings.Content = _settingsDrawer;
         PageSettings.IsVisible = false;
 
         _archiveActions = new ArchiveActionsMenu { Name = "ArchiveActionsMenu" };
@@ -68,18 +75,49 @@ public partial class MainWindow
             outer.Children.Remove(host); main.Children.Add(host);
         }
         if (_focusHost != null)
-            _focusHost.Bind(Border.BackgroundProperty, this.GetResourceObservable("FocusBackgroundBrush"));
+            _focusHost.Bind(Border.BackgroundProperty, this.GetResourceObservable("PaperBrush"));
+        ConfigureGlobalStudySurface();
     }
 
     private void OpenSettingsDrawer()
     {
-        if (_settingsDrawer == null) return;
+        if (_settingsDrawer == null || _settingsDrawerOpen) return;
+        if (!TryFlushWritingDraft()) return;
+        PersistPausedSurfaces();
+        StopWindowsLearningAudio();
+        ++_reviewEpoch;
+        _settingsPreviousPage = _currentPage;
+        _settingsPreviousFocusChrome = _globalFocusActive;
+        _settingsPageVisibility.Clear();
+        foreach (var control in new Control?[] { PageLookup, LookupPageHost, PageVocab, PageReview,
+            _learningHubPage, _ieltsPage, _quotesPage, _focusHost, _typingHost })
+            if (control != null) { _settingsPageVisibility[control] = control.IsVisible; control.IsVisible = false; }
+        SetGlobalFocusChrome(false);
+        _currentPage = "settings";
+        NavLookup.Classes.Set("active", false); NavVocab.Classes.Set("active", false); NavReview.Classes.Set("active", false);
+        _navLearningHub?.Classes.Set("active", false); _ieltsNav?.Classes.Set("active", false); _quotesNav?.Classes.Set("active", false);
         UpdateDataInfo();
         _settingsDrawerOpen = true;
+        PageSettings.IsVisible = true;
         NavSettings.Classes.Set("active", true);
         _settingsDrawer.Open();
     }
-    private void CloseSettingsDrawer() { _settingsDrawer?.Close(); _settingsDrawerOpen = false; }
+    private void CloseSettingsDrawer() { _settingsDrawer?.Close(); }
+
+    private void RestoreSettingsSource()
+    {
+        if (!_settingsDrawerOpen) return;
+        _settingsDrawerOpen = false;
+        PageSettings.IsVisible = false;
+        _currentPage = _settingsPreviousPage;
+        foreach (var (control, visible) in _settingsPageVisibility) control.IsVisible = visible;
+        _settingsPageVisibility.Clear();
+        NavSettings.Classes.Set("active", false);
+        NavLookup.Classes.Set("active", _currentPage == "lookup"); NavVocab.Classes.Set("active", _currentPage == "vocab");
+        NavReview.Classes.Set("active", _currentPage == "review"); _navLearningHub?.Classes.Set("active", _currentPage == "learning");
+        _ieltsNav?.Classes.Set("active", _currentPage == "ielts"); _quotesNav?.Classes.Set("active", _currentPage == "quotes");
+        SetGlobalFocusChrome(_settingsPreviousFocusChrome);
+    }
 
     private void SetGlobalFocusChrome(bool active)
     {
@@ -88,6 +126,8 @@ public partial class MainWindow
         MainBodyGrid.ColumnDefinitions[0].Width = new GridLength(active ? 0 : 208);
         GlobalFocusButton.Content = UiText.Text(active ? "退出专注" : "专注");
         if (!active && _workspaceChooser != null) _workspaceChooser.IsVisible = false;
+        RefreshUnifiedStudyCanvas();
+        RefreshGlobalStudySurface();
     }
 
     private void ToggleGlobalFocus()
@@ -113,6 +153,8 @@ public partial class MainWindow
         { ShowFocusSourceChooser(); return; }
         else if (_currentPage=="ielts" && _ieltsWorkspace?.IsVisible==true)
         { ShowIeltsFocusChooser(); return; }
+        else if (_currentPage is not "review" and not "learning")
+        { ShowFocusSourceChooser(); return; }
         SetGlobalFocusChrome(true);
     }
 

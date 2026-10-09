@@ -1,5 +1,4 @@
 using System;
-using Lexi.Features.Ielts;
 using System.Collections.Generic;
 using Avalonia;
 using Avalonia.Controls;
@@ -9,43 +8,45 @@ using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Path = Avalonia.Controls.Shapes.Path;
-using UiText = Lexi.Features.Ielts.UiText;
+using UiText = Lexi.UiText;
 
 namespace Lexi.Controls;
 
 /// <summary>
 /// 档案式词汇行组件：
-/// 包含选择框、英文词头、音标、词性、简短释义、学习状态、紧凑发音动作；
-/// 展开后呈现抽屉式详情（完整释义、例句与朗读、教材来源、补充说明、同义替换、收藏/查看档案）。
-/// 遵循契约：选择、展开、发音、收藏操作相互独立，资源缺字段时不强行占位。
+/// 包含选择框、英文词头、音标、词性、简短释义、学习状态、紧凑发音动作与行右侧 32DIP 独立档案收藏按钮；
+/// 展开后呈现抽屉式详情（完整释义、例句与朗读/例句收藏、教材来源、补充说明、同义替换）。
+/// 遵循契约：选择、展开、发音、收藏操作相互独立，用户内容采用 SelectableTextBlock 支持自由选择复制。
 /// </summary>
 public class VocabularyRow : Border
 {
     private readonly CheckBox _checkBox;
     private readonly ToggleButton _chevron;
-    private readonly TextBlock _wordBlock;
-    private readonly TextBlock _phoneticBlock;
+    private readonly SelectableTextBlock _wordBlock;
+    private readonly SelectableTextBlock _phoneticBlock;
     private readonly Border _posBorder;
     private readonly TextBlock _posBlock;
-    private readonly TextBlock _compactMeaning;
+    private readonly SelectableTextBlock _compactMeaning;
     private readonly Border _statusBorder;
     private readonly TextBlock _statusBlock;
     private readonly Button _audioBtn;
+    private readonly Button _rowArchiveBtn;
 
     // 抽屉详情
     private readonly Border _drawer;
     private readonly TextBlock _meaningTitle;
-    private readonly TextBlock _fullMeaningBlock;
+    private readonly SelectableTextBlock _fullMeaningBlock;
     private readonly StackPanel _examplePanel;
     private readonly TextBlock _exampleTitle;
-    private readonly TextBlock _exampleBlock;
+    private readonly SelectableTextBlock _exampleBlock;
     private readonly Button _exampleAudioBtn;
+    private readonly Button _saveExampleBtn;
     private readonly StackPanel _sourcePanel;
     private readonly TextBlock _sourceTitle;
-    private readonly TextBlock _sourceBlock;
+    private readonly SelectableTextBlock _sourceBlock;
     private readonly StackPanel _extraPanel;
     private readonly TextBlock _extraTitle;
-    private readonly TextBlock _extraBlock;
+    private readonly SelectableTextBlock _extraBlock;
     private readonly StackPanel _synonymsPanel;
     private readonly TextBlock _synonymsTitle;
     private readonly WrapPanel _synonymsWrap;
@@ -73,6 +74,14 @@ public class VocabularyRow : Border
     public event Action<VocabularyRow, string>? PlayExampleRequested;
     public event Action<VocabularyRow>? AddToArchiveRequested;
     public event Action<VocabularyRow, string>? ViewArchiveRequested;
+    public event Action<VocabularyRow, string>? SaveExampleRequested;
+
+    public Button RowArchiveButton => _rowArchiveBtn;
+    public Button SaveExampleButton => _saveExampleBtn;
+    public Button DetailArchiveButton => _archiveBtn;
+    public SelectableTextBlock WordBlock => _wordBlock;
+    public SelectableTextBlock FullMeaningBlock => _fullMeaningBlock;
+    public SelectableTextBlock ExampleBlock => _exampleBlock;
 
     public VocabularyRow()
     {
@@ -85,10 +94,10 @@ public class VocabularyRow : Border
         // 主容器（垂直：主行 + 展开抽屉）
         var rootPanel = new StackPanel { Spacing = 4 };
 
-        // 主行 Grid：选择框、折叠箭头、词头/音标/释义、状态徽章、发音按钮
+        // 主行 Grid：选择框、折叠箭头、词头/音标/释义、状态徽章、发音按钮、32DIP收藏按钮
         var mainGrid = new Grid
         {
-            ColumnDefinitions = new ColumnDefinitions("Auto,Auto,*,Auto,Auto"),
+            ColumnDefinitions = new ColumnDefinitions("Auto,Auto,*,Auto,Auto,Auto"),
             VerticalAlignment = VerticalAlignment.Center
         };
 
@@ -119,7 +128,7 @@ public class VocabularyRow : Border
         Grid.SetColumn(_chevron, 1);
         mainGrid.Children.Add(_chevron);
 
-        // 3. 单词信息区（词头、音标、词性、简短释义）
+        // 3. 单词信息区（词头、音标、词性、简短释义，全部使用 SelectableTextBlock）
         var wordStack = new StackPanel
         {
             Spacing = 2,
@@ -127,17 +136,14 @@ public class VocabularyRow : Border
         };
 
         var headerWrap = new WrapPanel { Orientation = Orientation.Horizontal };
-        _wordBlock = new TextBlock
+        _wordBlock = new SelectableTextBlock
         {
             FontSize = 16,
             FontWeight = FontWeight.SemiBold,
             Margin = new Thickness(0, 0, 8, 0)
         };
-        try { _wordBlock.Cursor = new Cursor(StandardCursorType.Hand); } catch { }
-        // 点击词头同样触发展开/收起，便于触控与鼠标操作
-        _wordBlock.PointerPressed += (_, _) => _chevron.IsChecked = !_chevron.IsChecked;
 
-        _phoneticBlock = new TextBlock
+        _phoneticBlock = new SelectableTextBlock
         {
             Classes = { "muted" },
             FontSize = 13,
@@ -158,8 +164,8 @@ public class VocabularyRow : Border
         headerWrap.Children.Add(_posBorder);
         wordStack.Children.Add(headerWrap);
 
-        // 收起时的紧凑释义（单行省略）
-        _compactMeaning = new TextBlock
+        // 收起时的紧凑释义（单行省略，可选择复制）
+        _compactMeaning = new SelectableTextBlock
         {
             Classes = { "muted" },
             FontSize = 12,
@@ -218,6 +224,30 @@ public class VocabularyRow : Border
         Grid.SetColumn(_audioBtn, 4);
         mainGrid.Children.Add(_audioBtn);
 
+        // 6. 行右侧发音旁 32DIP 中性 + / 勾号 独立收藏按钮（不联动展开或勾选）
+        _rowArchiveBtn = new Button
+        {
+            Classes = { "row-btn" },
+            Width = 32,
+            Height = 32,
+            MinWidth = 32,
+            MinHeight = 32,
+            Padding = new Thickness(0),
+            Margin = new Thickness(4, 0, 0, 0),
+            VerticalAlignment = VerticalAlignment.Center,
+            HorizontalAlignment = HorizontalAlignment.Center
+        };
+        _rowArchiveBtn.Click += (_, e) =>
+        {
+            e.Handled = true;
+            if (IsArchived)
+                ViewArchiveRequested?.Invoke(this, WordText);
+            else
+                AddToArchiveRequested?.Invoke(this);
+        };
+        Grid.SetColumn(_rowArchiveBtn, 5);
+        mainGrid.Children.Add(_rowArchiveBtn);
+
         rootPanel.Children.Add(mainGrid);
 
         // 展开抽屉（含完整释义、例句、来源、补充、同义替换）
@@ -231,19 +261,19 @@ public class VocabularyRow : Border
 
         var drawerStack = new StackPanel { Spacing = 8 };
 
-        // 完整释义
+        // 完整释义（用户内容 SelectableTextBlock）
         var meaningPanel = new StackPanel { Spacing = 2 };
-        _meaningTitle = new TextBlock { Classes = { "eyebrow" }, FontSize = 10, Text = "完整释义" };
-        _fullMeaningBlock = new TextBlock { FontSize = 14, TextWrapping = TextWrapping.Wrap, LineHeight = 22 };
+        _meaningTitle = new TextBlock { Classes = { "eyebrow" }, FontSize = 10, Text = UiText.Bilingual("完整释义", "Full Meaning") };
+        _fullMeaningBlock = new SelectableTextBlock { FontSize = 14, TextWrapping = TextWrapping.Wrap, LineHeight = 22 };
         meaningPanel.Children.Add(_meaningTitle);
         meaningPanel.Children.Add(_fullMeaningBlock);
         drawerStack.Children.Add(meaningPanel);
 
-        // 例句（缺字段时不造数据、不强行留空占位）
+        // 例句（用户内容 SelectableTextBlock，含发音及例句收藏按钮）
         _examplePanel = new StackPanel { Spacing = 2 };
-        _exampleTitle = new TextBlock { Classes = { "eyebrow" }, FontSize = 10, Text = "例句" };
-        var exampleGrid = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto") };
-        _exampleBlock = new TextBlock { Classes = { "example-en" }, FontSize = 13, TextWrapping = TextWrapping.Wrap, LineHeight = 20 };
+        _exampleTitle = new TextBlock { Classes = { "eyebrow" }, FontSize = 10, Text = UiText.Bilingual("例句", "Example") };
+        var exampleGrid = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto,Auto") };
+        _exampleBlock = new SelectableTextBlock { Classes = { "example-en" }, FontSize = 13, TextWrapping = TextWrapping.Wrap, LineHeight = 20 };
         Grid.SetColumn(_exampleBlock, 0);
         exampleGrid.Children.Add(_exampleBlock);
 
@@ -273,42 +303,72 @@ public class VocabularyRow : Border
         Grid.SetColumn(_exampleAudioBtn, 1);
         exampleGrid.Children.Add(_exampleAudioBtn);
 
+        // 新增例句收藏按钮
+        var saveExampleIcon = new Path
+        {
+            Data = SafeParseGeometry("M 3,2 L 11,2 L 11,14 L 7,10 L 3,14 Z"),
+            StrokeThickness = 1.2,
+            StrokeLineCap = PenLineCap.Round,
+            StrokeJoin = PenLineJoin.Round,
+            Width = 14,
+            Height = 14
+        };
+        saveExampleIcon.Bind(Shape.StrokeProperty, this.GetResourceObservable("MutedBrush"));
+
+        _saveExampleBtn = new Button
+        {
+            Classes = { "row-btn" },
+            Padding = new Thickness(4, 2),
+            Margin = new Thickness(4, 0, 0, 0),
+            VerticalAlignment = VerticalAlignment.Top,
+            Content = saveExampleIcon
+        };
+        _saveExampleBtn.Click += (_, e) =>
+        {
+            e.Handled = true;
+            if (!string.IsNullOrWhiteSpace(Example))
+                SaveExampleRequested?.Invoke(this, Example);
+        };
+        Grid.SetColumn(_saveExampleBtn, 2);
+        exampleGrid.Children.Add(_saveExampleBtn);
+
         _examplePanel.Children.Add(_exampleTitle);
         _examplePanel.Children.Add(exampleGrid);
         drawerStack.Children.Add(_examplePanel);
 
-        // 教材来源
+        // 教材来源（用户内容 SelectableTextBlock）
         _sourcePanel = new StackPanel { Spacing = 2 };
-        _sourceTitle = new TextBlock { Classes = { "eyebrow" }, FontSize = 10, Text = "教材来源" };
-        _sourceBlock = new TextBlock { Classes = { "muted" }, FontSize = 12 };
+        _sourceTitle = new TextBlock { Classes = { "eyebrow" }, FontSize = 10, Text = UiText.Bilingual("教材来源", "Source") };
+        _sourceBlock = new SelectableTextBlock { Classes = { "muted" }, FontSize = 12 };
         _sourcePanel.Children.Add(_sourceTitle);
         _sourcePanel.Children.Add(_sourceBlock);
         drawerStack.Children.Add(_sourcePanel);
 
-        // 补充说明
+        // 补充说明（用户内容 SelectableTextBlock）
         _extraPanel = new StackPanel { Spacing = 2 };
-        _extraTitle = new TextBlock { Classes = { "eyebrow" }, FontSize = 10, Text = "补充说明" };
-        _extraBlock = new TextBlock { FontSize = 13, TextWrapping = TextWrapping.Wrap, LineHeight = 20 };
+        _extraTitle = new TextBlock { Classes = { "eyebrow" }, FontSize = 10, Text = UiText.Bilingual("补充说明", "Notes") };
+        _extraBlock = new SelectableTextBlock { FontSize = 13, TextWrapping = TextWrapping.Wrap, LineHeight = 20 };
         _extraPanel.Children.Add(_extraTitle);
         _extraPanel.Children.Add(_extraBlock);
         drawerStack.Children.Add(_extraPanel);
 
         // 同义替换
         _synonymsPanel = new StackPanel { Spacing = 4 };
-        _synonymsTitle = new TextBlock { Classes = { "eyebrow" }, FontSize = 10, Text = "同义替换" };
+        _synonymsTitle = new TextBlock { Classes = { "eyebrow" }, FontSize = 10, Text = UiText.Bilingual("同义替换", "Synonyms") };
         _synonymsWrap = new WrapPanel { Orientation = Orientation.Horizontal };
         _synonymsPanel.Children.Add(_synonymsTitle);
         _synonymsPanel.Children.Add(_synonymsWrap);
         drawerStack.Children.Add(_synonymsPanel);
 
-        // 档案收藏/查看动作
+        // 抽屉内原有的重复大收藏按键（按契约隐藏）
         _archiveBtn = new Button
         {
             Classes = { "secondary" },
             Padding = new Thickness(10, 5),
             FontSize = 12,
             Margin = new Thickness(0, 4, 0, 0),
-            HorizontalAlignment = HorizontalAlignment.Left
+            HorizontalAlignment = HorizontalAlignment.Left,
+            IsVisible = false
         };
         _archiveBtn.Click += (_, _) =>
         {
@@ -406,7 +466,7 @@ public class VocabularyRow : Border
                 {
                     Classes = { "pos-chip" },
                     Margin = new Thickness(0, 0, 6, 4),
-                    Child = new TextBlock { Text = syn, FontSize = 12 }
+                    Child = new SelectableTextBlock { Text = syn, FontSize = 12 }
                 };
                 _synonymsWrap.Children.Add(chip);
             }
@@ -437,27 +497,55 @@ public class VocabularyRow : Border
 
     private void UpdateArchiveVisual()
     {
-        _archiveBtn.Content = IsArchived ? IeltsI18n.T("查看档案") : IeltsI18n.T("加入词汇档案");
-        _archiveBtn.SetValue(ToolTip.TipProperty, IsArchived
-            ? IeltsI18n.T("已在档案中 · 查看档案")
-            : IeltsI18n.T("加入词汇档案"));
+        // 详情重复大收藏键隐藏
+        _archiveBtn.IsVisible = false;
+
+        if (IsArchived)
+        {
+            var checkPath = new Path
+            {
+                Data = SafeParseGeometry("M 3,8 L 6,12 L 13,4"),
+                StrokeThickness = 1.6,
+                StrokeLineCap = PenLineCap.Round,
+                StrokeJoin = PenLineJoin.Round,
+                Width = 14,
+                Height = 14
+            };
+            checkPath.Bind(Shape.StrokeProperty, this.GetResourceObservable("PrimaryGreen"));
+            _rowArchiveBtn.Content = checkPath;
+            _rowArchiveBtn.SetValue(ToolTip.TipProperty, UiText.Bilingual("已在档案中 · 查看档案", "In Archive · View"));
+        }
+        else
+        {
+            var plusPath = new Path
+            {
+                Data = SafeParseGeometry("M 8,3 L 8,13 M 3,8 L 13,8"),
+                StrokeThickness = 1.6,
+                StrokeLineCap = PenLineCap.Round,
+                StrokeJoin = PenLineJoin.Round,
+                Width = 14,
+                Height = 14
+            };
+            plusPath.Bind(Shape.StrokeProperty, this.GetResourceObservable("MutedBrush"));
+            _rowArchiveBtn.Content = plusPath;
+            _rowArchiveBtn.SetValue(ToolTip.TipProperty, UiText.Bilingual("加入词汇档案", "Add to Archive"));
+        }
     }
 
     private void UpdateStatusVisual()
     {
-        var isEn = UiText.Language == "en";
         switch (StatusKind)
         {
             case "typed":
-                _statusBlock.Text = isEn ? "Practiced" : "已练习";
+                _statusBlock.Text = UiText.Bilingual("已练习", "Practiced");
                 _statusBlock.Bind(TextBlock.ForegroundProperty, this.GetResourceObservable("PrimaryGreen"));
                 break;
             case "error":
-                _statusBlock.Text = isEn ? "Error" : "错误词";
+                _statusBlock.Text = UiText.Bilingual("错误词", "Error");
                 _statusBlock.Foreground = Brushes.IndianRed;
                 break;
             default:
-                _statusBlock.Text = isEn ? "New" : "未练习";
+                _statusBlock.Text = UiText.Bilingual("未练习", "New");
                 _statusBlock.Bind(TextBlock.ForegroundProperty, this.GetResourceObservable("MutedBrush"));
                 break;
         }
@@ -465,17 +553,20 @@ public class VocabularyRow : Border
 
     public void RefreshLanguage()
     {
-        var isEn = UiText.Language == "en";
-        _meaningTitle.Text = isEn ? "Full Meaning" : "完整释义";
-        _exampleTitle.Text = isEn ? "Example" : "例句";
-        _sourceTitle.Text = isEn ? "Source" : "教材来源";
-        _extraTitle.Text = isEn ? "Notes" : "补充说明";
-        _synonymsTitle.Text = isEn ? "Synonyms" : "同义替换";
+        _meaningTitle.Text = UiText.Bilingual("完整释义", "Full Meaning");
+        _exampleTitle.Text = UiText.Bilingual("例句", "Example");
+        _sourceTitle.Text = UiText.Bilingual("教材来源", "Source");
+        _extraTitle.Text = UiText.Bilingual("补充说明", "Notes");
+        _synonymsTitle.Text = UiText.Bilingual("同义替换", "Synonyms");
 
-        _checkBox.SetValue(ToolTip.TipProperty, isEn ? "Select word" : "选择词汇");
-        _chevron.SetValue(ToolTip.TipProperty, isEn ? "Expand/collapse details" : "展开/收起详情");
-        _audioBtn.SetValue(ToolTip.TipProperty, isEn ? "Pronounce" : "朗读发音");
-        _exampleAudioBtn.SetValue(ToolTip.TipProperty, isEn ? "Read example" : "朗读例句");
+        _checkBox.SetValue(ToolTip.TipProperty, UiText.Bilingual("选择词汇", "Select word"));
+        _chevron.SetValue(ToolTip.TipProperty, UiText.Bilingual("展开/收起详情", "Expand/collapse details"));
+        _audioBtn.SetValue(ToolTip.TipProperty, UiText.Bilingual("朗读发音", "Pronounce"));
+        _rowArchiveBtn.SetValue(ToolTip.TipProperty, IsArchived
+            ? UiText.Bilingual("已在档案中 · 查看档案", "In Archive · View")
+            : UiText.Bilingual("加入词汇档案", "Add to Archive"));
+        _exampleAudioBtn.SetValue(ToolTip.TipProperty, UiText.Bilingual("朗读例句", "Read example"));
+        _saveExampleBtn.SetValue(ToolTip.TipProperty, UiText.Bilingual("收藏例句", "Save example"));
 
         UpdateStatusVisual();
         UpdateArchiveVisual();

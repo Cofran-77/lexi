@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Media.Imaging;
 using Avalonia.Controls.ApplicationLifetimes;
 using System.Reflection;
+using Avalonia.VisualTree;
 namespace Lexi;
 public static class QuickActionUiTests
 {
@@ -37,6 +38,12 @@ public static class QuickActionUiTests
                 Check(menu?.Items.OfType<NativeMenuItem>().Any(i=>i.Header=="退出 lexi" && i.Gesture?.Key==Avalonia.Input.Key.Q)==true,"mac application menu has a working quit entry");
                 Check(menu!.Items.OfType<NativeMenuItem>().Count(i=>i.Header is "查词" or "翻译句子" or "收藏金句")==3,"mac application menu exposes all three quick cards");
             }
+            card.Prepare(QuickAction.Translate,"Translation to quotes.");card.TranslationInput.Text="翻译收藏测试";
+            card.ShowNear(new PixelPoint(500,200));
+            card.GetVisualDescendants().OfType<Button>().Single(b=>b.Name=="QuickDetailsBtn").RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+            Check(quotes.GetQuotes("Translation to quotes",50,0).SingleOrDefault()?.Translation=="翻译收藏测试","translation Quotes action saves before opening the notebook");
+            quotes.DeleteQuote(quotes.GetQuotes("Translation to quotes",50,0).Single().Id);
+            card=new QuickCardWindow(dictionary,store,quotes,(_,_)=>pending.Task,settings,()=>{},_=>{},()=>{});
             card.Prepare(QuickAction.Lookup,"resilient");card.ShowNear(new PixelPoint(500,200));await card.RunAsync();
             Check(!string.IsNullOrWhiteSpace(card.TranslationInput.Text),"lookup card returns offline meaning");card.Save();Check(store.GetAllWords().Any(w=>w.Word=="resilient"),"lookup card saves a word");await Shot(card,"quick-lookup");
             card.Prepare(QuickAction.SaveQuote,"Evidence matters.");var request=card.RunAsync();card.TranslationInput.Text="我编辑的译文";pending.SetResult("模型译文");await request;
@@ -94,6 +101,12 @@ public static class QuickActionUiTests
             var replacementPath=Path.Combine(folder,"quick-replacement.sqlite3");
             using(var replacement=new VocabularyService(replacementPath))
             {
+                var replacementQuotes=(IQuoteArchive)replacement;
+                for(long id=1;id<oldQuote.Id;id++)
+                {
+                    var placeholder=replacementQuotes.SaveQuote(null,"ID fixture "+id,"","","");
+                    replacementQuotes.DeleteQuote(placeholder.Id);
+                }
                 var changed=((IQuoteArchive)replacement).SaveQuote(null,"Replacement sentence.","恢复后的不同金句","replacement source","");
                 Check(changed.Id==oldQuote.Id,"restore fixture reuses the quote ID with different content");
                 replacement.SaveSettings(new AppSettings {Provider="custom",AiProtocol="responses",Timeout=120,BaseUrl="https://relay.example.org/agent",Model="test-model"});

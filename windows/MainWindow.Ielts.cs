@@ -24,9 +24,9 @@ public partial class MainWindow
     private LearningProgress _ieltsProgress = new();
     private string? _ieltsProgressPath;
     private bool _ieltsProgressBlocked;
-    private LocalWordAudioPlayer? _learningAudio;
+    private IWordAudioPlayer? _learningAudio;
 
-    private LocalWordAudioPlayer GetLearningAudio() => _learningAudio ??= new LocalWordAudioPlayer(SetStatus);
+    private IWordAudioPlayer GetLearningAudio() => _learningAudio ??= new LocalWordAudioPlayer(SetStatus);
 
     [DllImport("user32.dll")] private static extern bool MessageBeep(uint type);
     private void SystemFeedbackSound(bool correct) => MessageBeep(correct ? 0x40u : 0x30u);
@@ -102,6 +102,7 @@ public partial class MainWindow
 
     private void ShowIeltsCatalog()
     {
+        if (!TryFlushWritingDraft()) return;
         ShowPage("ielts");
 
         if (_ieltsPage == null) return;
@@ -135,6 +136,7 @@ public partial class MainWindow
 
             _ieltsPage.Children.Add(_ieltsWorkspace);
             _ieltsWorkspace.ProgressChanged += SaveIeltsProgress;
+            _ieltsWorkspace.SaveExampleRequested += english => SaveExampleToQuotes(english);
         }
 
         // 显示主工作区，隐藏子页面
@@ -302,6 +304,8 @@ public partial class MainWindow
         _ieltsWorkspace?.RefreshLanguage();
         foreach (var browser in _ieltsSubContent?.Children.OfType<IeltsSynonymBrowser>() ?? [])
             browser.RefreshLanguage();
+        foreach (var writing in _ieltsSubContent?.Children.OfType<IeltsWritingWorkspace>() ?? [])
+            writing.RefreshLanguage();
     }
 
     [DllImport("winmm.dll", CharSet = CharSet.Unicode)]

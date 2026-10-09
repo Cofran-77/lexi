@@ -7,6 +7,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Media;
+using Lexi.Controls;
 using Lexi.Features.Learning;
 
 namespace Lexi;
@@ -40,6 +41,7 @@ public partial class MainWindow
     private StackPanel? _learningTypingLetters;
     private TextBlock? _learningTypingResult;
     private TextBlock? _learningTypingStats;
+    private SelectableTextBlock? _learningTypingHint;
     private List<LearningWord> _lastTypingWords = [];
     private Border? _typingHost;
     private string _typingPreviousPage = "learning";
@@ -541,8 +543,8 @@ public partial class MainWindow
         var dialog = new Window
         {
             Title = plan.Name + " · 最近批次拼写训练",
-            Width = 560,
-            Height = 360,
+            Width = 620,
+            Height = 540,
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
             Background = RootWindowBorder.Background,
             RequestedThemeVariant = RequestedThemeVariant
@@ -550,26 +552,13 @@ public partial class MainWindow
 
         var content = new StackPanel { Spacing = 16, Margin = new Thickness(24) };
         content.Children.Add(new TextBlock { Text = plan.Name + " · 批次拼写强化", FontSize = 18, FontWeight = FontWeight.SemiBold });
-        content.Children.Add(new TextBlock { Text = $"本批全部词汇共 {words.Count} 词，曾忘记词共 {forgotWords.Count} 词。", Opacity = 0.8 });
+        content.Children.Add(new TextBlock { Text = $"本批全部词汇共 {words.Count} 词，曾忘记词共 {forgotWords.Count} 词。", Opacity = 0.8, TextWrapping = TextWrapping.Wrap });
 
-        var choices = new StackPanel { Spacing = 10 };
-        var btnAllHint = LearningButton($"淡写（有提示）· 本批全部词 ({words.Count})", () => { dialog.Close(); StartLearningTyping(words.Select(ToTypingWord).ToList(), true); });
-        var btnForgotHint = LearningButton($"淡写（有提示）· 本批曾忘记词 ({forgotWords.Count})", () => { dialog.Close(); StartLearningTyping(forgotWords.Select(ToTypingWord).ToList(), true); });
-        btnForgotHint.IsEnabled = forgotWords.Count > 0;
-
-        var btnAllDictation = LearningButton($"默写（无提示）· 本批全部词 ({words.Count})", () => { dialog.Close(); StartLearningTyping(words.Select(ToTypingWord).ToList(), false); });
-        var btnForgotDictation = LearningButton($"默写（无提示）· 本批曾忘记词 ({forgotWords.Count})", () => { dialog.Close(); StartLearningTyping(forgotWords.Select(ToTypingWord).ToList(), false); });
-        btnForgotDictation.IsEnabled = forgotWords.Count > 0;
-
-        choices.Children.Add(btnAllHint);
-        choices.Children.Add(btnForgotHint);
-        choices.Children.Add(btnAllDictation);
-        choices.Children.Add(btnForgotDictation);
-
-        content.Children.Add(choices);
-        var closeBtn = LearningButton("取消", dialog.Close);
-        closeBtn.HorizontalAlignment = HorizontalAlignment.Right;
-        content.Children.Add(closeBtn);
+        // 复用既有 PracticeSetupControl：范围/模式单选 + 唯一开始键，替代四个大按钮。
+        var setup = new PracticeSetupControl(words.Count, forgotWords.Count,
+            (onlyWeak, hints) => { dialog.Close(); StartLearningTyping((onlyWeak ? forgotWords : words).Select(ToTypingWord).ToList(), hints); },
+            dialog.Close);
+        content.Children.Add(setup);
 
         dialog.Content = content;
         _ = dialog.ShowDialog(this);
@@ -695,7 +684,7 @@ public partial class MainWindow
             Padding = new Thickness(20, 12),
             BorderThickness = new Thickness(0, 0, 0, 1)
         };
-        headerBorder.Bind(Border.BackgroundProperty, this.GetResourceObservable("CardBrush"));
+        headerBorder.Bind(Border.BackgroundProperty, this.GetResourceObservable("PaperBrush"));
         headerBorder.Bind(Border.BorderBrushProperty, this.GetResourceObservable("LineBrush"));
 
         var headerGrid = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*,Auto") };
@@ -718,6 +707,7 @@ public partial class MainWindow
             TextTrimming = TextTrimming.CharacterEllipsis,
             MaxWidth = 360
         };
+        titleText.Bind(TextBlock.ForegroundProperty, this.GetResourceObservable("InkBrush"));
         titleStack.Children.Add(titleText);
         Grid.SetColumn(titleStack, 1);
         headerGrid.Children.Add(titleStack);
@@ -729,6 +719,7 @@ public partial class MainWindow
             FontWeight = FontWeight.Medium,
             VerticalAlignment = VerticalAlignment.Center
         };
+        progressBadge.Bind(TextBlock.ForegroundProperty, this.GetResourceObservable("MutedBrush"));
         Grid.SetColumn(progressBadge, 2);
         headerGrid.Children.Add(progressBadge);
 
@@ -781,49 +772,15 @@ public partial class MainWindow
                 TextWrapping = TextWrapping.Wrap
             });
 
-            // 拼写四选一选项
+            // 拼写强化准备：使用既有 PracticeSetupControl（唯一开始键），替代四个大按钮。
             var allBatchWords = session.BatchWords.ToList();
             var forgotBatchWords = allBatchWords.Where(w => _activeLearningPlan.ForgotWordIds.Contains(w.Id)).ToList();
 
-            var spellingSection = new Border
-            {
-                Padding = new Thickness(16),
-                CornerRadius = new CornerRadius(8),
-                BorderThickness = new Thickness(1),
-                Margin = new Thickness(0, 10, 0, 0)
-            };
-            spellingSection.Bind(Border.BackgroundProperty, this.GetResourceObservable("CardBrush"));
-            spellingSection.Bind(Border.BorderBrushProperty, this.GetResourceObservable("LineBrush"));
-
-            var spellingLayout = new StackPanel { Spacing = 10 };
-            spellingLayout.Children.Add(new TextBlock
-            {
-                Text = "选择拼写强化训练（淡写/默写 × 全部/曾忘记词）：",
-                FontSize = 14,
-                FontWeight = FontWeight.SemiBold
-            });
-
-            var spellingChoices = new StackPanel { Spacing = 8 };
-            var btnAllHint = LearningButton($"淡写（有提示）· 本批全部词 ({allBatchWords.Count})", () =>
-                StartLearningTyping(allBatchWords.Select(ToTypingWord).ToList(), true));
-            var btnForgotHint = LearningButton($"淡写（有提示）· 本批曾忘记词 ({forgotBatchWords.Count})", () =>
-                StartLearningTyping(forgotBatchWords.Select(ToTypingWord).ToList(), true));
-            btnForgotHint.IsEnabled = forgotBatchWords.Count > 0;
-
-            var btnAllDictation = LearningButton($"默写（无提示）· 本批全部词 ({allBatchWords.Count})", () =>
-                StartLearningTyping(allBatchWords.Select(ToTypingWord).ToList(), false));
-            var btnForgotDictation = LearningButton($"默写（无提示）· 本批曾忘记词 ({forgotBatchWords.Count})", () =>
-                StartLearningTyping(forgotBatchWords.Select(ToTypingWord).ToList(), false));
-            btnForgotDictation.IsEnabled = forgotBatchWords.Count > 0;
-
-            spellingChoices.Children.Add(btnAllHint);
-            spellingChoices.Children.Add(btnForgotHint);
-            spellingChoices.Children.Add(btnAllDictation);
-            spellingChoices.Children.Add(btnForgotDictation);
-
-            spellingLayout.Children.Add(spellingChoices);
-            spellingSection.Child = spellingLayout;
-            compLayout.Children.Add(spellingSection);
+            var setup = new PracticeSetupControl(allBatchWords.Count, forgotBatchWords.Count,
+                (onlyWeak, hints) => StartLearningTyping((onlyWeak ? forgotBatchWords : allBatchWords).Select(ToTypingWord).ToList(), hints),
+                () => { });
+            setup.Margin = new Thickness(0, 10, 0, 0);
+            compLayout.Children.Add(setup);
 
             var finishBtn = LearningButton("完成今日学习，返回计划概览", ExitDailyLearning, primary: true);
             finishBtn.HorizontalAlignment = HorizontalAlignment.Center;
@@ -835,23 +792,14 @@ public partial class MainWindow
         }
         else
         {
-            // 正常学习中卡片
+            // 正常学习中：与 focus 共享 StudyCanvasControl 内容组件。
             var word = _activeLearningPlan.Words.Single(w => w.Id == round.Current);
             PresentPlanMemory(_activeLearningPlan, round.Current, round.CurrentStep);
 
-            var cardBorder = new Border
-            {
-                Padding = new Thickness(24),
-                CornerRadius = new CornerRadius(12),
-                MinHeight = 270
-            };
-            cardBorder.Classes.Add("card");
-
-            var cardLayout = new StackPanel { Spacing = 14 };
-
-            // 模式与连击强化小标 (三格表达轮内强化)
-            var modeRow = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto") };
             var isLearnStep = round.CurrentStep == StudyStep.Learn;
+
+            // 模式与连击强化小标（与 focus 一致的进度表达）。
+            var modeRow = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto") };
             var modeText = new TextBlock
             {
                 Text = UiText.Text(isLearnStep ? "先学后测模式 · 请仔细阅读释义与例句" : "回忆卡测试"),
@@ -860,6 +808,7 @@ public partial class MainWindow
                 TextWrapping = TextWrapping.Wrap,
                 VerticalAlignment = VerticalAlignment.Center
             };
+            modeText.Bind(TextBlock.ForegroundProperty, this.GetResourceObservable("MutedBrush"));
             modeRow.Children.Add(modeText);
 
             if (!isLearnStep)
@@ -871,140 +820,44 @@ public partial class MainWindow
                     VerticalAlignment = VerticalAlignment.Center
                 };
                 streakStack.Children.Add(BuildStreakDots(round.CurrentStreak, round.CurrentTarget));
-                streakStack.Children.Add(new TextBlock
+                var streakText = new TextBlock
                 {
                     Text = UiText.Format($"连击 {round.CurrentStreak}/{round.CurrentTarget}"),
                     FontSize = 12,
                     Opacity = 0.8,
                     VerticalAlignment = VerticalAlignment.Center
-                });
+                };
+                streakText.Bind(TextBlock.ForegroundProperty, this.GetResourceObservable("MutedBrush"));
+                streakStack.Children.Add(streakText);
                 Grid.SetColumn(streakStack, 1);
                 modeRow.Children.Add(streakStack);
             }
 
-            cardLayout.Children.Add(modeRow);
+            cardCenterContainer.Children.Add(modeRow);
 
-            // 丰富词头与发音 (长词自适应换行，禁止直接裁切)
-            var headword = new TextBlock
-            {
-                Text = word.Word,
-                FontSize = 38,
-                FontWeight = FontWeight.Bold,
-                TextWrapping = TextWrapping.Wrap,
-                HorizontalAlignment = HorizontalAlignment.Center,
-                TextAlignment = TextAlignment.Center
-            };
-            cardLayout.Children.Add(headword);
-
-            // 音标与发音按钮
-            var phoneticRow = new StackPanel
+            // 朗读：沿用现有 LocalWordAudioPlayer 读音机制（代码库无 SpeakWordAsync）。
+            var pronounceRow = new StackPanel
             {
                 Orientation = Orientation.Horizontal,
                 Spacing = 10,
                 HorizontalAlignment = HorizontalAlignment.Center
             };
-            if (!string.IsNullOrWhiteSpace(word.Phonetic))
+            pronounceRow.Children.Add(LearningButton("朗读 🔊", () => GetLearningAudio().Play(word.Word, IeltsCatalog.ResolveAsset(word.AudioPath))));
+            cardCenterContainer.Children.Add(pronounceRow);
+
+            // 统一内容组件：纯色背景上的单词 / 音标 / 释义 / 定义 / 例句，全部 SelectableTextBlock。
+            var planCanvas = CreateStudyCanvas();
+            planCanvas.Render(new StudyCanvasModel
             {
-                phoneticRow.Children.Add(new TextBlock
-                {
-                    Text = $"/{word.Phonetic.Trim('/')}/",
-                    FontSize = 17,
-                    Opacity = 0.75,
-                    VerticalAlignment = VerticalAlignment.Center
-                });
-            }
-            var btnPronounce = LearningButton("朗读 🔊", () => GetLearningAudio().Play(word.Word, IeltsCatalog.ResolveAsset(word.AudioPath)));
-            btnPronounce.Padding = new Thickness(10, 5);
-            phoneticRow.Children.Add(btnPronounce);
-            cardLayout.Children.Add(phoneticRow);
-
-            // 释义与例句
-            if (isLearnStep || _planAnswerVisible)
-            {
-                var meaning = new TextBlock
-                {
-                    Text = word.Meaning,
-                    FontSize = 22,
-                    FontWeight = FontWeight.Medium,
-                    TextWrapping = TextWrapping.Wrap,
-                    HorizontalAlignment = HorizontalAlignment.Center,
-                    TextAlignment = TextAlignment.Center,
-                    Margin = new Thickness(0, 4, 0, 0)
-                };
-                cardLayout.Children.Add(meaning);
-
-                if (!string.IsNullOrWhiteSpace(word.Definition))
-                {
-                    var defBorder = new Border
-                    {
-                        Padding = new Thickness(12, 8),
-                        CornerRadius = new CornerRadius(6),
-                        BorderThickness = new Thickness(1),
-                        Margin = new Thickness(0, 4, 0, 0)
-                    };
-                    defBorder.Bind(Border.BackgroundProperty, this.GetResourceObservable("TintBrush"));
-                    defBorder.Bind(Border.BorderBrushProperty, this.GetResourceObservable("LineBrush"));
-                    defBorder.Child = new TextBlock
-                    {
-                        Text = word.Definition,
-                        FontSize = 14,
-                        Opacity = 0.9,
-                        TextWrapping = TextWrapping.Wrap
-                    };
-                    cardLayout.Children.Add(defBorder);
-                }
-
-                if (!string.IsNullOrWhiteSpace(word.Example))
-                {
-                    var exampleBorder = new Border
-                    {
-                        Padding = new Thickness(12),
-                        CornerRadius = new CornerRadius(6),
-                        BorderThickness = new Thickness(1),
-                        Margin = new Thickness(0, 4, 0, 0)
-                    };
-                    exampleBorder.Bind(Border.BackgroundProperty, this.GetResourceObservable("CardBrush"));
-                    exampleBorder.Bind(Border.BorderBrushProperty, this.GetResourceObservable("LineBrush"));
-
-                    var exampleLayout = new StackPanel { Spacing = 6 };
-                    exampleLayout.Children.Add(new TextBlock { Text = "例句：", FontSize = 12, Opacity = 0.7 });
-                    exampleLayout.Children.Add(new TextBlock
-                    {
-                        Text = word.Example,
-                        FontSize = 14,
-                        TextWrapping = TextWrapping.Wrap
-                    });
-                    exampleBorder.Child = exampleLayout;
-                    cardLayout.Children.Add(exampleBorder);
-                }
-            }
-            else
-            {
-                // 回忆阶段且尚未揭晓
-                var placeholder = new Border
-                {
-                    Padding = new Thickness(24),
-                    CornerRadius = new CornerRadius(8),
-                    BorderThickness = new Thickness(1),
-                    Margin = new Thickness(0, 10, 0, 0)
-                };
-                placeholder.Bind(Border.BackgroundProperty, this.GetResourceObservable("CardBrush"));
-                placeholder.Bind(Border.BorderBrushProperty, this.GetResourceObservable("LineBrush"));
-
-                var placeholderLayout = new StackPanel { Spacing = 10, HorizontalAlignment = HorizontalAlignment.Center };
-                placeholderLayout.Children.Add(new TextBlock
-                {
-                    Text = UiText.Text("释义已隐藏，请在心中回忆词义"),
-                    FontSize = 14,
-                    Opacity = 0.65,
-                    HorizontalAlignment = HorizontalAlignment.Center
-                });
-                placeholder.Child = placeholderLayout;
-                cardLayout.Children.Add(placeholder);
-            }
-
-            cardBorder.Child = cardLayout;
-            cardCenterContainer.Children.Add(cardBorder);
+                Word = word.Word,
+                Phonetic = string.IsNullOrWhiteSpace(word.Phonetic) ? "" : $"/{word.Phonetic.Trim('/')}/",
+                Meaning = word.Meaning,
+                Details = word.Definition,
+                Example = word.Example,
+                MeaningVisible = isLearnStep || _planAnswerVisible,
+                Placeholder = UiText.Text("释义已隐藏，请在心中回忆词义")
+            });
+            cardCenterContainer.Children.Add(planCanvas);
         }
 
         contentScroll.Content = cardCenterContainer;
@@ -1017,7 +870,7 @@ public partial class MainWindow
             Padding = new Thickness(20, 12),
             BorderThickness = new Thickness(0, 1, 0, 0)
         };
-        bottomBorder.Bind(Border.BackgroundProperty, this.GetResourceObservable("CardBrush"));
+        bottomBorder.Bind(Border.BackgroundProperty, this.GetResourceObservable("PaperBrush"));
         bottomBorder.Bind(Border.BorderBrushProperty, this.GetResourceObservable("LineBrush"));
 
         var bottomLayout = new StackPanel { Spacing = 8 };
@@ -1030,6 +883,7 @@ public partial class MainWindow
             Opacity = 0.7,
             HorizontalAlignment = HorizontalAlignment.Center
         };
+        statusLine.Bind(TextBlock.ForegroundProperty, this.GetResourceObservable("MutedBrush"));
         bottomLayout.Children.Add(statusLine);
 
         // 操作按钮行
@@ -1287,11 +1141,37 @@ public partial class MainWindow
             var word = session.Current;
             if (session.Hints)
             {
-                var prompt = LearningText(word.Word, Math.Max(27, 54 - Math.Max(0, word.Word.Length - 14) * 1.5));
-                prompt.FontFamily = new FontFamily("Consolas, Menlo, monospace");
-                prompt.Bind(TextBlock.ForegroundProperty, this.GetResourceObservable("MutedBrush"));
-                prompt.HorizontalAlignment = HorizontalAlignment.Center;
-                center.Children.Add(prompt);
+                // 辅助拼写：仅显示已揭示字母（下划线占位），绝不直接显示答案；逐字提示由 RevealHint 推进。
+                var hintText = session.Outcome == TypingOutcome.Correct ? TypingSession.Normalize(word.Word) : session.HintText;
+                _learningTypingHint = new SelectableTextBlock
+                {
+                    Text = hintText,
+                    FontSize = Math.Max(27, 54 - Math.Max(0, word.Word.Length - 14) * 1.5),
+                    FontFamily = new FontFamily("Consolas, Menlo, monospace"),
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    TextWrapping = TextWrapping.Wrap
+                };
+                _learningTypingHint.Bind(TextBlock.ForegroundProperty, this.GetResourceObservable("MutedBrush"));
+                center.Children.Add(_learningTypingHint);
+
+                // 渐进提示（逐字）与查看答案（查看答案会加入重练）。
+                var hintActions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10, HorizontalAlignment = HorizontalAlignment.Center };
+                hintActions.Children.Add(LearningButton("提示下一字母", () =>
+                {
+                    if (session.RevealHint() && _learningTypingHint != null)
+                    {
+                        _learningTypingHint.Text = session.HintText;
+                        _learningTypingInput?.Focus();
+                    }
+                }));
+                hintActions.Children.Add(LearningButton("查看答案", () =>
+                {
+                    session.RevealAnswer();
+                    if (_learningTypingHint != null) _learningTypingHint.Text = session.HintText;
+                    UpdateTypingStats();
+                    _learningTypingInput?.Focus();
+                }));
+                center.Children.Add(hintActions);
             }
             else
             {
@@ -1311,8 +1191,8 @@ public partial class MainWindow
                 Watermark = "输入英文",
                 FontSize = 30,
                 FontFamily = new FontFamily("Consolas, Menlo, monospace"),
-                Width = 490,
-                MaxWidth = 490,
+                MaxWidth = 620,
+                HorizontalAlignment = HorizontalAlignment.Stretch,
                 HorizontalContentAlignment = HorizontalAlignment.Center
             };
             _learningTypingInput.KeyDown += (_, e) => { if (e.Key == Key.Enter) { e.Handled = true; SubmitLearningTyping(); } };
@@ -1410,7 +1290,7 @@ public partial class MainWindow
         var s = _learningTypingSession;
         if (s != null && _learningTypingStats != null)
         {
-            _learningTypingStats.Text = $"完成 {s.Cursor}/{s.Count} · 字符准确率 {s.Accuracy:F1}% · 重试 {s.Retries} 次 · {s.Wpm} WPM";
+            _learningTypingStats.Text = $"完成 {s.Cursor}/{s.Count} · 字符准确率 {s.Accuracy:F1}% · 重试 {s.Retries} 次 · 提示辅助 {s.AssistedCount} · {s.Wpm} WPM";
         }
     }
 
@@ -1421,13 +1301,15 @@ public partial class MainWindow
         _learningTypingLetters.Children.Clear();
 
         var input = TypingSession.Normalize(_learningTypingInput.Text ?? "");
-        if (!s.Hints && (!submitted || s.Outcome == TypingOutcome.Pending))
+        // 输入中（含提示模式）不做即时错误着色，也不按真实答案泄露未输入字母。
+        if (!submitted || s.Outcome == TypingOutcome.Pending)
         {
             foreach (var ch in input) _learningTypingLetters.Children.Add(LearningText(ch.ToString(), 23));
             return;
         }
 
-        foreach (var letter in TypingFeedbackModel.Build(TypingSession.Normalize(s.Current.Word), input, s.Hints, s.Outcome))
+        // 提交后仅按已输入内容逐字母判定，绝不泄露未输入的答案字母。
+        foreach (var letter in TypingFeedbackModel.Build(TypingSession.Normalize(s.Current.Word), input, hints: false, s.Outcome))
         {
             var text = LearningText(letter.Character.ToString(), 23);
             if (letter.Tone == TypingLetterTone.Correct)

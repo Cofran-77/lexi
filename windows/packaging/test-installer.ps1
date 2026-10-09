@@ -1,4 +1,4 @@
-param([string]$Nsis = 'C:\Program Files (x86)\NSIS\makensis.exe', [string]$Version = '1.2.1', [string]$TestDirectory = 'installer-acceptance-verified')
+param([string]$Nsis = 'C:\Program Files (x86)\NSIS\makensis.exe', [string]$Version = '1.2.2', [string]$TestDirectory = 'installer-acceptance-verified')
 $ErrorActionPreference = 'Stop'
 $project = Split-Path $PSScriptRoot -Parent
 $workspace = Split-Path (Split-Path $project -Parent) -Parent
@@ -50,6 +50,11 @@ $interaction = Start-Process -FilePath (Join-Path $appDir 'Lexi.exe') -ArgumentL
 Check ($interaction.ExitCode -eq 0) 'installed app passes new study, shortcut, focus and IELTS interactions'
 $interactionReport = Get-Content (Join-Path $env:LEXI_DATA_DIR 'interaction-result.txt')
 Check (($interactionReport | Where-Object {$_ -like 'PASS *'}).Count -ge 70 -and !($interactionReport | Where-Object {$_ -like 'FAIL *'})) 'installed interaction report contains complete successful assertions'
+$env:LEXI_DATA_DIR = Join-Path $testRoot 'runtime-improvement'
+$improvement = Start-Process -FilePath (Join-Path $appDir 'Lexi.exe') -ArgumentList '--improvement-test' -WindowStyle Hidden -Wait -PassThru
+Check ($improvement.ExitCode -eq 0) 'installed app passes 1.2.2 theme, spelling, quotes, copy and writing acceptance'
+$improvementReport = Get-Content (Join-Path $env:LEXI_DATA_DIR 'improvement-test-result.txt')
+Check (($improvementReport | Where-Object {$_ -like 'PASS *'}).Count -ge 180 -and !($improvementReport | Where-Object {$_ -like 'FAIL *'})) 'installed improvement report contains complete successful assertions'
 $uninstaller = Join-Path $appDir 'Uninstall.exe'
 # NSIS treats all remaining text after _?= as the directory, including spaces.
 # Quoting the entire token bypasses this special parser and spawns a child copy.
@@ -68,3 +73,4 @@ $cleanup = Start-Process -FilePath $uninstaller -ArgumentList @('/S',('_?='+$app
 Check ($cleanup.ExitCode -eq 0 -and !(Test-Path -LiteralPath (Join-Path $appDir 'Lexi.exe'))) 'test application cleanup succeeds'
 $report | Set-Content -LiteralPath (Join-Path $testRoot 'result.txt') -Encoding utf8
 $report
+

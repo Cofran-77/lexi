@@ -50,6 +50,7 @@ public partial class MainWindow
     private void ApplyUiLanguage()
     {
         UiText.Apply(_settings.UiLanguage);
+        _settingsDrawer?.RefreshLanguage();
         RefreshIeltsLanguage();
         LanguageToggleBtn.Content = _settings.UiLanguage == "en" ? "中" : "EN";
         Title = UiText.Redisplay(Title);
@@ -58,27 +59,31 @@ public partial class MainWindow
         {
             switch (control)
             {
+                case SelectableTextBlock:
+                    // Vocabulary, quotes, examples and writing prompts are user content.
+                    break;
                 case TextBlock label when !string.IsNullOrEmpty(label.Text):
-                    label.Text = UiText.Redisplay(label.Text);
+                    label.Text = UiText.RedisplayFor(label, label.Text);
                     break;
                 case Button button when button.Content is string caption:
-                    button.Content = UiText.Redisplay(caption);
+                    button.Content = UiText.RedisplayFor(control, caption);
                     break;
                 case CheckBox box when box.Content is string caption:
-                    box.Content = UiText.Redisplay(caption);
+                    box.Content = UiText.RedisplayFor(control, caption);
                     break;
                 case TextBox input when !string.IsNullOrEmpty(input.Watermark):
-                    input.Watermark = UiText.Redisplay(input.Watermark);
+                    input.Watermark = UiText.RedisplayFor(input, input.Watermark);
                     break;
             }
         }
         foreach (var combo in new[] { SettingsThemeCombo, SettingsProviderCombo, SettingsProtocolCombo,
                      SettingsContextCombo, SettingsTimeoutCombo, VocabStatusFilter, BatchActionCombo })
             foreach (var item in combo.Items.OfType<ComboBoxItem>())
-                if (item.Content is string caption) item.Content = UiText.Redisplay(caption);
+                if (item.Content is string caption) item.Content = UiText.RedisplayFor(item, caption);
         _quickCard?.RefreshLanguage();
         _archiveActions?.RefreshLanguage();
         UpdateQuickShortcutStatus();
         RefreshStudyShortcutHints();
+        RefreshGlobalStudySurface();
     }
 }

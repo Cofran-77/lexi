@@ -146,8 +146,9 @@
                   <Grid ColumnDefinitions="*,Auto">
                     <StackPanel Spacing="2">
                       <WrapPanel Orientation="Horizontal" VerticalAlignment="Bottom">
-                        <TextBlock Name="ResultWordText" FontSize="30" TextWrapping="Wrap" FontWeight="Bold" Foreground="{DynamicResource InkBrush}"/>
-                        <TextBlock Name="ResultPhoneticText" Classes="muted" FontSize="14" VerticalAlignment="Bottom" Margin="12,0,0,5"/>
+                        <SelectableTextBlock Name="ResultWordText" FontSize="30" TextWrapping="Wrap" FontWeight="Bold" Foreground="{DynamicResource InkBrush}"/>
+                        <SelectableTextBlock Name="ResultPhoneticText" Classes="muted" FontSize="14" VerticalAlignment="Bottom" Margin="12,0,0,5"/>
+                        <Button Name="LookupSpeakButton" Tag="{Binding #ResultWordText.Text}" Click="OnContentSpeakClick" Content="♪" Classes="row-btn" ToolTip.Tip="朗读单词" AutomationProperties.Name="朗读单词" Margin="8,0,0,4"/>
                       </WrapPanel>
                     </StackPanel>
                     <Border Grid.Column="1" Background="{DynamicResource TintBrush}" CornerRadius="12" Padding="10,4" VerticalAlignment="Top">
@@ -156,8 +157,8 @@
                   </Grid>
 
                   <WrapPanel Name="ResultPosPanel" IsVisible="False"/>
-                  <TextBlock Name="ResultTranslationText" FontSize="15" TextWrapping="Wrap" LineHeight="24"/>
-                  <TextBlock Name="ResultDefinitionText" Classes="muted" FontSize="14" TextWrapping="Wrap" LineHeight="22"/>
+                  <SelectableTextBlock Name="ResultTranslationText" FontSize="15" TextWrapping="Wrap" LineHeight="24"/>
+                  <SelectableTextBlock Name="ResultDefinitionText" Classes="muted" FontSize="14" TextWrapping="Wrap" LineHeight="22"/>
 
                   <!-- Independent AI Tool Section -->
                   <Border BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,1,0,0" Padding="0,16,0,0">
@@ -186,7 +187,7 @@
                             <!-- Examples Group -->
                             <StackPanel Name="AiResultExamplesGroup" Spacing="8" IsVisible="False">
                               <TextBlock Name="AiResultExamplesTitle" Text="语境例句" FontWeight="SemiBold" FontSize="12" Foreground="{DynamicResource PrimaryGreen}"/>
-                              <TextBlock Name="AiResultExamplesBody" IsVisible="False" TextWrapping="Wrap" FontSize="12"/>
+                              <SelectableTextBlock Name="AiResultExamplesBody" IsVisible="False" TextWrapping="Wrap" FontSize="12"/>
                               <StackPanel Name="AiResultExamplesContainer" Spacing="6"/>
                             </StackPanel>
 
@@ -316,20 +317,20 @@
                             <!-- Word & Compact Meaning -->
                             <StackPanel Grid.Column="2" Spacing="2" VerticalAlignment="Center">
                               <WrapPanel Orientation="Horizontal">
-                                <TextBlock Text="{Binding Word}" TextWrapping="Wrap" Margin="0,0,8,0" FontSize="17" FontWeight="Bold" Foreground="{DynamicResource InkBrush}"/>
-                                <TextBlock Text="{Binding Phonetic}" Classes="muted" FontSize="13" VerticalAlignment="Center"/>
+                                <SelectableTextBlock Text="{Binding Word}" TextWrapping="Wrap" Margin="0,0,8,0" FontSize="17" FontWeight="Bold" Foreground="{DynamicResource InkBrush}"/>
+                                <SelectableTextBlock Text="{Binding Phonetic}" Classes="muted" FontSize="13" VerticalAlignment="Center"/>
                               </WrapPanel>
                               <!-- Compact translation (single line with ellipsis) when collapsed -->
-                              <TextBlock Text="{Binding Translation}"
+                              <SelectableTextBlock Text="{Binding Translation}"
                                          IsVisible="{Binding !IsExpanded}"
                                          Classes="muted"
                                          TextWrapping="NoWrap"
                                          TextTrimming="CharacterEllipsis"
                                          FontSize="12"/>
-                              <TextBlock Text="{Binding Archive.SourceTitle}" IsVisible="{Binding !IsExpanded}" Classes="muted" FontSize="10" TextTrimming="CharacterEllipsis"/>
+                              <SelectableTextBlock Text="{Binding Archive.SourceTitle}" IsVisible="{Binding !IsExpanded}" Classes="muted" FontSize="10" TextTrimming="CharacterEllipsis"/>
                               <ItemsControl ItemsSource="{Binding Archive.Tags}" IsVisible="{Binding !IsExpanded}" MaxHeight="24" ClipToBounds="True">
                                 <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
-                                <ItemsControl.ItemTemplate><DataTemplate><TextBlock Text="{Binding}" Classes="muted" FontSize="10" Margin="0,0,8,0"/></DataTemplate></ItemsControl.ItemTemplate>
+                                <ItemsControl.ItemTemplate><DataTemplate><SelectableTextBlock Text="{Binding}" Classes="muted" FontSize="10" Margin="0,0,8,0"/></DataTemplate></ItemsControl.ItemTemplate>
                               </ItemsControl>
                             </StackPanel>
 
@@ -343,6 +344,7 @@
 
                             <!-- Row Actions -->
                             <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                              <Button Tag="{Binding Word}" Click="OnContentSpeakClick" Classes="row-btn" Content="♪" ToolTip.Tip="朗读单词" AutomationProperties.Name="朗读单词"/>
                               <Button Tag="{Binding Id}" Click="OnEditWordClick" Classes="row-btn" ToolTip.Tip="编辑词汇档案" AutomationProperties.Name="编辑词汇档案">
                                 <Path Data="M 3,11 L 11,3 L 13,5 L 5,13 L 2,14 Z" Stroke="{DynamicResource MutedBrush}" StrokeThickness="1.2" Width="14" Height="14"/>
                               </Button>
@@ -357,20 +359,20 @@
                             <StackPanel Spacing="8">
                               <StackPanel Spacing="2">
                                 <TextBlock Text="完整释义" Classes="eyebrow" FontSize="10"/>
-                                <TextBlock Text="{Binding Translation}" FontSize="14" TextWrapping="Wrap" LineHeight="23"/>
+                                <SelectableTextBlock Text="{Binding Translation}" FontSize="14" TextWrapping="Wrap" LineHeight="23"/>
                               </StackPanel>
 
                               <StackPanel Spacing="2" IsVisible="{Binding Definition, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
                                 <TextBlock Text="英文定义" Classes="eyebrow" FontSize="10"/>
-                                <TextBlock Text="{Binding Definition}" Classes="muted" FontSize="14" TextWrapping="Wrap" LineHeight="22"/>
+                                <SelectableTextBlock Text="{Binding Definition}" Classes="muted" FontSize="14" TextWrapping="Wrap" LineHeight="22"/>
                               </StackPanel>
 
-                              <TextBlock Text="{Binding Archive.SourceTitle}" Classes="muted" TextWrapping="Wrap" IsVisible="{Binding Archive.SourceTitle, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
-                              <TextBlock Text="{Binding Archive.SourceExcerpt}" TextWrapping="Wrap" LineHeight="23" IsVisible="{Binding Archive.SourceExcerpt, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
-                              <TextBlock Text="{Binding Notes}" Classes="muted" TextWrapping="Wrap" IsVisible="{Binding Notes, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                              <SelectableTextBlock Text="{Binding Archive.SourceTitle}" Classes="muted" TextWrapping="Wrap" IsVisible="{Binding Archive.SourceTitle, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                              <SelectableTextBlock Text="{Binding Archive.SourceExcerpt}" TextWrapping="Wrap" LineHeight="23" IsVisible="{Binding Archive.SourceExcerpt, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                              <SelectableTextBlock Text="{Binding Notes}" Classes="muted" TextWrapping="Wrap" IsVisible="{Binding Notes, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
                               <ItemsControl ItemsSource="{Binding Archive.Tags}">
                                 <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
-                                <ItemsControl.ItemTemplate><DataTemplate><Border Classes="pos-chip"><TextBlock Text="{Binding}" FontSize="11"/></Border></DataTemplate></ItemsControl.ItemTemplate>
+                                <ItemsControl.ItemTemplate><DataTemplate><Border Classes="pos-chip"><SelectableTextBlock Text="{Binding}" FontSize="11"/></Border></DataTemplate></ItemsControl.ItemTemplate>
                               </ItemsControl>
                               <WrapPanel>
                                 <Button Classes="secondary" Content="记得" Click="OnRememberWordClick" Margin="0,0,8,6"/>
@@ -391,8 +393,9 @@
                               <ItemsControl ItemsSource="{Binding AiExamples}" IsVisible="{Binding HasAiExamples}">
                                 <ItemsControl.ItemTemplate><DataTemplate>
                                   <Border Classes="example-card" Margin="0,0,0,6"><StackPanel Spacing="4">
-                                    <TextBlock Text="{Binding English}" FontSize="15" LineHeight="24" TextWrapping="Wrap"/>
-                                    <TextBlock Text="{Binding Chinese}" Classes="muted" FontSize="13" LineHeight="21" TextWrapping="Wrap"/>
+                                    <SelectableTextBlock Text="{Binding English}" FontSize="15" LineHeight="24" TextWrapping="Wrap"/>
+                                    <SelectableTextBlock Text="{Binding Chinese}" Classes="muted" FontSize="13" LineHeight="21" TextWrapping="Wrap"/>
+                                    <StackPanel Orientation="Horizontal" Spacing="6"><Button Tag="{Binding English}" Click="OnContentSpeakClick" Classes="row-btn" Content="♪" ToolTip.Tip="朗读例句"/><Button Click="OnExampleQuoteClick" Classes="row-btn" Content="＋" ToolTip.Tip="收藏到金句本" AutomationProperties.Name="收藏例句到金句本"/></StackPanel>
                                   </StackPanel></Border>
                                 </DataTemplate></ItemsControl.ItemTemplate>
                               </ItemsControl>
@@ -410,8 +413,8 @@
                               <ItemsControl ItemsSource="{Binding AiPhrases}" IsVisible="{Binding HasAiPhrases}">
                                 <ItemsControl.ItemTemplate><DataTemplate>
                                   <Border Classes="example-card" Margin="0,0,0,6"><StackPanel Spacing="3">
-                                    <TextBlock Text="{Binding English}" FontSize="14" TextWrapping="Wrap"/>
-                                    <TextBlock Text="{Binding Chinese}" Classes="muted" FontSize="13" TextWrapping="Wrap"/>
+                                    <SelectableTextBlock Text="{Binding English}" FontSize="14" TextWrapping="Wrap"/>
+                                    <SelectableTextBlock Text="{Binding Chinese}" Classes="muted" FontSize="13" TextWrapping="Wrap"/>
                                   </StackPanel></Border>
                                 </DataTemplate></ItemsControl.ItemTemplate>
                               </ItemsControl>
@@ -470,12 +473,12 @@
                 <Grid RowDefinitions="*,Auto">
                   <ScrollViewer HorizontalScrollBarVisibility="Disabled">
                     <StackPanel Spacing="16" VerticalAlignment="Center">
-                      <TextBlock Name="ReviewWordText" FontSize="32" FontWeight="SemiBold" TextAlignment="Center" TextWrapping="Wrap"/>
-                      <TextBlock Name="ReviewPhoneticText" Classes="muted" TextAlignment="Center" TextWrapping="Wrap"/>
+                      <SelectableTextBlock Name="ReviewWordText" FontSize="32" FontWeight="SemiBold" TextAlignment="Center" TextWrapping="Wrap"/>
+                      <SelectableTextBlock Name="ReviewPhoneticText" Classes="muted" TextAlignment="Center" TextWrapping="Wrap"/>
                       <Border Name="ReviewAnswer" IsVisible="False" BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,1,0,0" Padding="0,18,0,8">
                         <StackPanel Spacing="12">
-                          <TextBlock Name="ReviewMeaningText" FontSize="17" LineHeight="28" TextWrapping="Wrap"/>
-                          <TextBlock Name="ReviewDefinitionText" Classes="muted" TextWrapping="Wrap" LineHeight="24"/>
+                          <SelectableTextBlock Name="ReviewMeaningText" FontSize="17" LineHeight="28" TextWrapping="Wrap"/>
+                          <SelectableTextBlock Name="ReviewDefinitionText" Classes="muted" TextWrapping="Wrap" LineHeight="24"/>
                         </StackPanel>
                       </Border>
                     </StackPanel>
@@ -600,7 +603,7 @@
 
                   <Border BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,1,0,0" Padding="0,14,0,0">
                     <Grid ColumnDefinitions="*,Auto">
-                      <TextBlock Text="离线优先 · 缺词按配置 AI 补全 · 扩展需点击生成" Classes="muted" VerticalAlignment="Center" FontSize="11"/>
+                      <TextBlock Text="离线优先 · 缺词按配置 AI 补全 · 扩展需点击生成" TextWrapping="Wrap" Margin="0,0,16,0" Classes="muted" VerticalAlignment="Center" FontSize="12"/>
                       <Button Name="SettingsSaveBtn" Grid.Column="1" Classes="primary" Content="保存设置"/>
                     </Grid>
                   </Border>
@@ -660,7 +663,7 @@
       <Border Grid.Row="2" Background="{DynamicResource TintBrush}" Padding="20,0">
         <Grid ColumnDefinitions="*,Auto">
           <TextBlock Name="GlobalStatusText" Text="本地查词不调用 AI。关闭窗口后可通过快捷键或托盘重新打开。" VerticalAlignment="Center" FontSize="11"/>
-          <TextBlock Grid.Column="1" Text="Lexi 1.2.1" Classes="muted" VerticalAlignment="Center" FontSize="11"/>
+          <TextBlock Grid.Column="1" Text="Lexi 1.2.2" Classes="muted" VerticalAlignment="Center" FontSize="11"/>
         </Grid>
       </Border>
     </Grid>
@@ -749,3 +752,4 @@
   </Grid>
   </Border>
 </Window>
+

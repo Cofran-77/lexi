@@ -63,7 +63,7 @@ public static class StudyKeySurfaceTests
         check(session.Round.CurrentStep==StudyStep.Recall&&Field<bool>("_planAnswerVisible")&&session.Round.CurrentStreak==0&&Field<Grid>("_studyWorkspaceHost").IsVisible,"plan Space advances then reveals without silently rating or returning");
         var settings=new Lexi.Features.Settings.SettingsDrawerControl();
         Call("OpenSettingsDrawer");
-        Field<Lexi.Features.Settings.SettingsDrawerControl>("_settingsDrawer").ShowSection(Lexi.Features.Settings.SettingsSection.StudyAndShortcuts);
+        Field<Lexi.Features.Settings.SettingsPageControl>("_settingsDrawer").ShowSection(Lexi.Features.Settings.SettingsSection.StudyAndShortcuts);
         var editors=Field<Dictionary<ShortcutAction,TextBox>>("_shortcutEditors");
         editors[ShortcutAction.Known].Text="Ctrl+K";
         Call("SaveStudyShortcutEditors");

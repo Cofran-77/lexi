@@ -82,6 +82,7 @@ public partial class MainWindow
 
     private void RenderReviewCard(bool resetPose = true)
     {
+        ApplyReviewCanvasTheme();
         var due = GetPendingReviewWords();
         if (!_reviewRoundStarted)
         {

@@ -3,7 +3,7 @@ Unicode true
 !include "LogicLib.nsh"
 
 !ifndef VERSION
-  !define VERSION "1.2.1"
+  !define VERSION "1.2.2"
 !endif
 
 !ifndef OUTDIR
@@ -136,3 +136,4 @@ Section "Uninstall"
   DeleteRegKey HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\LexiNative"
 !endif
 SectionEnd
+

@@ -1,4 +1,4 @@
-﻿using Avalonia;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Layout;
@@ -166,7 +166,12 @@ internal sealed class QuickCardWindow : Window
         _save.Click += (_, _) => Save();
         _cancel.Click += (_, _) => { CancelPending(); _status.Text = L("已取消，可重新生成或手动填写。", "Canceled. Retry or enter your own translation."); };
         _copy.Click += async (_, _) => { if (Clipboard != null && !string.IsNullOrWhiteSpace(TranslationInput.Text)) { await Clipboard.SetTextAsync(TranslationInput.Text); _status.Text = L("译文已复制。", "Translation copied."); } };
-        _detail.Click += (_, _) => { if (_mode == QuickAction.Lookup) _openWord(OriginalInput.Text?.Trim() ?? ""); else _openQuotes(); Close(); };
+        _detail.Click += (_, _) =>
+        {
+            if (_mode == QuickAction.Lookup) _openWord(OriginalInput.Text?.Trim() ?? "");
+            else { if (!TrySave()) return; _openQuotes(); }
+            Close();
+        };
         _pronounce.Click += (_, _) => _audio.Play(OriginalInput.Text ?? "");
         OriginalInput.PropertyChanged += (_, e) => { if (e.Property != TextBox.TextProperty || _preparing) return; CancelPending(); _lookup = null; _save.IsEnabled = _mode == QuickAction.SaveQuote; _status.Text = L("内容已修改，点击按钮重新查询或翻译。", "Text changed. Search or translate again."); };
         TranslationInput.PropertyChanged += (_, e) =>
@@ -218,7 +223,7 @@ internal sealed class QuickCardWindow : Window
         _save.Content = mode == QuickAction.Lookup ? L("加入生词本", "Save word") : L("保存金句", "Save quote");
         _copy.Content = L("复制译文", "Copy"); _cancel.Content = L("取消生成", "Cancel");
         _detail.Content = mode == QuickAction.Lookup ? L("完整档案", "Open word") : L("金句本", "Quotes");
-        _pronounce.Content = L("读音", "Listen");
+        _pronounce.Content = mode == QuickAction.Lookup ? L("读音", "Listen") : L("朗读", "Listen");
 
         // Exactly one primary solid blue action per task; neutral secondary for other actions
         if (mode == QuickAction.Lookup)
@@ -253,7 +258,8 @@ internal sealed class QuickCardWindow : Window
         _copy.IsEnabled = !string.IsNullOrWhiteSpace(TranslationInput.Text);
 
         _metadata.IsVisible = mode == QuickAction.SaveQuote;
-        _phonetic.IsVisible = _pronounce.IsVisible = mode == QuickAction.Lookup; _phonetic.Text = "";
+        _phonetic.IsVisible = mode == QuickAction.Lookup; _phonetic.Text = "";
+        _pronounce.IsVisible = true;
         TranslationInput.IsReadOnly = mode == QuickAction.Lookup; _cancel.IsVisible = false;
         Height = mode == QuickAction.SaveQuote ? 560 : 420;
         _allow.IsVisible = captureMessage != null; _status.Text = captureMessage ?? "";
@@ -314,13 +320,14 @@ internal sealed class QuickCardWindow : Window
 
     internal void CancelPending() { ++_generation; _request?.Cancel(); _request = null; _run.IsEnabled = true; _cancel.IsVisible = false; }
 
-    internal void Save()
+    internal void Save() => TrySave();
+    internal bool TrySave()
     {
         try
         {
             if (_mode == QuickAction.Lookup)
             {
-                if (_lookup == null || !_lookup.Found) return;
+                if (_lookup == null || !_lookup.Found) return false;
                 var exists = _words.GetAllWords().Any(w => w.Word.Equals(_lookup.Word, StringComparison.OrdinalIgnoreCase));
                 if (!exists) _words.AddWord(_lookup.Word, _lookup.Phonetic, _lookup.Translation, _lookup.Definition);
                 _status.Text = exists ? L("已在生词本中。", "Already saved.") : L("已加入生词本。", "Word saved.");
@@ -338,8 +345,9 @@ internal sealed class QuickCardWindow : Window
                 else { CancelPending(); _status.Text = L("金句已保存。", "Quote saved."); }
             }
             _changed(); if (!string.IsNullOrEmpty(_words.BackupWarning)) _status.Text += " " + _words.BackupWarning;
+            return true;
         }
-        catch (Exception ex) { _status.Text = ex.Message; }
+        catch (Exception ex) { _status.Text = ex.Message; return false; }
     }
 
     internal void ShowNear(PixelPoint anchor)

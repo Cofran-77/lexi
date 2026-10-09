@@ -422,4 +422,13 @@ try
 }
 finally { Directory.Delete(Path.GetDirectoryName(invalidOrderPath)!, recursive: true); }
 
+var assisted = new TypingSession();
+assisted.Reset([new LearningWord {Id="assisted",Words=["apple"]}],true);
+Check(assisted.HintText == "_____", "辅助拼写初始隐藏完整答案");
+Check(assisted.RevealHint() && assisted.HintText == "a____", "主动提示只揭示一个字母");
+Check(assisted.Submit("apple") == TypingOutcome.Correct && assisted.AssistedCount == 1 && assisted.UnassistedCorrectCount == 0, "提示完成不计入无提示正确");
+assisted.Reset([new LearningWord {Id="answer",Words=["apple"]}],false);
+assisted.RevealAnswer();
+Check(assisted.HintText=="apple"&&assisted.ErrorIds.Contains("answer"), "查看答案加入待重练词");
+Check(assisted.Submit("apple")==TypingOutcome.Correct&&assisted.UnassistedCorrectCount==0,"查看答案后不能计为无提示正确");
 Console.WriteLine("All learning tests passed.");

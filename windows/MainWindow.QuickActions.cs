@@ -171,11 +171,11 @@ public partial class MainWindow
         _quotesSummary!.Text=quotes.Count==0?QuickText("暂无金句。阅读时选中句子，按 Alt+S 收藏。","No quotes yet. Select a sentence while reading and press Alt+S."):QuickText($"第 {_quotePageIndex+1} 页 · {quotes.Count} 条",$"Page {_quotePageIndex+1} · {quotes.Count} quotes");
         foreach(var quote in quotes)
         {
-            var stack=new StackPanel {Spacing=10};stack.Children.Add(new TextBlock {Text=quote.Original,TextWrapping=TextWrapping.Wrap,FontSize=17,FontWeight=FontWeight.Medium});
-            stack.Children.Add(new TextBlock {Text=quote.Translation,TextWrapping=TextWrapping.Wrap,FontSize=14});
-            if(quote.Source.Length>0)stack.Children.Add(new TextBlock {Text=quote.Source,FontSize=12,Opacity=.65,TextWrapping=TextWrapping.Wrap});
-            if(quote.Notes.Length>0)stack.Children.Add(new TextBlock {Text=quote.Notes,FontSize=12,Opacity=.7,TextWrapping=TextWrapping.Wrap});
-            var actions=new StackPanel {Orientation=Orientation.Horizontal,Spacing=12};var edit=new Button {Content=QuickText("编辑","Edit")};edit.Click+=(_,_)=>OpenQuoteEditor(quote);var delete=new Button {Content=QuickText("删除…","Delete…")};
+            var stack=new StackPanel {Spacing=10};stack.Children.Add(new SelectableTextBlock {Text=quote.Original,TextWrapping=TextWrapping.Wrap,FontSize=17,FontWeight=FontWeight.Medium});
+            stack.Children.Add(new SelectableTextBlock {Text=quote.Translation,TextWrapping=TextWrapping.Wrap,FontSize=14});
+            if(quote.Source.Length>0)stack.Children.Add(new SelectableTextBlock {Text=quote.Source,FontSize=12,Opacity=.65,TextWrapping=TextWrapping.Wrap});
+            if(quote.Notes.Length>0)stack.Children.Add(new SelectableTextBlock {Text=quote.Notes,FontSize=12,Opacity=.7,TextWrapping=TextWrapping.Wrap});
+            var actions=new StackPanel {Orientation=Orientation.Horizontal,Spacing=12};var listen=new Button {Content=QuickText("朗读","Listen")};listen.Click+=(_,_)=>GetLearningAudio().Play(quote.Original);var edit=new Button {Content=QuickText("编辑","Edit")};edit.Click+=(_,_)=>OpenQuoteEditor(quote);var delete=new Button {Content=QuickText("删除…","Delete…")};
             delete.Click+=(_,_)=>
             {
                 delete.IsVisible=false;
@@ -183,7 +183,7 @@ public partial class MainWindow
                 cancel.Click+=(_,_)=>{actions.Children.Remove(confirm);actions.Children.Remove(cancel);delete.IsVisible=true;};
                 confirm.Click+=(_,_)=>{try{QuoteArchive.DeleteQuote(quote.Id);RenderQuotes();SetStatus(QuickText("金句已删除，可从 SQLite 备份恢复。","Quote deleted. SQLite backups can restore it."));}catch(Exception ex){SetStatus(ex.Message);}};
             };
-            actions.Children.Add(edit);actions.Children.Add(delete);stack.Children.Add(actions);_quotesList.Children.Add(new Border {Classes={"card"},Child=stack});
+            actions.Children.Add(listen);actions.Children.Add(edit);actions.Children.Add(delete);stack.Children.Add(actions);_quotesList.Children.Add(new Border {Classes={"card"},Child=stack});
         }
     }
     private async Task ExportQuotesAsync()

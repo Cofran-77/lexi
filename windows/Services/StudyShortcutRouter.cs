@@ -58,6 +58,14 @@ public sealed class StudyShortcutRouter
         if (e.Key == Key.ImeProcessed)
             return StudyShortcutDispatchResult.Ignored;
 
+        // A selected passage owns its copy and selection keys; it must never
+        // become a study rating, including when the user customized Ctrl+C.
+        if ((focusedElement as SelectableTextBlock ?? e.Source as SelectableTextBlock) is { } passage
+            && (passage.SelectionStart != passage.SelectionEnd
+                || e.KeyModifiers.HasFlag(KeyModifiers.Shift)
+                || e.KeyModifiers.HasFlag(KeyModifiers.Control) && e.Key is Key.C or Key.A))
+            return StudyShortcutDispatchResult.Ignored;
+
         // 防按键按住连发重复
         var isRepeat = !_pressedKeys.Add(e.Key);
 

@@ -1,4 +1,4 @@
-﻿<Styles xmlns="https://github.com/avaloniaui"
+<Styles xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
   <Styles.Resources>
     <ResourceDictionary>
@@ -6,7 +6,7 @@
       <CornerRadius x:Key="CardRadius">12</CornerRadius>
       <Thickness x:Key="ControlPadding">13,7</Thickness>
       <Thickness x:Key="CardPadding">20</Thickness>
-      <FontFamily x:Key="BodyFont">avares://Avalonia.Fonts.Inter/Assets#Inter, Microsoft YaHei UI</FontFamily>
+      <FontFamily x:Key="BodyFont">Segoe UI, Microsoft YaHei UI</FontFamily>
       <!-- Standalone themes: replacing Template alone leaves Fluent's nested
            state selectors active on PART_ContentPresenter (square/blue fills). -->
       <ControlTheme x:Key="LexiButtonTheme" TargetType="Button">
@@ -126,24 +126,24 @@
     <Setter Property="Foreground" Value="{DynamicResource InkBrush}"/>
   </Style>
 
-  <Style Selector="TextBlock">
+  <Style Selector=":is(TextBlock)">
     <Setter Property="FontFamily" Value="{DynamicResource BodyFont}"/>
     <Setter Property="Foreground" Value="{DynamicResource InkBrush}"/>
   </Style>
 
-  <Style Selector="TextBlock.muted">
+  <Style Selector=":is(TextBlock).muted">
     <Setter Property="Foreground" Value="{DynamicResource MutedBrush}"/>
     <Setter Property="FontSize" Value="12"/>
   </Style>
 
-  <Style Selector="TextBlock.eyebrow">
+  <Style Selector=":is(TextBlock).eyebrow">
     <Setter Property="FontSize" Value="12"/>
     <Setter Property="FontWeight" Value="SemiBold"/>
     <Setter Property="Foreground" Value="{DynamicResource MutedBrush}"/>
     <Setter Property="Margin" Value="0,0,0,4"/>
   </Style>
 
-  <Style Selector="TextBlock.h1">
+  <Style Selector=":is(TextBlock).h1">
     <Setter Property="FontSize" Value="24"/>
     <Setter Property="FontWeight" Value="Medium"/>
     <Setter Property="Margin" Value="0,0,0,4"/>
@@ -203,6 +203,9 @@
   </Style>
 
   <!-- Primary Action: Solid Blue (Only for the primary task action) -->
+  <Style Selector="Button.primary :is(TextBlock)">
+    <Setter Property="Foreground" Value="{DynamicResource OnPrimaryBrush}"/>
+  </Style>
   <Style Selector="Button.primary">
     <Setter Property="Background" Value="{DynamicResource PrimaryGreen}"/>
     <Setter Property="Foreground" Value="{DynamicResource OnPrimaryBrush}"/>
@@ -384,7 +387,7 @@
     <Setter Property="HorizontalAlignment" Value="Right"/>
     <Setter Property="VerticalAlignment" Value="Center"/>
   </Style>
-  <Style Selector="TextBlock.badge-text">
+  <Style Selector=":is(TextBlock).badge-text">
     <Setter Property="FontSize" Value="11"/>
     <Setter Property="FontWeight" Value="SemiBold"/>
     <Setter Property="Foreground" Value="{DynamicResource MutedBrush}"/>
@@ -395,7 +398,7 @@
   <Style Selector="Border.badge.badge-accent">
     <Setter Property="Background" Value="{DynamicResource PrimaryGreen}"/>
   </Style>
-  <Style Selector="TextBlock.badge-text.badge-accent-text">
+  <Style Selector=":is(TextBlock).badge-text.badge-accent-text">
     <Setter Property="Foreground" Value="{DynamicResource OnPrimaryBrush}"/>
   </Style>
 
@@ -639,10 +642,10 @@
       <Transitions><TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.08" Easing="CubicEaseOut"/></Transitions>
     </Setter>
   </Style>
-  <Style Selector="TextBlock.example-en">
+  <Style Selector=":is(TextBlock).example-en">
     <Setter Property="Foreground" Value="{DynamicResource InkBrush}"/>
   </Style>
-  <Style Selector="TextBlock.example-quote">
+  <Style Selector=":is(TextBlock).example-quote">
     <Setter Property="Foreground" Value="{DynamicResource PrimaryGreen}"/>
   </Style>
   <Style Selector="Border.pos-chip">
@@ -720,3 +723,4 @@
   <Style Selector="Window.compact Border.card"><Setter Property="Padding" Value="16"/></Style>
   <Style Selector="Window.expanded Border.card"><Setter Property="Padding" Value="24"/></Style>
 </Styles>
+

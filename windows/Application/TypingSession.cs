@@ -20,6 +20,25 @@ public sealed class TypingSession
     public IReadOnlyList<int> ErrorPositions { get; private set; } = [];
     public TypingOutcome Outcome { get; private set; } = TypingOutcome.Finished;
     public int Retries { get; private set; }
+    private readonly HashSet<int> _revealed = [];
+    private bool _answerViewed;
+    public int AssistedCount { get; private set; }
+    public int UnassistedCorrectCount { get; private set; }
+    public string HintText => Current == null ? "" : string.Concat(Normalize(Current.Word).Select((ch,i)=>char.IsLetter(ch)&&!_revealed.Contains(i)?'_':ch));
+    public bool RevealHint()
+    {
+        if (!Hints || Current == null || Outcome == TypingOutcome.Correct) return false;
+        var target=Normalize(Current.Word);
+        for(var i=0;i<target.Length;i++) if(char.IsLetter(target[i])&&!_revealed.Contains(i))
+        { _revealed.Add(i); return true; }
+        return false;
+    }
+    public void RevealAnswer()
+    {
+        if(Current==null||Outcome==TypingOutcome.Correct)return;
+        for(var i=0;i<Normalize(Current.Word).Length;i++)_revealed.Add(i);
+        _answerViewed=true;ErrorIds.Add(Current.Id);
+    }
     public HashSet<string> ErrorIds { get; } = [];
     public double Accuracy => _submittedCharacters == 0 ? 100 : 100d * _correctCharacters / _submittedCharacters;
     public int Wpm => _clock.Elapsed.TotalMinutes > 0 ? (int)(_completedCharacters / 5d / _clock.Elapsed.TotalMinutes) : 0;
@@ -27,7 +46,7 @@ public sealed class TypingSession
     {
         _words = words.Where(w => !string.IsNullOrWhiteSpace(w.Word)).ToList();
         Cursor = Retries = _submittedCharacters = _correctCharacters = _completedCharacters = 0;
-        Hints = hints; ErrorIds.Clear(); _clock.Reset(); ClearAttempt();
+        Hints = hints; AssistedCount=UnassistedCorrectCount=0; ErrorIds.Clear(); _clock.Reset(); ClearAttempt();
         Outcome = Current == null ? TypingOutcome.Finished : TypingOutcome.Pending;
     }
     public static string Normalize(string input) => string.Concat(input.Normalize(NormalizationForm.FormC)
@@ -56,6 +75,7 @@ public sealed class TypingSession
         {
             _submittedCharacters += input.Length; _correctCharacters += input.Length;
             _completedCharacters += input.Length;
+            if(_revealed.Count>0 || _answerViewed) AssistedCount++; else UnassistedCorrectCount++;
             ErrorPositions = []; FailedInput = "";
             return Outcome = TypingOutcome.Correct;
         }
@@ -69,5 +89,5 @@ public sealed class TypingSession
         if (Current == null) _clock.Stop();
         return true;
     }
-    private void ClearAttempt() { Input = FailedInput = ""; ErrorPositions = []; }
+    private void ClearAttempt() { Input = FailedInput = ""; ErrorPositions = []; _revealed.Clear(); _answerViewed=false; }
 }

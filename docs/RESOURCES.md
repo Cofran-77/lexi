@@ -1,36 +1,23 @@
-# 学习资源与接入
+# 学习资料与来源
 
-## 随应用提供的词典
+## 安装与资源
 
-Windows 与 Android 的 dictionary.sqlite3 来自 ECDICT 常用词子集，包含 59,026 条记录。ECDICT 采用 MIT 许可，其版权与原始许可继续保留；项目的非商业许可不改变这份第三方数据的许可。
+Windows 1.2.4 当前安装包包含离线词典及配套专题学习资料，安装后本地加载，无需另行下载。Android 按其已实现的功能集提供，不包含 Windows 专题工作区。
 
-## IELTS 资料核对
+开发者可在 [Windows 发布页](https://github.com/Cofran-77/lexi/releases/tag/windows-v1.2.4-nc.1) 下载 Lexi-1.2.4-study-resources.zip。将 Assets/IELTS 下的内容解压到 windows/Assets/IELTS 后构建。Git 中保留格式示例和资源哈希清单，避免在提交历史中重复存放约 500 MB 音频和资料。
 
-2026-10-09 核对 hefengxian/my-ielts 的公开 README 与仓库根目录。README 标明“禁止将本项目用于任何商业目的”，并说明内容包括《雅思词汇真经》原书音频、新东方语法讲义、《顾家北手把手教你雅思写作》翻译练习等。根目录未提供可核实的教材权利人再分发授权文件。资料公开可访问不等于允许再分发；仅声明非商业也不能证明转载原书内容不侵权。
+## 离线词典
 
-因此公开仓库与安装包不复制旧资源包，包含其教材词汇编排、录音、PDF、图片、翻译与讲义。相关工作区源码完整保留，不删除练习实现。后续若取得明确覆盖再分发的授权，再按授权范围接入并记录权利人、来源、许可、文件清单和日期。
+dictionary.sqlite3 来自 ECDICT 常用词子集，共 59,026 条，采用原项目 MIT 许可。原作者版权与许可保留。
 
-## 接入自己的资源
+## 专题资料
 
-应用读取输出目录 Assets/IELTS/catalog.json。资源路径相对该目录；解析器阻止路径越界。在源码 windows/Assets/IELTS/ 放入自己的原创或获授权数据，现有构建规则会复制到应用输出。单独购买教材一般不自动包含向公众再分发资源的权利。
+来源：[hefengxian/my-ielts](https://github.com/hefengxian/my-ielts)，适配基线提交 5cef573933663c4673c6e0093f1df04e68018b1a。上游声明禁止商业用途，原书、词汇编排、音频和讲义权利归各自权利人。来源声明不是原书权利人的授权证明；Lexi 不将这些材料声明为原创或重新授权。
 
-catalog.example.json 是本项目原创的格式示例，不来自教材。复制为 catalog.json 后可用于检查接入流程；它不代表完整教材。简化结构如下：
+当前本地适配包括 22 个词汇章节、3,674 条词汇记录、179 条听力词、376 条阅读替换记录、100 条写作句子和配套文件。阅读来源称“538”，实际已提供的记录为 376 条，不补造缺失内容。部分视频链接失效不代表安装包缺文件，也不保证外部网站永久可用。自动生成翻译保留来源，不作为标准答案。
 
-```json
-{
-  "Source": "My own study notes",
-  "Sections": [{
-    "Id": "my-section", "Kind": "vocabulary", "Title": "My words",
-    "Entries": [{"Id": "my-word", "Words": ["adaptive"], "Meaning": "能够适应变化的", "Group": 1}]
-  }],
-  "Sentences": []
-}
-```
+## 资源完整性
 
-具体字段和资源读取逻辑见 windows/Application/LearningCatalog.cs。语音、讲义等辅助文件按对应页面的读取格式配置，不保证任意教材格式可以直接导入。
+[STUDY-RESOURCES-MANIFEST.json](STUDY-RESOURCES-MANIFEST.json) 记录适配基线与文件 SHA256。下载附件另附 SHA256SUMS.txt，安装包和资源 ZIP 分别校验。固定适配目录在程序输出的 Assets/IELTS，应用不自动更新教材。
 
-## 参考项目与资源状态
-
-参考项目 [DespairJasper/lexi-macos](https://github.com/DespairJasper/lexi-macos) 将教材文件放在 lexi_avalonia/Assets/IELTS，并在 NOTICES.md 单独记录来源；不是运行时由转接服务下载。本项目不据此推断原书权利人已经授权。
-
-可在 [my-ielts 原项目](https://github.com/hefengxian/my-ielts) 查看来源与使用说明。此链接用于来源追溯，不代表 Lexi 获得原书资料授权。当前安装包不自动抓取第三方教材；取得明确授权后，可按授权允许的范围实现下载、缓存和离线加载。
+自备资料可按 catalog.example.json 格式接入。路径相对于资料目录，解析器限制越界访问。接入与分发第三方内容应遵循其权利和使用条件。

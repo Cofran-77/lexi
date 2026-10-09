@@ -21,7 +21,7 @@ pwsh -File windows/packaging/build-installer.ps1 -Version 1.2.4 -Dotnet dotnet
 pwsh -File windows/packaging/package-release.ps1 -Version 1.2.4
 ```
 
-默认输出到仓库根目录 `Lexi-1.2.4-Windows-x64/` 和相应源码/分发 ZIP。打包脚本不从桌面外部取资料；公开仓库的 `Assets/IELTS` 没有教材数据，因此此构建不包含旧资源包。安装程序需要 NSIS 位于默认路径或通过 `-Nsis` 指定。
+默认输出到仓库根目录 `Lexi-1.2.4-Windows-x64/` 和相应源码/分发 ZIP。Git 工程保留资源格式示例；构建完整专题版本时，先从当前 Windows Release 下载专题资源 ZIP，将其中 Assets/IELTS 内容解压到 windows/Assets/IELTS。现有构建规则会复制资源到输出；普通用户直接安装完整 Windows 安装包即可。安装程序需要 NSIS 位于默认路径或通过 `-Nsis` 指定。
 
 ### 测试
 

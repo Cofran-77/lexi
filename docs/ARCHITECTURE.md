@@ -24,4 +24,4 @@ Kotlin / Compose 主界面；`app/src/main/java/org/lexi/archive` 包含 ViewMod
 
 ## 资源与数据
 
-离线字典为 MIT 授权 ECDICT 子集。公开版本不跟踪用户数据库、个人设置、API Key、签名材料或第三方 IELTS 教材包。各端本地数据库有自己的恢复流程；词条迁移经 CSV/兼容 JSON 完成，而非直接共享 SQLite 文件。
+离线字典为 MIT 授权 ECDICT 子集。Git 不跟踪用户数据库、个人设置、API Key 或签名材料。第三方专题资料在当前 Windows 分发附件中单独提供，来源与权利声明保留。各端本地数据库有自己的恢复流程；词条迁移经 CSV/兼容 JSON 完成，而非直接共享 SQLite 文件。

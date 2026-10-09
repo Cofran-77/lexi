@@ -13,10 +13,12 @@
 | AndroidX / Compose、Kotlin、协程、OkHttp | 通常为 Apache-2.0，按各包发布内容为准 | Gradle 声明与依赖发布包 |
 | Gradle Wrapper | Apache-2.0 | Android Wrapper 与 `android/GRADLE-LICENSE.txt` |
 
-## 不随本仓库发布的内容
+## IELTS 学习资料
 
-此前本地项目从 [hefengxian/my-ielts](https://github.com/hefengxian/my-ielts) 参考/导入过教材词汇、录音、讲义等。原来源限制商业用途，但没有提供可核实的原书资源再分发授权；原书版权仍属于各权利人。**公开仓库与 Windows 公开安装包排除这些资源。** 历史版本也经过同样排除。具体核对依据见 [资源说明](docs/RESOURCES.md)。
+Windows 配套专题资料来自 [hefengxian/my-ielts](https://github.com/hefengxian/my-ielts)，适配时固定到提交 5cef573933663c4673c6e0093f1df04e68018b1a。上游 README 明确声明禁止商业用途；原书、词汇编排、音频和讲义的权利归各自权利人。Lexi 保留来源信息，不将这些资料归为 Cofran-77 或 DespairJasper 原创，不由根目录许可重新授权。来源声明不等于原书权利人的授权证明。
 
-`windows/Notices/MY-IELTS-SOURCE.md` 只保留来源说明；教材入口源码是程序实现，不是教材分发许可。使用资源必须自行取得相应授权。
+资料随当前 Windows 安装包及专题资源 ZIP 提供。详见 [资源说明](docs/RESOURCES.md) 与 windows/Notices/MY-IELTS-SOURCE.md。第三方依赖许可与通知继续分别保留。
 
-macOS 参考仓库 [DespairJasper/lexi-macos](https://github.com/DespairJasper/lexi-macos) 的许可以该仓库自身文件为准；本仓库没有导入 macOS 源码。本次修订以 PolyForm Noncommercial 许可分发原创内容，旧 MIT 授权不追溯撤回，详见 LICENSE-POLICY.md；不自动修改其他仓库或第三方许可。
+## 平台合作与许可
+
+macOS 参考项目 [DespairJasper/lexi-macos](https://github.com/DespairJasper/lexi-macos) 由合作作者维护，本仓库尚未导入该端源码。原创内容当前按 PolyForm Noncommercial 分发；许可适用范围与沿革见 LICENSE-POLICY.md，不自动修改外部仓库或第三方许可。

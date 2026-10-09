@@ -39,9 +39,10 @@ public static class VisualAcceptanceTests
             Check(themeToggle.IsEffectivelyVisible && w.RequestedThemeVariant != previousTheme, "visible title-bar theme button switches theme");
             using (var store = new VocabularyService()) Check(store.LoadSettings().Theme == w.RequestedThemeVariant!.Key.ToString(), "title-bar theme button persists without API settings");
             Click(C<Button>("NavSettings"));
+            ((Lexi.Features.Settings.SettingsDrawerControl)typeof(MainWindow).GetField("_settingsDrawer",BindingFlags.NonPublic|BindingFlags.Instance)!.GetValue(w)!).ShowSection(Lexi.Features.Settings.SettingsSection.Appearance);
             await Task.Delay(100);
             var themeCard = C<Border>("ThemeSettingsCard");
-            Check(themeCard.IsEffectivelyVisible && themeCard.TranslatePoint(new Point(), C<ScrollViewer>("PageSettings"))!.Value.Y < 200, "theme settings visible at top of settings page");
+            Check(themeCard.IsEffectivelyVisible && themeCard.Bounds.Width <= 440, "theme settings visible inside the bounded appearance drawer");
             await Snapshot("theme-settings");
             Click(C<Button>("NavLookup"));
             var input = C<TextBox>("LookupInput");

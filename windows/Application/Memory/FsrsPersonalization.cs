@@ -262,7 +262,6 @@ public sealed class FsrsPersonalization
         string? helperSha = null;
 
         PersonalizationModelState? published = null;
-        PersonalizationModelState? lastGood = null;
         IReadOnlyList<PersonalizationModelState> rows;
         try { rows = _store.LoadPersonalizationModels(SchedulingConfig.FsrsParameterModelKind, _options.HistoryScanLimit); }
         catch (Exception ex)

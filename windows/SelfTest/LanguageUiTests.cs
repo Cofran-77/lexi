@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Interactivity;
 using System.Reflection;
+using Avalonia.VisualTree;
 
 namespace Lexi;
 
@@ -24,6 +25,23 @@ public static class LanguageUiTests
             await Task.Delay(100);
             Check(main.FindControl<Button>("LookupBtn")!.Content?.ToString() == "Look up ↵", "English updates existing lookup controls");
             Check(main.FindControl<Button>("BackupNowBtn")!.Content?.ToString() == "Back up now", "English updates backup controls");
+            var quickNav = main.FindControl<StackPanel>("LearningNavHost")!.Children.OfType<Button>().ToList();
+            Check(quickNav.Single(b => b.Name == "OpenTranslateBtn").Content?.ToString() == "Translate sentence", "English translates sentence navigation");
+            Check(quickNav.Single(b => b.Name == "NavQuotes").Content?.ToString() == "Quotes", "English translates quotes navigation");
+            await main.HandleQuickActionAsync(QuickAction.Translate, 0);
+            var card = (QuickCardWindow)typeof(MainWindow).GetField("_quickCard", BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(main)!;
+            card.OriginalInput.Text = "Keep my sentence"; card.TranslationInput.Text = "保留我的译文";
+            method.Invoke(main, ["zh-CN"]); method.Invoke(main, ["en"]);
+            Check(card.OriginalInput.Text == "Keep my sentence" && card.TranslationInput.Text == "保留我的译文", "language change preserves open translation draft");
+            Check(card.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "QuickRunBtn").Content?.ToString() == "Translate", "open translation card updates its action language");
+            card.Close();
+            await main.HandleQuickActionAsync(QuickAction.SaveQuote, 0);
+            card = (QuickCardWindow)typeof(MainWindow).GetField("_quickCard", BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(main)!;
+            card.OriginalInput.Text="A quote worth keeping";card.TranslationInput.Text="保留金句草稿";
+            method.Invoke(main,["zh-CN"]);method.Invoke(main,["en"]);
+            Check(card.OriginalInput.Text=="A quote worth keeping"&&card.TranslationInput.Text=="保留金句草稿","language change preserves open quote draft");
+            Check(!System.Text.RegularExpressions.Regex.IsMatch(card.Title??"","[\\u4e00-\\u9fff]"),"open quote card title follows English mode");
+            card.Close();
             Check(main.FindControl<TextBox>("LookupInput")!.Text == "resilient" && main.FindControl<TextBox>("ArchiveNotesInput")!.Text == "用户备注：学习中", "language switching preserves user text");
             using var store = new VocabularyService();
             Check(store.LoadSettings().GetType().GetProperty("UiLanguage")!.GetValue(store.LoadSettings())?.ToString() == "en", "switching persists English");

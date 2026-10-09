@@ -26,7 +26,7 @@ public partial class MainWindow
     private TextBlock? _quotesSummary;
     private int _quotePageIndex;
     private const int QuotePageSize=50;
-    private string QuickText(string zh,string en)=>_settings.UiLanguage == "en" ? en : zh;
+    private string QuickText(string zh,string en)=>UiText.Bilingual(zh,en,_settings.UiLanguage);
     private bool AiLookupConfigured=>!string.IsNullOrWhiteSpace(_settings.ApiKey)&&!string.IsNullOrWhiteSpace(_settings.Model);
     private IQuoteArchive QuoteArchive => (IQuoteArchive)_vocabService;
 
@@ -34,7 +34,7 @@ public partial class MainWindow
     {
         var shortcuts=new StackPanel {Spacing=8};
         shortcuts.Children.Add(new TextBlock {Text=QuickText("全局快捷卡片","Global quick cards"),FontSize=16,FontWeight=FontWeight.Medium});
-        shortcuts.Children.Add(new TextBlock {Text=QuickText("关闭主窗口后继续驻留；托盘菜单“退出” 完全退出。先选中文本再按快捷键。","Closing the main window keeps shortcuts available; 托盘菜单“退出” quits. Select text before pressing a shortcut."),TextWrapping=TextWrapping.Wrap,FontSize=12});
+        shortcuts.Children.Add(new TextBlock {Text=QuickText("关闭主窗口后继续驻留；托盘菜单“退出” 完全退出。先选中文本再按快捷键。","Closing the main window keeps shortcuts available. Use Quit in the tray menu to exit. Select text before pressing a shortcut."),TextWrapping=TextWrapping.Wrap,FontSize=12});
         TextBox Shortcut(string name,string value,string label){var box=new TextBox {Name=name,Text=value,MaxLength=1,Width=54};var row=new StackPanel {Orientation=Orientation.Horizontal,Spacing=12};row.Children.Add(new TextBlock {Text=label,VerticalAlignment=VerticalAlignment.Center,Width=130});row.Children.Add(new TextBlock {Text="Alt+",VerticalAlignment=VerticalAlignment.Center});row.Children.Add(box);shortcuts.Children.Add(row);return box;}
         _lookupShortcutInput=Shortcut("LookupShortcutInput",_settings.LookupShortcut,QuickText("查词","Look up"));
         _translateShortcutInput=Shortcut("TranslateShortcutInput",_settings.TranslateShortcut,QuickText("句子翻译","Translate"));
@@ -43,7 +43,7 @@ public partial class MainWindow
         var apply=new Button {Content=QuickText("应用快捷键","Apply shortcuts"),Name="ApplyQuickShortcutsBtn"};apply.Click+=(_,_)=>SaveQuickShortcuts();shortcuts.Children.Add(apply);
         SettingsContent.Children.Insert(2,new Border {Classes={"card"},Child=shortcuts});
         Opened+=(_,_)=>Dispatcher.UIThread.Post(UpdateQuickShortcutStatus);
-        var translateButton = new Button { Name="OpenTranslateBtn", Content="句子翻译", Classes={"nav"} };
+        var translateButton = new Button { Name="OpenTranslateBtn", Content=QuickText("句子翻译","Translate sentence"), Classes={"nav"} };
         translateButton.Click += async (_,_) => await HandleQuickActionAsync(QuickAction.Translate,0); LearningNavHost.Children.Add(translateButton);
         ConfigureQuotesPage();
         if (App.Hotkey != null) App.Hotkey.RegistrationChanged += () => Dispatcher.UIThread.Post(UpdateQuickShortcutStatus);
@@ -70,9 +70,31 @@ public partial class MainWindow
     {
         var keys=new[]{_lookupShortcutInput!.Text,_translateShortcutInput!.Text,_quoteShortcutInput!.Text}.Select(s=>(s??"").Trim().ToUpperInvariant()).ToArray();
         if(keys.Any(k=>k.Length!=1 || k[0]<'A'||k[0]>'Z') || keys.Distinct().Count()!=3){_quickShortcutStatus!.Text=QuickText("请选择三个不同的英文字母。","Choose three different English letters.");return;}
-        _settings.LookupShortcut=keys[0];_settings.TranslateShortcut=keys[1];_settings.QuoteShortcut=keys[2];
-        try{_vocabService.SaveSettings(_settings);App.Hotkey?.Configure(keys[0],keys[1],keys[2]);UpdateQuickShortcutStatus();}
-        catch(Exception ex){_quickShortcutStatus!.Text=ex.Message;}
+        var oldLookup = _settings.LookupShortcut;
+        var oldTranslate = _settings.TranslateShortcut;
+        var oldQuote = _settings.QuoteShortcut;
+        if (App.Hotkey != null && !App.Hotkey.TryConfigure(keys[0], keys[1], keys[2], out var hotkeyError))
+        {
+            _quickShortcutStatus!.Text = hotkeyError ?? QuickText("快捷键已被其他程序占用，保留原配置。", "Shortcuts occupied by another application. Kept previous configuration.");
+            return;
+        }
+        _settings.LookupShortcut = keys[0];
+        _settings.TranslateShortcut = keys[1];
+        _settings.QuoteShortcut = keys[2];
+        try
+        {
+            _vocabService.SaveSettings(_settings);
+            UpdateQuickShortcutStatus();
+        }
+        catch (Exception ex)
+        {
+            _settings.LookupShortcut = oldLookup;
+            _settings.TranslateShortcut = oldTranslate;
+            _settings.QuoteShortcut = oldQuote;
+            App.Hotkey?.TryConfigure(oldLookup, oldTranslate, oldQuote, out _);
+            UpdateQuickShortcutStatus();
+            _quickShortcutStatus!.Text = ex.Message;
+        }
     }
     private void UpdateQuickShortcutStatus()
     {
@@ -127,7 +149,7 @@ public partial class MainWindow
     }
     private void ConfigureQuotesPage()
     {
-        _quotesNav=new Button {Name="NavQuotes",Content="金句本",Classes={"nav"}}; LearningNavHost.Children.Add(_quotesNav);
+        _quotesNav=new Button {Name="NavQuotes",Content=QuickText("金句本","Quotes"),Classes={"nav"}}; LearningNavHost.Children.Add(_quotesNav);
         _quotesNav.Click+=(_,_)=>ShowPage("quotes");
         var content=new StackPanel {Spacing=16,MaxWidth=850,HorizontalAlignment=HorizontalAlignment.Stretch};
         content.Children.Add(new TextBlock {Text=QuickText("金句本","Quotes"),FontSize=28,FontWeight=FontWeight.SemiBold});

@@ -30,6 +30,11 @@ public sealed class IeltsWorkspaceControl : Grid, IDisposable
     private readonly Action<List<LearningWord>> _startSynonyms;
     private readonly Action _openResources;
     private readonly Action _openWriting;
+    private readonly Action<LearningSection?>? _openSynonyms;
+    private readonly Action<List<LearningWord>>? _archiveBatch;
+    private readonly Action<LearningWord, LearningSection?>? _archiveSingle;
+    private readonly Action<string>? _viewArchive;
+    private readonly Func<string, bool>? _isArchived;
 
     private readonly IeltsSelectionStore _selectionStore = new();
     private readonly IeltsPracticeSettings _practiceSettings = new();
@@ -51,12 +56,15 @@ public sealed class IeltsWorkspaceControl : Grid, IDisposable
     private readonly TextBlock _sectionDescBlock;
     private readonly TextBox _wordSearchBox;
 
-    // 批量栏
+    // 批量栏与筛选操作
     private readonly Border _batchBar;
     private readonly TextBlock _batchSelectedCountBlock;
+    private readonly Button _batchArchiveBtn;
     private readonly Button _batchClearBtn;
     private readonly Button _batchViewSelectedBtn;
     private readonly Button _batchPracticeBtn;
+    private readonly Button _selectAllFilteredBtn;
+    private readonly Button _invertVisibleBtn;
 
     // 练习设置与开始菜单
     private readonly Border _settingsDrawer;
@@ -93,7 +101,12 @@ public sealed class IeltsWorkspaceControl : Grid, IDisposable
         Action<LearningSection> createPlan,
         Action<List<LearningWord>> startSynonyms,
         Action openResources,
-        Action openWriting)
+        Action openWriting,
+        Action<LearningSection?>? openSynonyms = null,
+        Action<List<LearningWord>>? archiveBatch = null,
+        Action<LearningWord, LearningSection?>? archiveSingle = null,
+        Action<string>? viewArchive = null,
+        Func<string, bool>? isArchived = null)
     {
         _catalog = catalog;
         _progress = progress;
@@ -105,6 +118,11 @@ public sealed class IeltsWorkspaceControl : Grid, IDisposable
         _startSynonyms = startSynonyms;
         _openResources = openResources;
         _openWriting = openWriting;
+        _openSynonyms = openSynonyms;
+        _archiveBatch = archiveBatch;
+        _archiveSingle = archiveSingle;
+        _viewArchive = viewArchive;
+        _isArchived = isArchived;
 
         // 恢复已有勾选词
         if (_sharedSelection.Count > 0)
@@ -146,7 +164,13 @@ public sealed class IeltsWorkspaceControl : Grid, IDisposable
         _topNavPanel = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6, VerticalAlignment = VerticalAlignment.Center };
         _tabVocab = CreateNavTab(IeltsI18n.T("词汇"), true, () => { });
         _tabResources = CreateNavTab(IeltsI18n.T("听力资料"), false, _openResources);
-        _tabSynonyms = CreateNavTab(IeltsI18n.T("阅读同义替换"), false, () => _startSynonyms(GetActiveWordsForSynonyms()));
+        _tabSynonyms = CreateNavTab(IeltsI18n.T("阅读同义替换"), false, () =>
+        {
+            if (_openSynonyms != null)
+                _openSynonyms(_selectedSection);
+            else
+                _startSynonyms(GetActiveWordsForSynonyms());
+        });
         _tabWriting = CreateNavTab(IeltsI18n.T("写作练习"), false, _openWriting);
 
         _topNavPanel.Children.Add(_tabVocab);
@@ -320,7 +344,22 @@ public sealed class IeltsWorkspaceControl : Grid, IDisposable
         _practiceMenu.Items.Add(itemPlan);
 
         var itemSynonyms = new MenuItem { Header = IeltsI18n.T("同义替换听写") };
-        itemSynonyms.Click += (_, _) => _startSynonyms(GetTargetPracticeWords());
+        itemSynonyms.Click += (_, _) =>
+        {
+            var targetWords = GetTargetPracticeWords().Where(w => w.Synonyms.Count > 0).ToList();
+            if (targetWords.Count > 0)
+            {
+                _startSynonyms(targetWords);
+            }
+            else if (_openSynonyms != null)
+            {
+                _openSynonyms(_selectedSection);
+            }
+            else
+            {
+                _startSynonyms(GetTargetPracticeWords());
+            }
+        };
         _practiceMenu.Items.Add(itemSynonyms);
 
         _startPracticeBtn = new Button
@@ -440,7 +479,7 @@ public sealed class IeltsWorkspaceControl : Grid, IDisposable
         };
         var batchGrid = new Grid
         {
-            ColumnDefinitions = new ColumnDefinitions("*,Auto,Auto,Auto")
+            ColumnDefinitions = new ColumnDefinitions("*,Auto,Auto,Auto,Auto")
         };
         _batchSelectedCountBlock = new TextBlock
         {
@@ -451,6 +490,23 @@ public sealed class IeltsWorkspaceControl : Grid, IDisposable
         _batchSelectedCountBlock.Bind(TextBlock.ForegroundProperty, this.GetResourceObservable("InkBrush"));
         Grid.SetColumn(_batchSelectedCountBlock, 0);
         batchGrid.Children.Add(_batchSelectedCountBlock);
+
+        _batchArchiveBtn = new Button
+        {
+            Content = IeltsI18n.T("收藏到档案"),
+            Classes = { "secondary" },
+            Padding = new Thickness(10, 5),
+            Margin = new Thickness(0, 0, 6, 0),
+            FontSize = 12
+        };
+        _batchArchiveBtn.Click += (_, _) =>
+        {
+            var words = _selectionStore.GetSelectedWords();
+            if (words.Count > 0)
+                _archiveBatch?.Invoke(words);
+        };
+        Grid.SetColumn(_batchArchiveBtn, 1);
+        batchGrid.Children.Add(_batchArchiveBtn);
 
         _batchViewSelectedBtn = new Button
         {
@@ -464,7 +520,7 @@ public sealed class IeltsWorkspaceControl : Grid, IDisposable
         {
             SetWordFilter(_wordFilterType == IeltsFilterType.SelectedOnly ? IeltsFilterType.All : IeltsFilterType.SelectedOnly);
         };
-        Grid.SetColumn(_batchViewSelectedBtn, 1);
+        Grid.SetColumn(_batchViewSelectedBtn, 2);
         batchGrid.Children.Add(_batchViewSelectedBtn);
 
         _batchClearBtn = new Button
@@ -482,7 +538,7 @@ public sealed class IeltsWorkspaceControl : Grid, IDisposable
             UpdateBatchBar();
             RenderWordList();
         };
-        Grid.SetColumn(_batchClearBtn, 2);
+        Grid.SetColumn(_batchClearBtn, 3);
         batchGrid.Children.Add(_batchClearBtn);
 
         _batchPracticeBtn = new Button
@@ -493,13 +549,41 @@ public sealed class IeltsWorkspaceControl : Grid, IDisposable
             FontSize = 12,
             Flyout = _practiceMenu
         };
-        Grid.SetColumn(_batchPracticeBtn, 3);
+        Grid.SetColumn(_batchPracticeBtn, 4);
         batchGrid.Children.Add(_batchPracticeBtn);
 
         _batchBar.Child = batchGrid;
 
+        // 筛选工具行（支持全选当前筛选 / 反选可见）
+        var selectionTools = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 6,
+            Margin = new Thickness(0, 0, 0, 4)
+        };
+        _selectAllFilteredBtn = new Button
+        {
+            Content = IeltsI18n.T("全选当前筛选"),
+            Classes = { "ghost" },
+            Padding = new Thickness(8, 4),
+            FontSize = 11
+        };
+        _selectAllFilteredBtn.Click += (_, _) => SelectAllCurrentFilter();
+        selectionTools.Children.Add(_selectAllFilteredBtn);
+
+        _invertVisibleBtn = new Button
+        {
+            Content = IeltsI18n.T("反选可见"),
+            Classes = { "ghost" },
+            Padding = new Thickness(8, 4),
+            FontSize = 11
+        };
+        _invertVisibleBtn.Click += (_, _) => InvertVisibleSelection();
+        selectionTools.Children.Add(_invertVisibleBtn);
+
         var filterAndBatchStack = new StackPanel { Spacing = 6 };
         filterAndBatchStack.Children.Add(filterBar);
+        filterAndBatchStack.Children.Add(selectionTools);
         filterAndBatchStack.Children.Add(_batchBar);
 
         Grid.SetRow(filterAndBatchStack, 2);
@@ -707,6 +791,8 @@ public sealed class IeltsWorkspaceControl : Grid, IDisposable
             var statusKind = _progress.Errors.Contains(word.Id) ? "error" : (_progress.Typed.Contains(word.Id) ? "typed" : "new");
             var isSelected = _selectionStore.Contains(word.Id);
 
+            var isArchived = _isArchived?.Invoke(word.Word) ?? false;
+
             row.BindWord(
                 id: word.Id,
                 word: word.Word,
@@ -719,12 +805,25 @@ public sealed class IeltsWorkspaceControl : Grid, IDisposable
                 synonyms: word.Synonyms,
                 audioPath: word.AudioPath,
                 statusKind: statusKind,
-                isSelected: isSelected
+                isSelected: isSelected,
+                isExpanded: _expandedWords.Contains(word.Id),
+                isArchived: isArchived
             );
             row.SetExpanded(_expandedWords.Contains(word.Id));
             row.ExpansionToggled += (_, expanded) =>
             {
                 if (expanded) _expandedWords.Add(word.Id); else _expandedWords.Remove(word.Id);
+            };
+
+            // 档案单词收藏与查看
+            row.AddToArchiveRequested += (r) =>
+            {
+                _archiveSingle?.Invoke(word, _selectedSection);
+                r.SetArchived(_isArchived?.Invoke(word.Word) ?? true);
+            };
+            row.ViewArchiveRequested += (_, text) =>
+            {
+                _viewArchive?.Invoke(text);
             };
 
             // 选择操作（跨章保存）
@@ -754,6 +853,72 @@ public sealed class IeltsWorkspaceControl : Grid, IDisposable
         }
 
         UpdateBatchBar();
+    }
+
+    public void RefreshArchivedStatus()
+    {
+        foreach (var row in _wordListPanel.Children.OfType<VocabularyRow>())
+        {
+            var archived = _isArchived?.Invoke(row.WordText) ?? false;
+            row.SetArchived(archived);
+        }
+    }
+
+    private void SelectAllCurrentFilter()
+    {
+        var visibleWords = GetCurrentlyVisibleWords();
+        foreach (var w in visibleWords)
+        {
+            _selectionStore.Toggle(w, _selectedSection?.Id ?? "", true);
+            _sharedSelection.Add(w.Id);
+        }
+        UpdateBatchBar();
+        RenderWordList();
+    }
+
+    private void InvertVisibleSelection()
+    {
+        var visibleWords = GetCurrentlyVisibleWords();
+        foreach (var w in visibleWords)
+        {
+            var nowSelected = !_selectionStore.Contains(w.Id);
+            _selectionStore.Toggle(w, _selectedSection?.Id ?? "", nowSelected);
+            if (nowSelected)
+                _sharedSelection.Add(w.Id);
+            else
+                _sharedSelection.Remove(w.Id);
+        }
+        UpdateBatchBar();
+        RenderWordList();
+    }
+
+    private List<LearningWord> GetCurrentlyVisibleWords()
+    {
+        if (_selectedSection == null) return [];
+        var query = _selectedSection.Entries.AsEnumerable();
+
+        if (!string.IsNullOrWhiteSpace(_wordSearchKeyword))
+        {
+            query = query.Where(w =>
+                w.Word.Contains(_wordSearchKeyword, StringComparison.OrdinalIgnoreCase) ||
+                w.Meaning.Contains(_wordSearchKeyword, StringComparison.OrdinalIgnoreCase) ||
+                w.Phonetic.Contains(_wordSearchKeyword, StringComparison.OrdinalIgnoreCase));
+        }
+
+        switch (_wordFilterType)
+        {
+            case IeltsFilterType.Practiced:
+                query = query.Where(w => _progress.Typed.Contains(w.Id));
+                break;
+            case IeltsFilterType.Errors:
+                query = query.Where(w => _progress.Errors.Contains(w.Id));
+                break;
+            case IeltsFilterType.SelectedOnly:
+                query = query.Where(w => _selectionStore.Contains(w.Id));
+                break;
+        }
+
+        return query.ToList();
     }
 
     private void UpdateBatchBar()
@@ -881,8 +1046,11 @@ public sealed class IeltsWorkspaceControl : Grid, IDisposable
         _practiceRandomCheck.Content = IeltsI18n.T("随机练习");
         _startPracticeBtn.Content = IeltsI18n.T("开始练习") + " ▾";
 
+        _batchArchiveBtn.Content = IeltsI18n.T("收藏到档案");
         _batchClearBtn.Content = IeltsI18n.T("清空");
         _batchPracticeBtn.Content = IeltsI18n.T("学习已选词") + " ▾";
+        _selectAllFilteredBtn.Content = IeltsI18n.T("全选当前筛选");
+        _invertVisibleBtn.Content = IeltsI18n.T("反选可见");
 
         _audioBar.RefreshLanguage();
         UpdateBatchBar();

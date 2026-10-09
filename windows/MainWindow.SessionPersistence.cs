@@ -29,8 +29,7 @@ public partial class MainWindow
         else if (surface == "focus" && _focusRound != null)
         {
             memory = _focusMemory;
-            var scope = "focus:" + string.Join("|", JsonSerializer.Deserialize<StudyRound<string>.PersistedRound>(
-                _focusRound.CaptureJson(w => w))!.States.Select(w => w.WordId).OrderBy(w => w, StringComparer.Ordinal));
+            var scope = FocusSurfaceScope();
             saved = new(1, scope, _focusRound.CaptureJson(w => w),
                 _focusPresentation, _focusLastPresentation, _focusLastCommitted,
                 _focusAnswerVisible, _focusRated, _focusLastRating, _focusRatedWord,

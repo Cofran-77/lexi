@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading;
 
@@ -11,10 +13,18 @@ public readonly record struct HotkeyRegistrationStatus(string Key, bool IsRegist
 public sealed class HotkeyService : IDisposable
 {
     private const int HotkeyId = 9001;
+    private const int TempHotkeyId = 9101;
     private const uint ModAlt = 0x0001;
     private const uint ModNoRepeat = 0x4000;
     private const uint ReconfigureMessage = 0x8001;
+    private const uint TryReconfigureMessage = 0x8002;
     private const int WmHotkey = 0x0312;
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern IntPtr SendMessage(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
+
+    [DllImport("user32.dll")]
+    private static extern bool IsWindow(IntPtr hWnd);
 
     [DllImport("user32.dll", SetLastError = true)]
     private static extern bool RegisterHotKey(IntPtr hWnd, int id, uint fsModifiers, uint vk);
@@ -95,17 +105,70 @@ public sealed class HotkeyService : IDisposable
     private readonly object _gate = new();
     private string[] _keys = ["D", "A", "S"];
     private HotkeyRegistrationStatus[] _statuses = [new("D", false, null), new("A", false, null), new("S", false, null)];
+    private sealed class ReconfigureRequest
+    {
+        public string[] NewKeys = null!;
+        public bool Success;
+        public string? ErrorMessage;
+    }
+    private ReconfigureRequest? _pendingRequest;
+    private readonly object _configurationGate=new();
+    private int[] _registeredIds=[9001,9002,9003];
+    private int _nextRegistrationId=10001;
+
     public event Action<QuickAction>? QuickActionPressed;
     public event Action? RegistrationChanged;
     public HotkeyRegistrationStatus GetStatus(QuickAction action) { lock (_gate) return _statuses[(int)action]; }
+
     public void Configure(string lookup, string translate, string quote)
     {
-        var keys = new[] {lookup, translate, quote}.Select(k => (k ?? "").Trim().ToUpperInvariant()).ToArray();
+        var keys = new[] { lookup, translate, quote }.Select(k => (k ?? "").Trim().ToUpperInvariant()).ToArray();
         if (keys.Any(k => k.Length != 1 || k[0] < 'A' || k[0] > 'Z') || keys.Distinct().Count() != 3)
             throw new ArgumentException("请选择三个不同的英文字母。");
-        lock (_gate) _keys = keys;
-        if (_hwnd != IntPtr.Zero) PostMessage(_hwnd, ReconfigureMessage, IntPtr.Zero, IntPtr.Zero);
+        TryConfigure(keys[0], keys[1], keys[2], out _);
     }
+
+    public bool TryConfigure(string lookup, string translate, string quote)
+        => TryConfigure(lookup, translate, quote, out _);
+
+    public bool TryConfigure(string lookup, string translate, string quote, out string? error)
+    {
+        error = null;
+        var keys = new[] { lookup, translate, quote }.Select(k => (k ?? "").Trim().ToUpperInvariant()).ToArray();
+        if (keys.Any(k => k.Length != 1 || k[0] < 'A' || k[0] > 'Z') || keys.Distinct().Count() != 3)
+        {
+            error = "请选择三个不同的英文字母。";
+            return false;
+        }
+
+        lock (_configurationGate)
+        {
+            if (_hwnd == IntPtr.Zero || !IsWindow(_hwnd))
+            {
+                _keys = keys;
+                _statuses = keys.Select(k => new HotkeyRegistrationStatus(k, false, null)).ToArray();
+                RegistrationChanged?.Invoke();
+                return true;
+            }
+
+            lock(_gate) _pendingRequest = new ReconfigureRequest { NewKeys = keys };
+            SendMessage(_hwnd, TryReconfigureMessage, IntPtr.Zero, IntPtr.Zero);
+            var req = _pendingRequest;
+            _pendingRequest = null;
+            if (req != null)
+            {
+                error = req.ErrorMessage;
+                if (req.Success)
+                {
+                    RegistrationChanged?.Invoke();
+                    return true;
+                }
+                return false;
+            }
+            return false;
+        }
+    }
+
     private void RegisterConfiguredKeys()
     {
         lock (_gate)
@@ -119,6 +182,35 @@ public sealed class HotkeyService : IDisposable
         }
     }
 
+    private void HandleTryReconfigure()
+    {
+        lock (_gate)
+        {
+            var req = _pendingRequest;
+            if (req == null) return;
+            var ids = new int[3];
+            var added = new List<int>();
+            for (var i = 0; i < 3; i++)
+            {
+                var oldIndex = Array.FindIndex(_keys, k => k == req.NewKeys[i]);
+                if (oldIndex >= 0 && _statuses[oldIndex].IsRegistered)
+                { ids[i] = _registeredIds[oldIndex]; continue; }
+                var id = _nextRegistrationId++;
+                if (!RegisterHotKey(_hwnd, id, ModAlt | ModNoRepeat, req.NewKeys[i][0]))
+                {
+                    foreach (var held in added) UnregisterHotKey(_hwnd, held);
+                    req.ErrorMessage = "快捷键 Alt+" + req.NewKeys[i] + " 被其他程序占用，保留原配置。";
+                    return;
+                }
+                added.Add(id); ids[i] = id;
+            }
+            foreach (var oldId in _registeredIds.Where(id => !ids.Contains(id))) UnregisterHotKey(_hwnd, oldId);
+            _registeredIds = ids;
+            _keys = req.NewKeys;
+            _statuses = _keys.Select(k => new HotkeyRegistrationStatus(k, true, null)).ToArray();
+            req.Success = true;
+        }
+    }
     public bool IsRegistered => GetStatus(QuickAction.Lookup).IsRegistered;
     public event Action? HotkeyPressed;
 
@@ -189,15 +281,16 @@ public sealed class HotkeyService : IDisposable
     {
         if (msg == 0x0010)
         {
-            for (var i = 0; i < 3; i++) UnregisterHotKey(hWnd, HotkeyId + i);
+            foreach(var id in _registeredIds) UnregisterHotKey(hWnd, id);
             DestroyWindow(hWnd);
             PostQuitMessage(0);
             return IntPtr.Zero;
         }
         if (msg == ReconfigureMessage) { RegisterConfiguredKeys(); RegistrationChanged?.Invoke(); return IntPtr.Zero; }
-        if (msg == WmHotkey && wParam.ToInt32() >= HotkeyId && wParam.ToInt32() < HotkeyId + 3)
+        if (msg == TryReconfigureMessage) { HandleTryReconfigure(); return IntPtr.Zero; }
+        if (msg == WmHotkey && Array.IndexOf(_registeredIds,wParam.ToInt32()) is var actionIndex && actionIndex>=0)
         {
-            var action = (QuickAction)(wParam.ToInt32() - HotkeyId);
+            var action = (QuickAction)actionIndex;
             QuickActionPressed?.Invoke(action);
             if (action == QuickAction.Lookup) HotkeyPressed?.Invoke();
             return IntPtr.Zero;

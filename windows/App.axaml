@@ -5,6 +5,7 @@
   <Application.Styles>
     <FluentTheme />
     <StyleInclude Source="avares://Lexi/Styles/VisualTheme.axaml" />
+    <StyleInclude Source="avares://Lexi/Styles/InteractionControls.axaml" />
   </Application.Styles>
 
 

@@ -24,21 +24,43 @@ public partial class MainWindow
         _synonymCursor = 0;
         if (_synonymQuestions.Count == 0)
         {
-            SetStatus(IeltsI18n.T("当前范围没有同义替换练习。"));
+            SetStatus(IeltsI18n.T("当前范围没有同义替换练习，已切换至全部同义替换浏览。"));
+            ShowIeltsSynonymsBrowser();
             return;
         }
 
         // 切换到子页面展示
-        ShowIeltsSubPage();
+        ShowIeltsSubPage(bounded: false);
         RenderIeltsSynonym();
     }
 
-    private void ShowIeltsSubPage()
+    private void ShowIeltsSubPage(bool bounded = false)
     {
         ShowPage("ielts");
         if (_ieltsWorkspace != null) _ieltsWorkspace.IsVisible = false;
-        if (_ieltsSubContentPage != null) _ieltsSubContentPage.IsVisible = true;
+        if (_ieltsSubContentPage != null)
+        {
+            _ieltsSubContentPage.IsVisible = true;
+            _ieltsSubContentPage.VerticalScrollBarVisibility = bounded
+                ? Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled
+                : Avalonia.Controls.Primitives.ScrollBarVisibility.Auto;
+        }
         _ieltsSubContent?.Children.Clear();
+    }
+
+    private void ShowIeltsSynonymsBrowser(LearningSection? currentSection = null)
+    {
+        ShowIeltsSubPage(bounded: true);
+        if (_ieltsSubContent == null || _ieltsCatalog == null) return;
+
+        var browser = new IeltsSynonymBrowser(
+            catalog: _ieltsCatalog,
+            initialSection: currentSection,
+            playerProvider: GetLearningAudio,
+            startPractice: StartIeltsSynonyms,
+            onBack: ShowIeltsCatalog
+        );
+        _ieltsSubContent.Children.Add(browser);
     }
 
     private void RenderIeltsSynonym()
@@ -138,63 +160,16 @@ public partial class MainWindow
 
     private void ShowIeltsResources()
     {
-        ShowIeltsSubPage();
-        if (_ieltsSubContent == null) return;
+        ShowIeltsSubPage(bounded: true);
+        if (_ieltsSubContent == null || _ieltsCatalog == null) return;
 
-        var body = new StackPanel { Name = "IeltsResourcesPanel", Spacing = 14 };
-
-        var topBar = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto") };
-        var title = LearningText(IeltsI18n.T("听力与语法学习资料"), 22);
-        Grid.SetColumn(title, 0);
-        topBar.Children.Add(title);
-
-        var backBtn = LearningButton(IeltsI18n.T("返回 IELTS 目录"), ShowIeltsCatalog);
-        Grid.SetColumn(backBtn, 1);
-        topBar.Children.Add(backBtn);
-        body.Children.Add(topBar);
-
-        // 工具与资料链接（中性操作按钮）
-        var tools = new WrapPanel { Orientation = Orientation.Horizontal };
-        foreach (var (label, path) in new[]
-        {
-            (IeltsI18n.T("课程视频"), _ieltsCatalog!.GrammarVideo),
-            (IeltsI18n.T("语法讲义 PDF"), IeltsCatalog.ResolveAsset("grammar/雅思基础语法配套课程讲义.pdf")),
-            (IeltsI18n.T("语法思维导图"), IeltsCatalog.ResolveAsset("grammar/雅思语法.svg")),
-            (IeltsI18n.T("资料来源"), _ieltsCatalog.Source)
-        })
-        {
-            var button = LearningButton(label, () => OpenIeltsResource(path));
-            button.IsEnabled = !string.IsNullOrEmpty(path);
-            tools.Children.Add(button);
-        }
-        body.Children.Add(tools);
-
-        var listening = _ieltsCatalog.Sections.Where(s => s.Kind == "listening").ToList();
-        body.Children.Add(LearningText($"{IeltsI18n.T("听力词汇资料")} · {listening.Sum(s => s.Entries.Count)} 条", 16));
-
-        var sectionLinks = new WrapPanel { Orientation = Orientation.Horizontal };
-        foreach (var section in listening)
-        {
-            sectionLinks.Children.Add(LearningButton(section.Title, () =>
-            {
-                SelectIeltsSection(section);
-            }));
-        }
-        body.Children.Add(sectionLinks);
-
-        if (IeltsCatalog.ResolveAsset("listening-notes.txt") is { } notes)
-        {
-            body.Children.Add(LearningButton(IeltsI18n.T("打开完整听力笔记"), () => OpenIeltsResource(notes)));
-            body.Children.Add(new ScrollViewer
-            {
-                Content = LearningText(File.ReadAllText(notes)),
-                MaxHeight = 420
-            });
-        }
-
-        body.Children.Add(LearningText("资料来自 my-ielts；原作者禁止商业用途。口语和大小作文尚无完整内容。", 12));
-
-        _ieltsSubContent.Children.Add(LearningCard(body));
+        var view = new IeltsResourceView(
+            catalog: _ieltsCatalog,
+            onSelectSection: SelectIeltsSection,
+            onOpenResource: OpenIeltsResource,
+            onBack: ShowIeltsCatalog
+        );
+        _ieltsSubContent.Children.Add(view);
     }
 
     private void OpenIeltsResource(string? path)
@@ -205,12 +180,13 @@ public partial class MainWindow
             SetStatus("资源地址格式无效。");
             return;
         }
-        Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
+        try { Process.Start(new ProcessStartInfo(path) { UseShellExecute = true }); }
+        catch (Exception ex) { SetStatus(UiText.Bilingual("无法打开资源：", "Cannot open resource: ") + ex.Message); }
     }
 
     private void ShowIeltsWriting()
     {
-        ShowIeltsSubPage();
+        ShowIeltsSubPage(bounded: false);
         if (_ieltsSubContent == null) return;
 
         var body = new StackPanel { Name = "IeltsWritingPanel", Spacing = 14 };

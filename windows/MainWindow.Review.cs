@@ -32,15 +32,12 @@ public partial class MainWindow
         ReviewUnfamiliarBtn.Click += async (_, _) => await RateReviewAsync(false);
         ReviewUnsureBtn.Click += async (_, _) => await RateReviewRatingAsync(StudyRating.Unsure);
         ReviewRoundUndoBtn.Click += (_, _) => UndoRoundRating();
-        PageReview.KeyDown += async (_, e) =>
-        {
-            if (e.KeyModifiers != KeyModifiers.None || e.Source is TextBox || _reviewBusy) return;
-            if (e.Key == Key.Space && !_reviewRevealed) { RevealReview(); e.Handled = true; }
-            else if (_reviewRevealed && e.Key is Key.Left or Key.Right)
-            { e.Handled = true; await RateReviewAsync(e.Key == Key.Right); }
-            else if (_reviewRevealed && e.Key == Key.Down)
-            { e.Handled = true; await RateReviewRatingAsync(StudyRating.Unsure); }
-        };
+
+        ToolTip.SetTip(ReviewUnfamiliarBtn, "忘记 (← 或 1)");
+        ToolTip.SetTip(ReviewUnsureBtn, "模糊 (↓ 或 2)");
+        ToolTip.SetTip(ReviewRememberBtn, "认识 (→ 或 3)");
+        ToolTip.SetTip(ReviewRevealBtn, "揭晓释义 (Space / Enter)");
+        ToolTip.SetTip(ReviewRoundUndoBtn, "撤销 (Ctrl+Z)");
     }
 
     private void OpenReviewDeck()

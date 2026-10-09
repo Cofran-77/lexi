@@ -139,7 +139,7 @@ public static class LearningIntegrationTests
             studyBitmap.Save(Path.Combine(Environment.GetEnvironmentVariable("LEXI_DATA_DIR")!, "study-narrow.png"));
         }
         var ratingButtons = studyHost.GetLogicalDescendants().OfType<Button>()
-            .Where(b => b.Content?.ToString() is "忘记了 (1)" or "模糊 (2)" or "认识 (3)").ToList();
+            .Where(b => b.Name is "StudyRateForgot" or "StudyRateUnsure" or "StudyRateKnown").ToList();
         check(ratingButtons.Count == 3 && ratingButtons.All(b => b.TranslatePoint(default, window) is { } p
             && p.X >= 0 && p.X + b.Bounds.Width <= window.Bounds.Width && p.Y + b.Bounds.Height <= window.Bounds.Height),
             "three neutral rating actions remain entirely visible at 760 by 520");

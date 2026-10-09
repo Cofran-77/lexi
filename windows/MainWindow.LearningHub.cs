@@ -118,81 +118,6 @@ public partial class MainWindow
         _typingHost.SetValue(Panel.ZIndexProperty, 100);
         ((Grid)RootWindowBorder.Child!).Children.Add(_typingHost);
 
-        // 键盘事件监听
-        AddHandler(KeyDownEvent, (sender, e) =>
-        {
-            if (_typingHost.IsVisible && e.Key == Key.Escape)
-            {
-                ExitLearningTyping();
-                e.Handled = true;
-                return;
-            }
-
-            // 专注学习快捷键处理：输入框聚焦时不得触发学习评分
-            if (_studyWorkspaceHost.IsVisible && !_typingHost.IsVisible && _dailyLearningSession != null)
-            {
-                var focused = FocusManager?.GetFocusedElement();
-                if (focused is TextBox) return;
-
-                if (e.Key == Key.Escape)
-                {
-                    ExitDailyLearning();
-                    e.Handled = true;
-                }
-                else if (e.Key == Key.A)
-                {
-                    PlayCurrentLearningWordAudio();
-                    e.Handled = true;
-                }
-                else if (e.Key == Key.Z && (e.KeyModifiers == KeyModifiers.Control || e.KeyModifiers == KeyModifiers.Alt))
-                {
-                    if (_dailyLearningSession.CanUndo)
-                    {
-                        UndoDailyLearning();
-                        e.Handled = true;
-                    }
-                }
-                else if (_dailyLearningSession.Round.CurrentStep == StudyStep.Learn)
-                {
-                    if (e.Key is Key.Space or Key.Enter)
-                    {
-                        CompleteDailyLearn();
-                        e.Handled = true;
-                    }
-                }
-                else if (_dailyLearningSession.Round.CurrentStep == StudyStep.Recall)
-                {
-                    if (!_planAnswerVisible)
-                    {
-                        if (e.Key is Key.Space or Key.Enter)
-                        {
-                            _planAnswerVisible = true;
-                            RenderDailyLearning();
-                            e.Handled = true;
-                        }
-                    }
-                    else
-                    {
-                        if (e.Key is Key.D1 or Key.NumPad1)
-                        {
-                            RateDailyLearning(StudyRating.Forgot);
-                            e.Handled = true;
-                        }
-                        else if (e.Key is Key.D2 or Key.NumPad2)
-                        {
-                            RateDailyLearning(StudyRating.Unsure);
-                            e.Handled = true;
-                        }
-                        else if (e.Key is Key.D3 or Key.NumPad3 or Key.Space or Key.Enter)
-                        {
-                            RateDailyLearning(StudyRating.Known);
-                            e.Handled = true;
-                        }
-                    }
-                }
-            }
-        }, Avalonia.Interactivity.RoutingStrategies.Tunnel);
-
         ReloadLearningPlans();
     }
 
@@ -222,7 +147,7 @@ public partial class MainWindow
         var button = new Button
         {
             Content = UiText.Text(label),
-            Width = 106,
+            MinWidth = 106,
             Padding = new Thickness(8, 8),
             HorizontalContentAlignment = HorizontalAlignment.Center
         };
@@ -468,19 +393,13 @@ public partial class MainWindow
         if (ieltsActive.Count > 0)
         {
             _learningPlansPanel.Children.Add(LearningText("IELTS 专题计划", 18));
-            foreach (var plan in ieltsActive)
-            {
-                RenderSinglePlanCard(plan);
-            }
+            RenderPlanBoardGroup(ieltsActive);
         }
 
         if (archiveActive.Count > 0)
         {
             _learningPlansPanel.Children.Add(LearningText("词汇档案计划", 18));
-            foreach (var plan in archiveActive)
-            {
-                RenderSinglePlanCard(plan);
-            }
+            RenderPlanBoardGroup(archiveActive);
         }
 
         if (inactive.Count > 0)
@@ -502,10 +421,7 @@ public partial class MainWindow
 
             if (_completedPlansExpanded)
             {
-                foreach (var plan in inactive)
-                {
-                    RenderSinglePlanCard(plan);
-                }
+                RenderPlanBoardGroup(inactive);
             }
         }
     }
@@ -1153,13 +1069,13 @@ public partial class MainWindow
             if (round.CurrentStep == StudyStep.Learn)
             {
                 // 先学后测主动作
-                var btnStartRecall = LearningButton("看完了，开始回忆 → ↵", CompleteDailyLearn, primary: true);
+                var btnStartRecall = LearningButton(UiText.Text("看完了，开始回忆")+" ("+ShortcutHint(ShortcutAction.Primary)+")", CompleteDailyLearn, primary: true);
                 rightBox.Children.Add(btnStartRecall);
             }
             else if (!_planAnswerVisible)
             {
                 // 尚未揭晓
-                var btnRevealBottom = LearningButton("查看释义 ↵", () =>
+                var btnRevealBottom = LearningButton(UiText.Text("揭晓释义")+" ("+ShortcutHint(ShortcutAction.Primary)+")", () =>
                 {
                     _planAnswerVisible = true;
                     RenderDailyLearning();
@@ -1169,9 +1085,12 @@ public partial class MainWindow
             else
             {
                 // 三键评分：中性次级按钮，等宽，统一主题中性
-                var btnForgot = RatingButton("忘记了 (1)", StudyRating.Forgot);
-                var btnUnsure = RatingButton("模糊 (2)", StudyRating.Unsure);
-                var btnKnown = RatingButton("认识 (3)", StudyRating.Known);
+                var btnForgot = RatingButton(UiText.Text("忘记")+" ("+ShortcutHint(ShortcutAction.Forgot)+")", StudyRating.Forgot);
+                var btnUnsure = RatingButton(UiText.Text("模糊")+" ("+ShortcutHint(ShortcutAction.Unsure)+")", StudyRating.Unsure);
+                var btnKnown = RatingButton(UiText.Text("认识")+" ("+ShortcutHint(ShortcutAction.Known)+")", StudyRating.Known);
+                btnForgot.Name = "StudyRateForgot";
+                btnUnsure.Name = "StudyRateUnsure";
+                btnKnown.Name = "StudyRateKnown";
 
                 rightBox.Children.Add(btnForgot);
                 rightBox.Children.Add(btnUnsure);

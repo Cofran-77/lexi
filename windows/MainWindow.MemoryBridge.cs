@@ -161,11 +161,9 @@ public partial class MainWindow
     private void BeginFocusMemory(StudyMode mode, int count)
     {
         var memory = SurfaceMemory(ref _focusMemory);
-        var scope = "focus:" + string.Join("|", System.Text.Json.JsonSerializer
-            .Deserialize<StudyRound<string>.PersistedRound>(_focusRound!.CaptureJson(w => w))!
-            .States.Select(w => w.WordId).OrderBy(w => w, StringComparer.Ordinal));
+        var scope = FocusSurfaceScope();
         if (RestoreLearningSurface("focus", scope, memory)) return;
-        memory.BeginSession(mode, WordSource.Archive, "", count);
+        memory.BeginSession(mode, _focusIeltsWords.Count>0?WordSource.Ielts:WordSource.Archive, "", count);
         _focusPresentation = _focusLastPresentation = null;
         _focusLastCommitted = false;
         PersistLearningSurface("focus");
@@ -173,10 +171,12 @@ public partial class MainWindow
 
     private void PresentFocusMemory(string word, StudyStep step)
     {
-        var identity = WordKeyResolver.FormC(word);
+        var sourceWord=_focusIeltsWords.GetValueOrDefault(word);
+        var identity = sourceWord==null?WordKeyResolver.FormC(word):word;
         if (_focusPresentation is { } current && current.Identity == identity && current.Step == step) return;
         var archive = _allWords.FirstOrDefault(item => WordKeyResolver.FormC(item.Word) == identity);
-        var key = archive == null ? WordKeyResolver.FromForm(word) : WordKeyResolver.FromArchive(archive);
+        var key = sourceWord!=null?WordKeyResolver.FromIelts(sourceWord):archive == null ? WordKeyResolver.FromForm(word) : WordKeyResolver.FromArchive(archive);
+        if(sourceWord!=null)((VocabularyService)_learningMemoryStore!).SaveSourceWordDetails(key.Key,sourceWord.Word,sourceWord.Phonetic??"",sourceWord.Meaning??"",sourceWord.Example??"");
         if (archive == null && WordKeyResolver.FormC(ResultWordText.Text ?? "") == identity)
             ((VocabularyService)_learningMemoryStore!).SaveSourceWordDetails(key.Key, word,
                 ResultPhoneticText.Text ?? "", _focusOriginalTranslation, ResultDefinitionText.Text ?? "");

@@ -1,4 +1,4 @@
-param([string]$Nsis = 'C:\Program Files (x86)\NSIS\makensis.exe', [string]$Version = '1.2.0', [string]$TestDirectory = 'installer-acceptance-verified')
+param([string]$Nsis = 'C:\Program Files (x86)\NSIS\makensis.exe', [string]$Version = '1.2.1', [string]$TestDirectory = 'installer-acceptance-verified')
 $ErrorActionPreference = 'Stop'
 $project = Split-Path $PSScriptRoot -Parent
 $workspace = Split-Path (Split-Path $project -Parent) -Parent
@@ -45,6 +45,11 @@ $env:LEXI_DATA_DIR = Join-Path $testRoot 'runtime-ui'
 $smoke = Start-Process -FilePath (Join-Path $appDir 'Lexi.exe') -ArgumentList '--ui-smoke' -WindowStyle Hidden -Wait -PassThru -RedirectStandardOutput (Join-Path $testRoot 'installed-ui.log') -RedirectStandardError (Join-Path $testRoot 'installed-ui-errors.log')
 Check ($smoke.ExitCode -eq 0) 'installed app passes actual Windows UI smoke tests'
 Check (!(Get-Content (Join-Path $env:LEXI_DATA_DIR 'ui-smoke-result.txt') | Where-Object {$_ -like 'FAIL *'})) 'installed UI report contains no failures'
+$env:LEXI_DATA_DIR = Join-Path $testRoot 'runtime-interaction'
+$interaction = Start-Process -FilePath (Join-Path $appDir 'Lexi.exe') -ArgumentList '--interaction-test' -WindowStyle Hidden -Wait -PassThru
+Check ($interaction.ExitCode -eq 0) 'installed app passes new study, shortcut, focus and IELTS interactions'
+$interactionReport = Get-Content (Join-Path $env:LEXI_DATA_DIR 'interaction-result.txt')
+Check (($interactionReport | Where-Object {$_ -like 'PASS *'}).Count -ge 70 -and !($interactionReport | Where-Object {$_ -like 'FAIL *'})) 'installed interaction report contains complete successful assertions'
 $uninstaller = Join-Path $appDir 'Uninstall.exe'
 # NSIS treats all remaining text after _?= as the directory, including spaces.
 # Quoting the entire token bypasses this special parser and spawns a child copy.

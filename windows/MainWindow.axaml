@@ -24,7 +24,7 @@
 
           <Button Name="LanguageToggleBtn" Grid.Column="2" Classes="ghost" Content="EN" ToolTip.Tip="切换界面语言" Margin="0,0,6,0"/>
           <Button Name="ThemeToggleBtn" Grid.Column="3" Classes="ghost" Content="切换深色" ToolTip.Tip="切换浅色 / 深色主题，自动保存" Margin="0,0,12,0"/>
-          <TextBlock Grid.Column="4" Text="Alt+D" Classes="muted" VerticalAlignment="Center" Margin="0,0,15,0"/>
+          <Button Name="GlobalFocusButton" Grid.Column="4" Content="专注" Classes="ghost" Focusable="False" ToolTip.Tip="进入 / 退出专注模式 · F11" Margin="0,0,8,0"/>
 
           <!-- Centered vector Path caption buttons, no font glyphs -->
           <Button Name="HideToTrayBtn" Grid.Column="5" Classes="window-control" ToolTip.Tip="最小化到任务栏" AutomationProperties.Name="最小化" Margin="0">
@@ -437,17 +437,17 @@
                 <TextBlock Name="VocabPageText" Classes="muted" VerticalAlignment="Center"/>
                 <Button Name="VocabNextBtn" Classes="ghost" Content="下一页"/>
               </StackPanel>
-              <Grid ColumnDefinitions="Auto,*,Auto">
-                <ComboBox Name="BatchActionCombo" SelectedIndex="0">
+              <Grid Name="ArchiveActionsHost" ColumnDefinitions="Auto,*,Auto">
+                <ComboBox Name="BatchActionCombo" SelectedIndex="0" IsVisible="False">
                   <ComboBoxItem Content="批量操作…"/>
                   <ComboBoxItem Content="完成本次复习 (推进阶段)"/>
                   <ComboBoxItem Content="标记已掌握"/>
-                  <ComboBoxItem Content="置入今日复习"/>
+                  <ComboBoxItem Content="今日复习"/>
                   <ComboBoxItem Content="调整复习阶段…"/>
                   <ComboBoxItem Content="重新学习 (第 1 阶段)"/>
                   <ComboBoxItem Content="删除所选…"/>
                 </ComboBox>
-                <Button Name="ExportPrintBtn" Grid.Column="2" Classes="primary" Content="↗ 导出打印 A4 清单"/>
+                <Button Name="ExportPrintBtn" Grid.Column="2" Classes="ghost" Content="↗ 打印" ToolTip.Tip="导出打印 A4 清单"/>
               </Grid>
               </StackPanel>
             </Border>
@@ -528,13 +528,13 @@
                   </StackPanel>
               </Border>
 
-              <Border Classes="card"><StackPanel Spacing="10">
+              <Border Name="LookupShortcutsCard" Classes="card"><StackPanel Spacing="10">
                 <TextBlock Text="查词与快捷方式" FontSize="16" FontWeight="SemiBold"/>
-                <TextBlock Text="Alt+Space 将当前查询结果加入生词本（仅在 Lexi 查词页生效，已收藏的词不会重复入库）。" Classes="muted" TextWrapping="Wrap"/>
+                <TextBlock Text="Ctrl+D 收藏当前单词；Alt+Space 保留 Windows 系统菜单。学习按键可以在此自定义。" Classes="muted" TextWrapping="Wrap"/>
                 <TextBlock Text="选中英文后按 Alt+D 即查；未选中时唤醒输入框。优先使用本地词典，已配置 AI 时可补全未收录的词。" Classes="muted" TextWrapping="Wrap"/>
                 <TextBlock Text="× 隐藏到托盘 · 横线最小化 · 标题栏双击最大化 · 拖动边缘调整大小。完全退出请用托盘菜单。" Classes="muted" TextWrapping="Wrap"/>
               </StackPanel></Border>
-              <Border Classes="card">
+              <Border Name="AiSettingsCard" Classes="card">
                 <StackPanel Spacing="16">
                   <TextBlock Text="AI 与语境偏好" FontSize="16" FontWeight="SemiBold"/>
                   <StackPanel Spacing="6">
@@ -606,7 +606,7 @@
                   </Border>
                 </StackPanel>
               </Border>
-              <Border Classes="card">
+              <Border Name="DataSettingsCard" Classes="card">
                 <StackPanel Spacing="10">
                   <TextBlock Text="数据与备份" FontWeight="SemiBold" FontSize="16"/>
                   <TextBlock Name="DataIdentityText" TextWrapping="Wrap" FontWeight="SemiBold"/>
@@ -646,7 +646,7 @@
                   </Border>
                 </StackPanel>
               </Border>
-              <Border Classes="card"><StackPanel Spacing="10">
+              <Border Name="AboutSettingsCard" Classes="card"><StackPanel Spacing="10">
                 <TextBlock Text="关于与诊断" FontSize="16" FontWeight="SemiBold"/>
                 <TextBlock Name="DiagnosticsText" Classes="muted" TextWrapping="Wrap"/>
                 <TextBlock Text="Lexi · 私人词汇档案。离线查词，按需使用自己的 AI，保存真正遇见的表达。" Classes="muted" TextWrapping="Wrap"/>
@@ -660,7 +660,7 @@
       <Border Grid.Row="2" Background="{DynamicResource TintBrush}" Padding="20,0">
         <Grid ColumnDefinitions="*,Auto">
           <TextBlock Name="GlobalStatusText" Text="本地查词不调用 AI。关闭窗口后可通过快捷键或托盘重新打开。" VerticalAlignment="Center" FontSize="11"/>
-          <TextBlock Grid.Column="1" Text="Lexi 1.2.0" Classes="muted" VerticalAlignment="Center" FontSize="11"/>
+          <TextBlock Grid.Column="1" Text="Lexi 1.2.1" Classes="muted" VerticalAlignment="Center" FontSize="11"/>
         </Grid>
       </Border>
     </Grid>

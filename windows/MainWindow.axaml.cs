@@ -66,6 +66,7 @@ public partial class MainWindow : Window
         InitializeIelts();
         BindAppearanceEvents();
         ConfigureQuickActions();
+        ConfigureInteractionWorkspace();
         BindLanguageEvents();
         LoadSettingsToUi();
         RefreshWords();
@@ -256,6 +257,9 @@ public partial class MainWindow : Window
     private void ShowPage(string page)
     {
         if (!_databaseAvailable) return;
+        if (page == "settings") { OpenSettingsDrawer(); return; }
+        CloseSettingsDrawer();
+        if (_globalFocusActive) SetGlobalFocusChrome(false);
         PersistPausedSurfaces();
         if (_focusActive) ExitFocus();
         StopWindowsLearningAudio();
@@ -846,6 +850,7 @@ public partial class MainWindow : Window
     {
         var selectedCount = _filteredWords.Count(w => w.Selected);
         SelectedCountText.Text = $"已选 {selectedCount} 项";
+        _archiveActions?.UpdateSelection(selectedCount);
         SelectAllCheckBox.IsChecked = _displayedWords.Count > 0 && _displayedWords.All(w => w.Selected);
     }
 

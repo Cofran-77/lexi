@@ -161,6 +161,12 @@ public static class IeltsTests
         row.SetExpanded(false);
         Assert(!row.IsExpanded, "收起详情");
         Assert(row.IsSelected, "收起不影响选择");
+
+        // 5. 收藏状态正交独立
+        Assert(!row.IsArchived, "初始未收藏");
+        row.SetArchived(true);
+        Assert(row.IsArchived, "设置已收藏");
+        Assert(row.IsSelected, "收藏状态变化不破坏选择");
     }
 
     private static void TestDynamicLocalization()

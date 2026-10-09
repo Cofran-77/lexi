@@ -42,7 +42,7 @@ public static class FocusIntegrationTests
             Call("ExitFocus"); Check(!Field<bool>("_focusActive") && window.FindControl<ScrollViewer>("PageLookup")!.IsVisible, "exit restores lookup visibility");
             var catalog = IeltsCatalog.Load(); Check(catalog.Sections.Count > 0 && catalog.AllWords.Any(), "IELTS catalog deployed with entries");
             Call("ShowIeltsCatalog"); Call("ShowIeltsResources");
-            Check(Field<StackPanel>("_ieltsSubContent").Children.Count > 0 && Field<Grid>("_ieltsPage").IsVisible,
+            Check(Field<Grid>("_ieltsSubContent").Children.Count > 0 && Field<Grid>("_ieltsPage").IsVisible,
                 "IELTS resources stay on the independent IELTS page");
             Call("ShowIeltsWriting"); Check(catalog.Sentences.Count == 100, "writing resource exercises available");
             Call("ShowIeltsCatalog");

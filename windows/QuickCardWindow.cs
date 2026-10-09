@@ -49,7 +49,7 @@ internal sealed class QuickCardWindow : Window
     internal string Status => _status.Text ?? "";
     internal QuickAction Mode => _mode;
     internal string SelectionSource => _source.Text ?? "";
-    private string L(string zh, string en) => _appearance.UiLanguage == "en" ? en : zh;
+    private string L(string zh, string en) => UiText.Bilingual(zh,en,_appearance.UiLanguage);
 
     internal QuickCardWindow(IDictionaryLookup dictionary, IVocabularyArchive words, IQuoteArchive quotes,
         Func<string, CancellationToken, Task<string>> translate, AppSettings settings, Action changed, Action<string> openWord, Action openQuotes,
@@ -192,6 +192,19 @@ internal sealed class QuickCardWindow : Window
             _surface.Background = settings.Theme == "Dark" ? new SolidColorBrush(Color.Parse("#152332")) : new SolidColorBrush(Color.Parse("#F7FAFD"));
             Foreground = settings.HighContrast ? (settings.Theme == "Dark" ? Brushes.White : Brushes.Black) : new SolidColorBrush(Color.Parse(settings.Theme == "Dark" ? "#ECF5FD" : "#172E43"));
         }
+    }
+
+    internal void RefreshLanguage()
+    {
+        foreach (var control in this.GetVisualDescendants().OfType<Control>())
+        {
+            if (control is Button button && button.Content is string caption) button.Content = UiText.Redisplay(caption);
+            else if (control is TextBox input && input.Watermark != null) input.Watermark = UiText.Redisplay(input.Watermark);
+        }
+        _heading.Text = _mode switch { QuickAction.Lookup => L("查词", "Look up"), QuickAction.Translate => L("句子翻译", "Translate sentence"), _ => L("收藏金句", "Save quote") };
+        foreach (var label in _metadata.Children.OfType<TextBlock>()) label.Text = UiText.Redisplay(label.Text);
+        _status.Text = UiText.Redisplay(_status.Text);
+        Title = "lexi · " + _heading.Text;
     }
 
     internal void Prepare(QuickAction mode, string? text, QuoteItem? quote = null, string? captureMessage = null, string? source = null)

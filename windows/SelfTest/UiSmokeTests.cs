@@ -42,7 +42,11 @@ public static class UiSmokeTests
             await (Task)Call("PerformLookupAsync")!;
             Check(C<TextBlock>("ResultWordText").Text == "serendipity", "offline query renders word");
             input.RaiseEvent(new Avalonia.Input.KeyEventArgs { RoutedEvent = Avalonia.Input.InputElement.KeyDownEvent, Key = Avalonia.Input.Key.Space, KeyModifiers = Avalonia.Input.KeyModifiers.Alt });
-            Check(!C<Button>("AddWordBtn").IsEnabled, "Alt+Space adds the current lookup while input has focus");
+            Check(C<Button>("AddWordBtn").IsEnabled, "Alt+Space does not archive a word while typing");
+            C<Button>("AddWordBtn").Focus();
+            window.RaiseEvent(new Avalonia.Input.KeyEventArgs { RoutedEvent=Avalonia.Input.InputElement.KeyDownEvent, Key=Avalonia.Input.Key.D, KeyModifiers=Avalonia.Input.KeyModifiers.Control });
+            window.RaiseEvent(new Avalonia.Input.KeyEventArgs { RoutedEvent=Avalonia.Input.InputElement.KeyUpEvent, Key=Avalonia.Input.Key.D });
+            Check(!C<Button>("AddWordBtn").IsEnabled, "Ctrl+D archives the current lookup outside text input");
 
             // Visual Test 2: AI Option CheckBox capsules retain semantics
             var optExamples = C<CheckBox>("AiOptExamples");
@@ -70,12 +74,13 @@ public static class UiSmokeTests
 
             input.Text = "resilient";
             await (Task)Call("PerformLookupAsync")!;
-            SendMessage(window.TryGetPlatformHandle()!.Handle, 0x0104, new IntPtr(0x20), new IntPtr(1L << 29));
-            Check(!C<Button>("AddWordBtn").IsEnabled, "native Windows Alt+Space adds without opening the system menu");
+            C<Button>("AddWordBtn").Focus();
+            window.RaiseEvent(new Avalonia.Input.KeyEventArgs { RoutedEvent=Avalonia.Input.InputElement.KeyDownEvent, Key=Avalonia.Input.Key.D, KeyModifiers=Avalonia.Input.KeyModifiers.Control });
+            Check(!C<Button>("AddWordBtn").IsEnabled, "unified Ctrl+D archives a second lookup");
             var shortcutStore = (IVocabularyArchive)typeof(MainWindow).GetField("_vocabService", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(window)!;
             var savedRevision = shortcutStore.GetAllWords().Single(x => x.Word == "resilient").Archive.Revision;
-            SendMessage(window.TryGetPlatformHandle()!.Handle, 0x0104, new IntPtr(0x20), new IntPtr((1L << 29) | (1L << 30)));
-            input.RaiseEvent(new Avalonia.Input.KeyEventArgs { RoutedEvent = Avalonia.Input.InputElement.KeyDownEvent, Key = Avalonia.Input.Key.Space, KeyModifiers = Avalonia.Input.KeyModifiers.Alt });
+            window.RaiseEvent(new Avalonia.Input.KeyEventArgs { RoutedEvent=Avalonia.Input.InputElement.KeyDownEvent, Key=Avalonia.Input.Key.D, KeyModifiers=Avalonia.Input.KeyModifiers.Control });
+            window.RaiseEvent(new Avalonia.Input.KeyEventArgs { RoutedEvent=Avalonia.Input.InputElement.KeyUpEvent, Key=Avalonia.Input.Key.D });
             Check(shortcutStore.GetAllWords().Single(x => x.Word == "resilient").Archive.Revision == savedRevision, "held or repeated add shortcut leaves archived content unchanged");
             Click("NavVocab");
             var offPageKey = new Avalonia.Input.KeyEventArgs { RoutedEvent = Avalonia.Input.InputElement.KeyDownEvent, Key = Avalonia.Input.Key.Space, KeyModifiers = Avalonia.Input.KeyModifiers.Alt };

@@ -1,4 +1,5 @@
 using System;
+using Lexi.Features.Ielts;
 using System.Collections.Generic;
 using Avalonia;
 using Avalonia.Controls;
@@ -8,14 +9,15 @@ using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Path = Avalonia.Controls.Shapes.Path;
+using UiText = Lexi.Features.Ielts.UiText;
 
 namespace Lexi.Controls;
 
 /// <summary>
 /// 档案式词汇行组件：
 /// 包含选择框、英文词头、音标、词性、简短释义、学习状态、紧凑发音动作；
-/// 展开后呈现抽屉式详情（完整释义、例句与朗读、教材来源、补充说明、同义替换）。
-/// 遵循契约：选择、展开、发音三项操作相互独立，资源缺字段时不强行占位。
+/// 展开后呈现抽屉式详情（完整释义、例句与朗读、教材来源、补充说明、同义替换、收藏/查看档案）。
+/// 遵循契约：选择、展开、发音、收藏操作相互独立，资源缺字段时不强行占位。
 /// </summary>
 public class VocabularyRow : Border
 {
@@ -47,6 +49,7 @@ public class VocabularyRow : Border
     private readonly StackPanel _synonymsPanel;
     private readonly TextBlock _synonymsTitle;
     private readonly WrapPanel _synonymsWrap;
+    private readonly Button _archiveBtn;
 
     public string WordId { get; private set; } = "";
     public string WordText { get; private set; } = "";
@@ -59,6 +62,7 @@ public class VocabularyRow : Border
     public IReadOnlyList<string> Synonyms { get; private set; } = Array.Empty<string>();
     public string AudioPath { get; private set; } = "";
     public string StatusKind { get; private set; } = "new";
+    public bool IsArchived { get; private set; }
 
     public bool IsSelected => _checkBox.IsChecked == true;
     public bool IsExpanded => _chevron.IsChecked == true;
@@ -67,6 +71,8 @@ public class VocabularyRow : Border
     public event Action<VocabularyRow, bool>? ExpansionToggled;
     public event Action<VocabularyRow, string>? PlayAudioRequested;
     public event Action<VocabularyRow, string>? PlayExampleRequested;
+    public event Action<VocabularyRow>? AddToArchiveRequested;
+    public event Action<VocabularyRow, string>? ViewArchiveRequested;
 
     public VocabularyRow()
     {
@@ -295,6 +301,24 @@ public class VocabularyRow : Border
         _synonymsPanel.Children.Add(_synonymsWrap);
         drawerStack.Children.Add(_synonymsPanel);
 
+        // 档案收藏/查看动作
+        _archiveBtn = new Button
+        {
+            Classes = { "secondary" },
+            Padding = new Thickness(10, 5),
+            FontSize = 12,
+            Margin = new Thickness(0, 4, 0, 0),
+            HorizontalAlignment = HorizontalAlignment.Left
+        };
+        _archiveBtn.Click += (_, _) =>
+        {
+            if (IsArchived)
+                ViewArchiveRequested?.Invoke(this, WordText);
+            else
+                AddToArchiveRequested?.Invoke(this);
+        };
+        drawerStack.Children.Add(_archiveBtn);
+
         _drawer.Child = drawerStack;
         rootPanel.Children.Add(_drawer);
 
@@ -324,7 +348,8 @@ public class VocabularyRow : Border
         string audioPath,
         string statusKind,
         bool isSelected,
-        bool isExpanded = false)
+        bool isExpanded = false,
+        bool isArchived = false)
     {
         WordId = id;
         WordText = word;
@@ -337,6 +362,7 @@ public class VocabularyRow : Border
         Synonyms = synonyms ?? Array.Empty<string>();
         AudioPath = audioPath;
         StatusKind = statusKind;
+        IsArchived = isArchived;
 
         _checkBox.IsChecked = isSelected;
         _chevron.IsChecked = isExpanded;
@@ -387,6 +413,7 @@ public class VocabularyRow : Border
         }
 
         UpdateStatusVisual();
+        UpdateArchiveVisual();
         RefreshLanguage();
     }
 
@@ -400,6 +427,20 @@ public class VocabularyRow : Border
     {
         if (_chevron.IsChecked != expanded)
             _chevron.IsChecked = expanded;
+    }
+
+    public void SetArchived(bool isArchived)
+    {
+        IsArchived = isArchived;
+        UpdateArchiveVisual();
+    }
+
+    private void UpdateArchiveVisual()
+    {
+        _archiveBtn.Content = IsArchived ? IeltsI18n.T("查看档案") : IeltsI18n.T("加入词汇档案");
+        _archiveBtn.SetValue(ToolTip.TipProperty, IsArchived
+            ? IeltsI18n.T("已在档案中 · 查看档案")
+            : IeltsI18n.T("加入词汇档案"));
     }
 
     private void UpdateStatusVisual()
@@ -437,6 +478,7 @@ public class VocabularyRow : Border
         _exampleAudioBtn.SetValue(ToolTip.TipProperty, isEn ? "Read example" : "朗读例句");
 
         UpdateStatusVisual();
+        UpdateArchiveVisual();
     }
 
     private static Geometry? SafeParseGeometry(string data)

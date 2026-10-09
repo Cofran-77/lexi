@@ -45,7 +45,7 @@ public partial class MainWindow
             _focusEntry.IsVisible = false;
         }
 
-        var layout = new Grid { RowDefinitions = new RowDefinitions("Auto,*,Auto"), Margin = new Thickness(36, 26, 36, 42) };
+        var layout = new Grid { RowDefinitions = new RowDefinitions("Auto,*,Auto"), Margin = new Thickness(24, 18, 24, 22) };
         var top = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*,Auto,Auto") };
         var back = FocusButton("返回", ExitFocus);
         back.HorizontalAlignment = HorizontalAlignment.Left;
@@ -60,20 +60,23 @@ public partial class MainWindow
 
         var studyScroll = new ScrollViewer { HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled,
             VerticalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Hidden };
-        var card = new StackPanel { Spacing = 18, MaxWidth = 680, Margin = new Thickness(0, 70, 0, 24), HorizontalAlignment = HorizontalAlignment.Center };
+        var card = new StackPanel { Spacing = 18 };
         _focusWord = new TextBlock { Name = "FocusWord", FontSize = 46, FontWeight = FontWeight.Bold, TextWrapping = TextWrapping.Wrap };
         _focusPhonetic = new TextBlock { FontSize = 18, Opacity = .72, TextWrapping = TextWrapping.Wrap };
         _focusMeaning = new TextBlock { Name = "FocusMeaning", FontSize = 23, FontWeight = FontWeight.Medium, TextWrapping = TextWrapping.Wrap, IsVisible = false };
         _focusDetails = new TextBlock { Name = "FocusDetails", FontSize = 16, TextWrapping = TextWrapping.Wrap, Opacity = .86 };
         card.Children.Add(_focusWord); card.Children.Add(_focusPhonetic); card.Children.Add(_focusMeaning); card.Children.Add(_focusDetails);
-        studyScroll.Content = card; Grid.SetRow(studyScroll, 1); layout.Children.Add(studyScroll);
+        var paper = new Border { Child = card, MaxWidth = 680, Padding = new Thickness(28), Margin = new Thickness(0,24,0,24), CornerRadius = new CornerRadius(18), BorderThickness = new Thickness(1), HorizontalAlignment = HorizontalAlignment.Stretch, VerticalAlignment = VerticalAlignment.Center };
+        paper.Bind(Border.BackgroundProperty, this.GetResourceObservable("FocusCardBackgroundBrush"));
+        paper.Bind(Border.BorderBrushProperty, this.GetResourceObservable("FocusCardBorderBrush"));
+        studyScroll.Content = paper; Grid.SetRow(studyScroll, 1); layout.Children.Add(studyScroll);
 
         var bottom = new StackPanel { Spacing = 20, HorizontalAlignment = HorizontalAlignment.Center };
         _focusFeedback = new TextBlock { Name = "FocusFeedback", TextWrapping = TextWrapping.Wrap, TextAlignment = TextAlignment.Center, Opacity = .68 };
         _focusActions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10, HorizontalAlignment = HorizontalAlignment.Center };
         bottom.Children.Add(_focusFeedback); bottom.Children.Add(_focusActions);
         Grid.SetRow(bottom, 2); layout.Children.Add(bottom);
-        _focusHost = new Border { Name = "FocusHost", Child = layout, IsVisible = false };
+        _focusHost = new Border { Name = "FocusHost", Child = layout, IsVisible = false, Focusable = true };
         _focusHost.Bind(Border.BackgroundProperty, this.GetResourceObservable("PaperBrush"));
         Grid.SetRow(_focusHost, 1);
         _focusHost.SetValue(Panel.ZIndexProperty, 100);
@@ -85,25 +88,13 @@ public partial class MainWindow
         {
             if (e.Source is Control control && control.DataContext is WordItem item) EnterArchiveFocusWithFirst(item);
         };
-        AddHandler(KeyDownEvent, (_, e) =>
-        {
-            if (!_focusActive || e.Source is TextBox) return;
-            if (e.Key == Key.Escape) { ExitFocus(); e.Handled = true; }
-            else if (e.Key == Key.A) { GetLearningAudio().Play(_focusRated ? _focusRatedWord ?? "" : _focusRound?.HasCurrent == true ? _focusRound.Current : ""); e.Handled = true; }
-            else if (e.Key == Key.C) { SaveFocusCurrent(); e.Handled = true; }
-            else if (e.Key == Key.Delete) { MasterFocus(); e.Handled = true; }
-            else if (e.Key is Key.Enter or Key.S) { HandleFocusSpace(); e.Handled = true; }
-            else if (e.Key == Key.Space && e.KeyModifiers == KeyModifiers.Alt) { UndoFocus(); e.Handled = true; }
-            else if (e.Key == Key.Space) { HandleFocusSpace(); e.Handled = true; }
-            else if (e.Key == Key.Q && _focusAnswerVisible && !_focusRated) { RateFocus(StudyRating.Known); e.Handled = true; }
-            else if (e.Key == Key.W && _focusAnswerVisible && !_focusRated) { RateFocus(StudyRating.Unsure); e.Handled = true; }
-            else if (e.Key == Key.E && _focusAnswerVisible && !_focusRated) { RateFocus(StudyRating.Forgot); e.Handled = true; }
-        }, RoutingStrategies.Tunnel);
+
     }
 
     private void EnterFocusFromLookup()
     {
         if (_focusActive || _restoring || !_databaseAvailable || !LookupResultCard.IsVisible) return;
+        _focusIeltsWords.Clear();
         var text = ResultWordText.Text?.Trim(); if (string.IsNullOrWhiteSpace(text)) return;
         var archive = _allWords.FirstOrDefault(w => w.Word.Equals(text, StringComparison.OrdinalIgnoreCase));
         _focusWordId = archive?.Id.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? text;
@@ -113,6 +104,7 @@ public partial class MainWindow
         BeginFocusMemory(_focusRound.Mode, _focusRound.Total);
         PageLookup.IsVisible = false; LookupPageHost.IsVisible = false; _learningHubPage.IsVisible = false; _focusHost!.IsVisible = true;
         RenderFocus();
+        _focusHost.Focus();
     }
 
     private void ExitFocus()
@@ -120,6 +112,7 @@ public partial class MainWindow
         if (!_focusActive) return;
         PersistLearningSurface("focus");
         _focusActive = false; _focusHost!.IsVisible = false; PageLookup.IsVisible = _focusPreviousPage == "lookup"; LookupPageHost.IsVisible = _focusPreviousPage == "lookup";
+        SetGlobalFocusChrome(false);
         PageVocab.IsVisible = _focusPreviousPage == "vocab"; PageReview.IsVisible = _focusPreviousPage == "review"; PageSettings.IsVisible = _focusPreviousPage == "settings"; _learningHubPage.IsVisible = _focusPreviousPage == "learning";
         if (_ieltsPage != null) _ieltsPage.IsVisible = _focusPreviousPage == "ielts";
         if (_quotesPage != null) _quotesPage.IsVisible = _focusPreviousPage == "quotes";
@@ -137,10 +130,11 @@ public partial class MainWindow
             _focusStreak.Children.Add(new Border { Width = 16, Height = 6, CornerRadius = new CornerRadius(3),
                 Background = new SolidColorBrush(Avalonia.Media.Color.Parse(index < _focusRound.CurrentStreak ? "#245FAD" : "#8AAFC5")) });
         var current = _focusRated ? _focusRatedWord ?? "" : _focusRound.HasCurrent ? _focusRound.Current : "";
+        var sourceWord = _focusIeltsWords.GetValueOrDefault(current);
         if (_focusRound.HasCurrent && !_focusRated) PresentFocusMemory(current, _focusRound.CurrentStep);
-        _focusWord!.Text = current;
+        _focusWord!.Text = FocusDisplayWord(current);
         if (_focusRound.HasCurrent && _focusRound.CurrentStep == StudyStep.Learn) _focusAnswerVisible = true;
-        var archive = _allWords.FirstOrDefault(w => w.Word.Equals(current, StringComparison.OrdinalIgnoreCase));
+        var archive = sourceWord==null ? _allWords.FirstOrDefault(w => w.Word.Equals(current, StringComparison.OrdinalIgnoreCase)) : null;
         _focusPhonetic!.Text = archive?.Phonetic ?? (string.Equals(ResultWordText.Text, current, StringComparison.OrdinalIgnoreCase) ? ResultPhoneticText.Text ?? "" : "");
         _focusMeaning!.Text = _focusAnswerVisible ? archive?.Translation ?? _focusOriginalTranslation : "先回忆这个词的含义";
         _focusMeaning.IsVisible = _focusAnswerVisible;
@@ -148,13 +142,24 @@ public partial class MainWindow
             ? string.Equals(ResultWordText.Text, current, StringComparison.OrdinalIgnoreCase) ? ResultDefinitionText.Text ?? "" : ""
             : string.Join("\n", new[] { archive.Definition }.Concat(archive.AiExamples.Select(e => e.English + "\n" + e.Chinese)));
         _focusDetails.IsVisible = _focusAnswerVisible;
+        if(sourceWord!=null)
+        {
+            _focusPhonetic.Text=sourceWord.Phonetic;
+            _focusMeaning.Text=sourceWord.Meaning;
+            _focusDetails.Text=string.Join("\n",new[]{sourceWord.Pos,sourceWord.Example,sourceWord.Extra}.Where(t=>!string.IsNullOrWhiteSpace(t)));
+        }
         PersistLearningSurface("focus");
         _focusFeedback!.Text = _focusRound.IsFinished ? "本轮已完成。你可以退出专注。" : _focusRound.CurrentStep == StudyStep.Learn ? "学习卡：看过释义后开始回忆。" : _focusRated ? (_focusLastRating == StudyRating.Known ? "已记为认识。" : "稍后会再次出现。") : "先自己回忆，再揭晓释义。";
-        _focusTopActions.Children.Add(FocusButton("朗读", () => GetLearningAudio().Play(current)));
+        _focusTopActions.Children.Add(FocusButton("朗读", () => GetLearningAudio().Play(FocusDisplayWord(current),sourceWord==null?null:IeltsCatalog.ResolveAsset(sourceWord.AudioPath))));
         if (_focusRound.HasCurrent && !_focusRated)
         {
             _focusTopActions.Children.Add(FocusButton("收藏", SaveFocusCurrent));
-            _focusTopActions.Children.Add(FocusButton("已掌握", MasterFocus));
+            var more = FocusButton("…", () => { });
+            var menu = new MenuFlyout();
+            TrackStudyFlyout(menu);
+            var mastered = new MenuItem { Header = UiText.Text("标记已掌握") };
+            mastered.Click += (_,_) => MasterFocus(); menu.Items.Add(mastered); more.Flyout = menu;
+            if(sourceWord==null)_focusTopActions.Children.Add(more);
         }
         if (!_focusRound.HasCurrent)
         {
@@ -178,9 +183,15 @@ public partial class MainWindow
             _focusActions.Children.Add(FocusButton("揭晓释义", () => { _focusAnswerVisible = true; RenderFocus(); }, true));
         else if (!_focusRated)
         {
-            _focusActions.Children.Add(FocusButton("认识 (Q)", () => RateFocus(StudyRating.Known)));
-            _focusActions.Children.Add(FocusButton("模糊 (W)", () => RateFocus(StudyRating.Unsure)));
-            _focusActions.Children.Add(FocusButton("忘记 (E)", () => RateFocus(StudyRating.Forgot)));
+            var btnKnown = FocusButton(UiText.Text("认识")+" ("+ShortcutHint(ShortcutAction.Known)+")", () => RateFocus(StudyRating.Known));
+            var btnUnsure = FocusButton(UiText.Text("模糊")+" ("+ShortcutHint(ShortcutAction.Unsure)+")", () => RateFocus(StudyRating.Unsure));
+            var btnForgot = FocusButton(UiText.Text("忘记")+" ("+ShortcutHint(ShortcutAction.Forgot)+")", () => RateFocus(StudyRating.Forgot));
+            ToolTip.SetTip(btnKnown, ShortcutHint(ShortcutAction.Known));
+            ToolTip.SetTip(btnUnsure, ShortcutHint(ShortcutAction.Unsure));
+            ToolTip.SetTip(btnForgot, ShortcutHint(ShortcutAction.Forgot));
+            _focusActions.Children.Add(btnForgot);
+            _focusActions.Children.Add(btnUnsure);
+            _focusActions.Children.Add(btnKnown);
         }
         else
         {
@@ -191,7 +202,7 @@ public partial class MainWindow
 
     private Button FocusButton(string label, Action action, bool primary = false)
     {
-        var b = new Button { Content = label, Padding = new Thickness(14, 9) }; b.Classes.Add(primary ? "primary" : "secondary"); b.Click += (_, _) => action(); return b;
+        var b = new Button { Content = UiText.Text(label), Padding = new Thickness(14, 9) }; b.Classes.Add(primary ? "primary" : "secondary"); b.Click += (_, _) => action(); return b;
     }
 
     private void RateFocus(StudyRating rating)
@@ -244,8 +255,7 @@ public partial class MainWindow
             _focusRound.CompleteLearn(); _focusPresentation = null; _focusAnswerVisible = false; _focusRated = false; RenderFocus(); return;
         }
         if (!_focusAnswerVisible) { _focusAnswerVisible = true; RenderFocus(); return; }
-        if (_focusRated) { _focusRated = false; _focusAnswerVisible = false; RenderFocus(); return; }
-        RateFocus(StudyRating.Known);
+        // 关键：已揭晓未评分时 Space/Enter 不隐式判定 Known，不退出
     }
 
     private void MasterFocus()
@@ -267,6 +277,7 @@ public partial class MainWindow
     private void EnterArchiveFocusWithFirst(WordItem? first)
     {
         if (_restoring || !_databaseAvailable || _focusActive) return;
+        _focusIeltsWords.Clear();
         var words = _allWords.Where(w => w.Selected).ToList(); if (words.Count == 0) words = _allWords.ToList();
         if (first != null) { words.RemoveAll(w => w.Id == first.Id); words.Insert(0, first); }
         if (words.Count == 0) { SetStatus("词汇档案为空。"); return; }
@@ -276,7 +287,7 @@ public partial class MainWindow
         PageLookup.IsVisible = false; LookupPageHost.IsVisible = false; PageVocab.IsVisible = false; PageReview.IsVisible = false; PageSettings.IsVisible = false; _learningHubPage.IsVisible = false;
         if (_ieltsPage != null) _ieltsPage.IsVisible = false;
         if (_quotesPage != null) _quotesPage.IsVisible = false;
-        _focusHost!.IsVisible = true; RenderFocus();
+        _focusHost!.IsVisible = true; RenderFocus(); _focusHost.Focus();
     }
     private void ReclassifyFocus()
     {
@@ -287,6 +298,7 @@ public partial class MainWindow
     {
         if (_restoring || !_databaseAvailable || !_focusActive || _focusRound?.HasCurrent != true) return;
         var word = _focusRound.Current;
+        if(_focusIeltsWords.TryGetValue(word,out var source)) {ArchiveSingleIeltsWord(source,null);return;}
         if (_allWords.Any(w => w.Word.Equals(word, StringComparison.OrdinalIgnoreCase))) { SetStatus("该词已收藏。"); return; }
         if (!string.Equals(ResultWordText.Text, word, StringComparison.OrdinalIgnoreCase))
         { SetStatus("当前词已不在档案中，请从查词页重新查询后收藏。"); return; }

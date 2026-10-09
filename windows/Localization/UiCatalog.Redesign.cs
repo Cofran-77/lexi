@@ -41,6 +41,7 @@ internal static partial class UiCatalog
             ["连击 {0}/{1}"] = "Streak {0}/{1}",
         };
         foreach (var pair in additions) English[pair.Key] = pair.Value;
+        AddInteractionTranslations();
         foreach (var key in English.Keys.ToList())
             English[key] = English[key].Replace("this Mac", "this PC").Replace("the menu bar", "the system tray");
     }

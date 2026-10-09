@@ -53,7 +53,8 @@ public partial class MainWindow
         RefreshIeltsLanguage();
         LanguageToggleBtn.Content = _settings.UiLanguage == "en" ? "中" : "EN";
         Title = UiText.Redisplay(Title);
-        foreach (var control in this.GetLogicalDescendants().OfType<Control>())
+        foreach (var control in this.GetLogicalDescendants().OfType<Control>()
+                     .Concat(_settingsRoots.SelectMany(root => root.GetLogicalDescendants().OfType<Control>().Prepend(root))).Distinct())
         {
             switch (control)
             {
@@ -75,5 +76,9 @@ public partial class MainWindow
                      SettingsContextCombo, SettingsTimeoutCombo, VocabStatusFilter, BatchActionCombo })
             foreach (var item in combo.Items.OfType<ComboBoxItem>())
                 if (item.Content is string caption) item.Content = UiText.Redisplay(caption);
+        _quickCard?.RefreshLanguage();
+        _archiveActions?.RefreshLanguage();
+        UpdateQuickShortcutStatus();
+        RefreshStudyShortcutHints();
     }
 }

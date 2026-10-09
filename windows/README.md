@@ -1,36 +1,37 @@
-# Lexi Windows 1.2.4
+# Lexi for Windows
 
-Windows 10/11 x64，C# + Avalonia 11.3.12 + .NET 8。作者：Cofran-77、DespairJasper。项目原创代码采用根目录 MIT 许可。
+Windows 10 / 11 x64 桌面版，当前应用版本 1.2.4。使用 C#、Avalonia 11.3.12 与 .NET 8，作者 Cofran-77、DespairJasper。
 
 ## 功能
 
-- 59,026 条 ECDICT 本地词典、词汇档案、来源与标签、可选择复制的正文。
-- 今日重逢与计划学习接入 FSRS-6；Rust 助手用于个人参数训练。样本不足时使用默认参数；并非每次启动都会训练。
-- 每日计划、辅助拼写、全局专注、朗读、可配置快捷键、句子翻译与金句本。
-- CSV / JSON 词条导入导出、本端备份与恢复。
-- 教材与资料工作区代码保留，**第三方 IELTS 数据和录音未发布**；未配置资源时教材功能不可用，普通查词、档案与个人词汇复习可使用。
+- 离线 ECDICT 词典、个人词汇档案、来源和标签、批量管理。
+- FSRS-6 自适应复习、今日重逢、每日计划与辅助拼写。
+- 全局专注学习、正文选择与复制、可配置快捷键、朗读。
+- 可选 AI 内容生成、句子翻译和金句本。
+- CSV / JSON 词条迁移、打印、本端备份与恢复。
+- 专题词汇、听力、语法与写作工作区源码；教材资源需用户合法接入。
 
-## 1.2.4 修复
+1.2.4 修复小浮框磨砂材质遮挡新界面的问题，磨砂限于浮框内部，保持主页面清晰。此后的发布许可修订不改变应用功能版本。
 
-菜单与确认框只在小浮框内部绘制磨砂材质，主页面保持清晰。修复原来整页模糊快照遮住新界面及菜单锚点离开视觉树后未清理的问题；保留深浅主题配色、纯色回退与模态输入隔离。
+## 安装与数据
 
-## 使用
+从 [Releases](https://github.com/Cofran-77/lexi/releases) 下载 Windows 安装程序，包含 .NET 运行环境与 FSRS 助手。安装包未签名；Windows 可能提示未知发布者。
 
-从 [Releases](https://github.com/Cofran-77/lexi/releases/tag/windows-v1.2.4) 下载 Windows 公开安装包。它不含 IELTS 教材与录音，不能与此前本地完整资源包等同。安装无需另外安装 .NET。未签名安装包可能被 Windows 提示未知发布者，不提供商用签名认证承诺。
+词库默认保存在 `%LOCALAPPDATA%\Lexi`。更新前备份并从托盘完全退出。安装更新与卸载不主动删除该数据目录；备份仍应由用户保存。公开安装包不含第三方教材资源，离线查词和个人档案学习可直接使用。
 
-默认词库在 `%LOCALAPPDATA%\Lexi`。安装更新与卸载不主动删除该数据目录；仍建议先备份。关闭主窗口通常驻留托盘，完全退出使用托盘菜单。
+## 学习快捷键
 
-默认学习快捷键：← 忘记、↓ 模糊、→ 认识、↑ 朗读；Space / Enter 执行主要动作，Ctrl+Z 撤销，F11 专注，Esc 关闭当前界面。评分在揭晓后生效，输入框、菜单和文本选择按上下文处理。全局查词/翻译/收藏默认 Alt+D / Alt+T / Alt+S，可在设置修改。
+← 忘记、↓ 模糊、→ 认识、↑ 朗读；Space / Enter 执行主要动作，Ctrl+Z 撤销，F11 专注，Esc 关闭当前界面。评分在揭晓后生效，输入框、菜单与文本选择按上下文处理。全局查词、翻译、收藏默认 Alt+D / Alt+T / Alt+S，可在设置修改。
 
-## 构建与验证
-
-详见 [BUILDING](../docs/BUILDING.md)。快速启动：
+## 构建
 
 ```powershell
 cargo build --manifest-path native/fsrs-optimizer/Cargo.toml --release --locked
 dotnet run --project Lexi.csproj
 ```
 
-历史验收不是本次全部重新验证。本次公开整理仅检查源码、许可排除与当前编译；旧 `--glass124-test` 等包含真实 IELTS 数据依赖的测试不能在缺少资源时直接宣称通过。定向/领域测试请在隔离数据目录执行，勿使用个人词库。
+安装包构建和定向验证见 [构建指南](../docs/BUILDING.md)。缺少第三方教材时，依赖该资料的历史 UI 检查不能作为公开包的测试结论。
 
-第三方许可证保留在 `Notices/` 和 `native/fsrs-optimizer/vendor/fsrs/LICENSE`。
+## 许可与资源
+
+当前分发采用根目录 PolyForm Noncommercial 1.0.0；此前 MIT 版本的既有授权保留，见 [许可政策](../LICENSE-POLICY.md)。第三方许可独立保留在 Notices/ 和 FSRS vendor 目录。教材接入见 [资源指南](../docs/RESOURCES.md)。

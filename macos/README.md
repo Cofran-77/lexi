@@ -2,7 +2,7 @@
 
 此目录为 macOS 版本预留，目前没有上传 macOS 源码、资源、安装包或发布标签。
 
-项目作者：**Cofran-77 与 DespairJasper**。macOS 源码由合作作者后续提交；现有参考项目为 [DespairJasper/lexi-macos](https://github.com/DespairJasper/lexi-macos)。该外部仓库的授权以其自身 LICENSE 为准，本仓库 MIT 许可不自动替换外部仓库许可。
+项目作者：**Cofran-77 与 DespairJasper**。macOS 源码由合作作者后续提交；现有参考项目为 [DespairJasper/lexi-macos](https://github.com/DespairJasper/lexi-macos)。该外部仓库的授权以其自身 LICENSE 为准，本仓库当前许可不自动替换外部仓库许可。
 
 ## 接入步骤
 

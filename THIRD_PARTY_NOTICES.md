@@ -1,6 +1,6 @@
 # 第三方代码与资源说明
 
-根目录 MIT LICENSE 只覆盖 Cofran-77 与 DespairJasper 的项目原创代码和文档，不覆盖以下第三方内容。构建后实际分发的依赖也须保留对应通知。
+根目录 PolyForm Noncommercial LICENSE 只覆盖 Cofran-77 与 DespairJasper 的项目原创代码和文档，不覆盖以下第三方内容。构建后实际分发的依赖也须保留对应通知。
 
 | 内容 | 来源 / 许可 | 仓库中的保留位置 |
 | --- | --- | --- |
@@ -15,8 +15,8 @@
 
 ## 不随本仓库发布的内容
 
-此前本地项目从 [hefengxian/my-ielts](https://github.com/hefengxian/my-ielts) 参考/导入过教材词汇、录音、讲义等，原来源限制商业用途，原书版权仍属于各权利人。**本次公开仓库与 Windows 公开安装包排除了这些资源，不把它们重新授权为 MIT。** 历史版本也经过同样排除。
+此前本地项目从 [hefengxian/my-ielts](https://github.com/hefengxian/my-ielts) 参考/导入过教材词汇、录音、讲义等。原来源限制商业用途，但没有提供可核实的原书资源再分发授权；原书版权仍属于各权利人。**公开仓库与 Windows 公开安装包排除这些资源。** 历史版本也经过同样排除。具体核对依据见 [资源说明](docs/RESOURCES.md)。
 
 `windows/Notices/MY-IELTS-SOURCE.md` 只保留来源说明；教材入口源码是程序实现，不是教材分发许可。使用资源必须自行取得相应授权。
 
-macOS 参考仓库 [DespairJasper/lexi-macos](https://github.com/DespairJasper/lexi-macos) 的许可以该仓库自身文件为准；本仓库没有导入 macOS 源码。双方作者同意本仓库原创代码使用 MIT，不自动修改其他仓库或第三方许可。
+macOS 参考仓库 [DespairJasper/lexi-macos](https://github.com/DespairJasper/lexi-macos) 的许可以该仓库自身文件为准；本仓库没有导入 macOS 源码。本次修订以 PolyForm Noncommercial 许可分发原创内容，旧 MIT 授权不追溯撤回，详见 LICENSE-POLICY.md；不自动修改其他仓库或第三方许可。

@@ -2,6 +2,8 @@
 
 日期：2026-10-09。
 
+本日后续许可修订仅更改文档、许可副本、FSRS 助手许可元数据及安装包卸载清单。Windows 应用源文件逐项 SHA256 与本地 1.2.4 对比无差异；Android 18 个 Kotlin 源文件与 0.2.2 交付 ZIP 对比无差异。Windows 使用此前验证的 publish 输出重新打包，未重新编译应用。历史 MIT 权利保留，见 LICENSE-POLICY.md。此修订不增加全软件测试结论。
+
 - 已从交付包整理 11 个 Windows 与 6 个 Android 源码快照，清单及 SHA256 见 SOURCE-MANIFEST.json。
 - 检查所有历史提交，未纳入第三方 IELTS 教材数据、录音、PDF 或讲义。
 - 当前 Windows 公开源码 Release 编译成功（原有 6 项警告，0 错误），自包含发布成功。

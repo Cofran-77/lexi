@@ -3,7 +3,7 @@ name = "fsrs-optimizer"
 version = "0.2.0"
 edition = "2021"
 authors = ["Cofran-77", "DespairJasper"]
-license = "MIT OR Apache-2.0"
+license = "PolyForm-Noncommercial-1.0.0"
 description = "Standalone FSRS-6 personal parameter training helper for Lexi"
 
 [dependencies]

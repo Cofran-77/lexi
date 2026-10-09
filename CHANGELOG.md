@@ -1,3 +1,7 @@
+# 发布许可与文档修订 · 2026-10-09
+
+当前原创内容改按 PolyForm Noncommercial 1.0.0 分发，保留作者商业授权权利；历史 MIT 授权不追溯撤回。重写项目与平台介绍，补齐许可沿革及教材授权核对说明。应用功能版本仍为 Windows 1.2.4、Android 0.2.2。
+
 # 重要版本更新
 
 本文件精选适合公开发布的里程碑。所有 11 个 Windows、6 个 Android 快照均进入 Git 历史，完整索引见 [VERSION_HISTORY](docs/VERSION_HISTORY.md)。公开归档经过资源与隐私筛选，不是原始内部完整资料包。历史发布日期不伪造，公开 Release 使用实际发布日。

@@ -28,3 +28,9 @@ catalog.example.json 是本项目原创的格式示例，不来自教材。复�
 ```
 
 具体字段和资源读取逻辑见 windows/Application/LearningCatalog.cs。语音、讲义等辅助文件按对应页面的读取格式配置，不保证任意教材格式可以直接导入。
+
+## 参考项目与资源状态
+
+参考项目 [DespairJasper/lexi-macos](https://github.com/DespairJasper/lexi-macos) 将教材文件放在 lexi_avalonia/Assets/IELTS，并在 NOTICES.md 单独记录来源；不是运行时由转接服务下载。本项目不据此推断原书权利人已经授权。
+
+可在 [my-ielts 原项目](https://github.com/hefengxian/my-ielts) 查看来源与使用说明。此链接用于来源追溯，不代表 Lexi 获得原书资料授权。当前安装包不自动抓取第三方教材；取得明确授权后，可按授权允许的范围实现下载、缓存和离线加载。

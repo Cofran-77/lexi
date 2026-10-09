@@ -1,0 +1,16 @@
+{
+  "Source": "Lexi original format example; see macos/LICENSE",
+  "Commit": "",
+  "Sections": [
+    {
+      "Id": "lexi-demo",
+      "Kind": "vocabulary",
+      "Title": "自备资料格式示例",
+      "Description": "仅说明目录结构，不是 IELTS 教材。",
+      "Entries": [
+        { "Id": "lexi-demo-adaptive", "Words": ["adaptive"], "Pos": "adj.", "Meaning": "能够适应变化的", "Phonetic": "/əˈdæptɪv/", "Example": "We built an adaptive study plan.", "Group": 1 }
+      ]
+    }
+  ],
+  "Sentences": []
+}

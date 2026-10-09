@@ -38,3 +38,11 @@ wolfpack.config.json
 windows/Assets/IELTS/**
 !windows/Assets/IELTS/README.md
 !windows/Assets/IELTS/catalog.example.json
+
+# macOS generated files and signing material
+.DS_Store
+**/.DS_Store
+*.p12
+*.pfx
+*.key
+*.pem

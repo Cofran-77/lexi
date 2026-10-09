@@ -1,6 +1,6 @@
 # 完整源码版本史
 
-本仓库从工作区交付源码 ZIP 重建有序提交，**不是原始 Git 开发记录**。归档日期与原开发日期分别记录。版权共同署名 Cofran-77 与 DespairJasper。
+Windows / Android 历史从工作区交付源码 ZIP 重建有序提交，**不是原始 Git 开发记录**。macOS 此次从原 Git 工程接入当前快照。归档日期与原开发日期分别记录。版权共同署名 Cofran-77 与 DespairJasper。
 
 所有历史快照都移除了教材资源、本机配置、构建缓存、私钥、内部协作日志和运行数据。代码和第三方许可按保存的快照导入；最新 main 另外补齐公开文档与缺失资源提示。
 
@@ -29,4 +29,10 @@
 
 详细来源哈希、导入文件数和对应历史提交保存在 [SOURCE-MANIFEST.json](SOURCE-MANIFEST.json)。清单记录的是内部来源包的 SHA256，**不是公开 Release 资产校验码**；公开资产单独附 SHA256SUMS.txt。
 
-macOS 的 3.x 参考版本没有导入本仓库。后续由合作作者提交，因此没有用已有本地 macOS 文件填充预留目录。
+## macOS 源码接入
+
+2026-10-09 将 `DespairJasper/lexi-macos` 的 3.1.3 源码接入 `macos/`；原始提交、646 个导入文件与 3,881 个未导入 IELTS 资源的 SHA256 见 [MACOS-SOURCE-MANIFEST.json](MACOS-SOURCE-MANIFEST.json)。应用代码、脚本、许可证与内部相对目录保留，README 和忽略规则按 monorepo 整合。
+
+3.1.3 修复 Dock 唤醒强制回首页；3.1.2 引入启动更新检查与数据保留说明；3.1.1 接入 FSRS-6 个人参数训练与 Context 校准；3.0.4 增加每日学习计划。完整历史见 [macOS README](../macos/README.md)。此次接入当前快照，不重建或伪造原仓库全部开发历史。
+
+现有 macOS 安装包仍在 [原 v3.1.3 Release](https://github.com/DespairJasper/lexi-macos/releases/tag/v3.1.3)。本仓库尚未创建 `macos-v3.1.3` 标签或 Release；未来本仓库发布继续使用 `macos-vX.Y.Z` 约定。

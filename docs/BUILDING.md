@@ -58,4 +58,21 @@ chmod +x gradlew
 
 ## macOS
 
-暂未提交源码，因此没有构建或安装说明。合作作者接入后补齐工具链和签名要求，见 [macos/README](../macos/README.md)。
+当前接入 3.1.3，运行面向 Apple Silicon / macOS 12+。开发需要 macOS 与 .NET SDK 8；个人 FSRS 助手另需 Rust 工具链。全部入口从 `macos/` 执行：
+
+```sh
+cd macos
+dotnet build lexi_avalonia/Lexi.csproj -c Release
+bash 启动Lexi源码.command
+python3 scripts/verify_source_integrity.py
+# 提供合法本地 IELTS 资源后，运行完整领域与 UI 回归
+bash scripts/run_tests.sh
+# 构建助手：使用自己已安装的 Rust 工具链
+bash scripts/build_fsrs_optimizer.sh
+```
+
+本机 SDK 可放在 `macos/.tools/dotnet/`，或使用 `DOTNET_ROOT` / PATH；不提交 SDK。Git 中的 IELTS 目录只保留结构示例，不含教材或音频；完整专题测试依赖原资源，见 [资源说明](RESOURCES.md)。构建应用本身不要求助手二进制存在；完整打包要求先构建并验证助手。
+
+签名与发布脚本在 `macos/scripts/`，配置在 `macos/packaging/`。现有 release pin 和 helper SHA256 绑定原发布身份与已审计助手；自己的发布身份须显式更新 pin 并完成审计，不能直接复用作者的签名证明。完整签名、DMG、数据保留和校验步骤见 [macOS README](../macos/README.md)。
+
+本仓库 CI 目前仍仅编译 Windows / Android。macOS 的本地验证单独记录于 [验证记录](VERIFICATION.md)，不宣称 CI 已覆盖 macOS。

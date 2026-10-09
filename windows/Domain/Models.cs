@@ -19,6 +19,10 @@ public sealed class ReviewLog
 
 public sealed class AppSettings
 {
+    public string AiProtocol { get; set; } = "chat";
+    public string LookupShortcut { get; set; } = "D";
+    public string TranslateShortcut { get; set; } = "A";
+    public string QuoteShortcut { get; set; } = "S";
     public string Provider { get; set; } = "deepseek";
     public string BaseUrl { get; set; } = "https://api.deepseek.com";
     public string Model { get; set; } = "deepseek-chat";
@@ -26,7 +30,8 @@ public sealed class AppSettings
     public bool RememberKey { get; set; } = false;
     public bool Clipboard { get; set; } = false;
     public int Timeout { get; set; } = 15;
-    public string Theme { get; set; } = "Dark";
+    public string Theme { get; set; } = "Light";
+    public string UiLanguage { get; set; } = "zh-CN";
     public string AiContext { get; set; } = "日常表达";
     public bool IncludeSourceInAi { get; set; } = false;
     public bool HighContrast { get; set; }
@@ -60,3 +65,4 @@ public sealed class LlmResult
 
     public bool HasContent => Examples.Count > 0 || Synonyms.Count > 0 || Antonyms.Count > 0 || Phrases.Count > 0;
 }
+

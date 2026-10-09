@@ -91,7 +91,7 @@ internal sealed class Win32SelectionClipboard : ISelectionClipboard
             var sequence = Sequence;
             var handle = GetClipboardData(UnicodeText);
             var size = (long)GlobalSize(handle);
-            if (handle == 0 || size <= 0 || size > 4096) return (null, sequence);
+            if (handle == 0 || size <= 0 || size > (4096 + 1) * 2) return (null, sequence);
             var ptr = GlobalLock(handle);
             if (ptr == 0) return (null, sequence);
             try

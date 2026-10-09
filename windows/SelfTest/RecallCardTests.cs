@@ -42,7 +42,7 @@ public static class RecallCardTests
             C<TextBox>("VocabSearchInput").Text = "does-not-match-anything";
             w.Width = 840; w.Height = 600;
             Click("NavReview");
-            check(C<TextBlock>("ReviewWordText").Text == "recall-one" && C<TextBlock>("ReviewRemainingText").Text == "还剩 2 个词", "recall ignores archive filters and excludes future words");
+            check(C<TextBlock>("ReviewWordText").Text == "recall-one" && C<TextBlock>("ReviewRemainingText").Text?.StartsWith("已完成 0 / 2") == true, "recall ignores archive filters and excludes future words");
             check(!C<Border>("ReviewAnswer").IsVisible && C<TextBlock>("ReviewMeaningText").Text == "" && !C<Grid>("ReviewRatingBar").IsVisible, "recall front does not disclose answer or ratings");
             var before = store.GetAllWords().Single(x => x.Word == "recall-one");
             await (Task)Call("RateReviewAsync", true)!;
@@ -85,38 +85,27 @@ public static class RecallCardTests
             check(store.GetAllWords().Single(x => x.Id == before.Id).Stage == before.Stage + 1, "double rating commits exactly one stage");
             check(C<TextBlock>("ReviewWordText").Text == "recall-two" && C<TextBlock>("ReviewMeaningText").Text == "", "next card hides its answer");
 
-            // An undo restores the prior due date and must make the card visible again.
-            check(store.UndoLastReview(before.Id), "review fixture can be undone");
-            Call("RefreshWords"); Click("NavLookup"); Click("NavReview");
-            check(C<TextBlock>("ReviewWordText").Text == "recall-one", "undo then reopen shows the restored due word");
-
-            // Rate it again, then explicitly schedule it for today; reopening must
-            // likewise invalidate the session exclusion.
+            Click("ReviewRoundUndoBtn");
+            check(C<TextBlock>("ReviewWordText").Text == "recall-one", "review undo restores the previous card");
+            var firstKey = WordKeyResolver.FromArchive(store.GetAllWords().Single(x => x.Id == before.Id)).Key;
+            check(ServiceFactory.OpenMemory(store).GetCard(firstKey) == null, "review undo restores FSRS pre-state");
             Click("ReviewRevealBtn");
             await (Task)Call("RateReviewAsync", true)!;
             store.ExecuteBatch([before.Id], "today");
             Call("RefreshWords"); Click("NavLookup"); Click("NavReview");
-            check(C<TextBlock>("ReviewWordText").Text == "recall-one", "today reschedule then reopen shows the due word");
-            Click("ReviewRevealBtn");
-            var reviewedStage = store.GetAllWords().Single(x => x.Id == before.Id).Stage;
-            await (Task)Call("RateReviewAsync", true)!;
-            check(store.GetAllWords().Single(x => x.Id == before.Id).Stage == reviewedStage, "same-day rating preserves scheduling idempotence");
-            store.ExecuteBatch([before.Id], "today");
-            Call("RefreshWords"); Click("NavLookup"); Click("NavReview");
-            check(C<TextBlock>("ReviewWordText").Text == "recall-one", "same-date explicit reschedule invalidates handled revision");
-            Click("ReviewRevealBtn");
-            await (Task)Call("RateReviewAsync", false)!;
+            check(C<TextBlock>("ReviewWordText").Text != "recall-one", "legacy today action cannot override an FSRS due date");
 
             Click("ReviewRevealBtn"); Click("NavLookup"); Click("NavReview");
             check(!C<Border>("ReviewAnswer").IsVisible, "re-entering deck hides current answer");
             Click("ReviewRevealBtn");
+            var keyboardRatedWord = C<TextBlock>("ReviewWordText").Text;
             C<Grid>("PageReview").RaiseEvent(new KeyEventArgs { RoutedEvent = InputElement.KeyDownEvent, Key = Key.Left });
-            await Task.Delay(35);
+            await Task.Delay(450);
+            check(store.GetAllWords().Single(x => x.Word == keyboardRatedWord).NextReviewDate == DateTime.Today.ToString("yyyy-MM-dd"), "left-key unfamiliar remains due today for relearning");
             Click("NavLookup"); Click("NavReview");
             await Task.Delay(500);
             check(C<Border>("ReviewCard").Opacity == 1, "page navigation cancels old animation without fading the reopened deck");
-            check(store.GetAllWords().Single(x => x.Word == "recall-two").NextReviewDate == DateTime.Today.AddDays(1).ToString("yyyy-MM-dd"), "left-key unfamiliar schedules tomorrow");
-            check(C<Border>("ReviewEmptyCard").IsVisible && C<TextBlock>("ReviewRemainingText").Text == "还剩 0 个词", "completed deck displays zero remaining");
+            check(!C<Border>("ReviewEmptyCard").IsVisible && C<TextBlock>("ReviewRemainingText").Text?.StartsWith("已完成 ") == true, "forgotten word remains in the round until its streak is complete");
             C<CheckBox>("HighContrastBox").IsChecked = true;
             C<CheckBox>("OpaqueMaterialBox").IsChecked = true;
             C<CheckBox>("ReduceMotionBox").IsChecked = true;

@@ -56,11 +56,17 @@ public partial class MainWindow : Window
         VocabListBox.ItemsSource = _displayedWords;
 
         BindEvents();
+        BindAiConnectionTest();
         ConfigureWindowChrome();
         ConfigureLookupShortcut();
         BindFoundationEvents();
         BindReviewEvents();
+        InitializeLearningHub();
+        InitializeFocus();
+        InitializeIelts();
         BindAppearanceEvents();
+        ConfigureQuickActions();
+        BindLanguageEvents();
         LoadSettingsToUi();
         RefreshWords();
 
@@ -107,6 +113,7 @@ public partial class MainWindow : Window
         {
             if (e.Property == TextBox.TextProperty)
             {
+                CancelLookupFallback();
                 var hasText = !string.IsNullOrEmpty(LookupInput.Text);
                 LookupClearBtn.Opacity = hasText ? 1.0 : 0.0;
                 LookupClearBtn.IsHitTestVisible = hasText;
@@ -193,6 +200,7 @@ public partial class MainWindow : Window
         }
         else
         {
+            _memoryParameterRuntime?.Invalidate();
             _dictService.Dispose();
             _vocabService.Dispose();
         }
@@ -202,6 +210,7 @@ public partial class MainWindow : Window
     {
         if (_restoring) return;
         _aiCts?.Cancel();
+        CancelLookupFallback();
         ++_lookupVersion;
         _filterTimer.Stop();
         foreach (var cts in _rowAiRequests.Values) cts.Cancel();
@@ -222,8 +231,7 @@ public partial class MainWindow : Window
         Show();
         if (WindowState == WindowState.Minimized) WindowState = _restoreWindowState;
         Activate();
-        ShowPage("lookup");
-        LookupInput.Focus();
+        if (_currentPage == "lookup" && !_focusActive) LookupInput.Focus();
     }
 
     public void ToggleVisibility()
@@ -246,6 +254,8 @@ public partial class MainWindow : Window
     private void ShowPage(string page)
     {
         if (!_databaseAvailable) return;
+        if (_focusActive) ExitFocus();
+        StopWindowsLearningAudio();
         ++_reviewEpoch; // Invalidate any in-flight card transition before page navigation.
         _currentPage = page;
         _isReviewMode = false; // Review deck owns its queue; archive filters never change it.
@@ -260,6 +270,9 @@ public partial class MainWindow : Window
         PageVocab.IsVisible = page == "vocab";
         PageReview.IsVisible = page == "review";
         PageSettings.IsVisible = page == "settings";
+        ShowLearningHub(page == "learning");
+        if (_ieltsPage != null) { _ieltsPage.IsVisible = page == "ielts"; _ieltsNav?.Classes.Set("active", page == "ielts"); }
+        if (_quotesPage != null) { _quotesPage.IsVisible = page == "quotes"; _quotesNav?.Classes.Set("active", page == "quotes"); if (page == "quotes") RenderQuotes(); }
 
         if (page == "lookup")
         {
@@ -286,6 +299,7 @@ public partial class MainWindow : Window
     private async Task PerformLookupAsync()
     {
         if (_restoring || !_databaseAvailable) return;
+        _lookupAiCts?.Cancel();
         var requestVersion = ++_lookupVersion;
         _currentExpansion = null;
         _aiCts?.Cancel();
@@ -318,6 +332,18 @@ public partial class MainWindow : Window
                 Definition = personal.Definition, Found = true
             };
             if (requestVersion != _lookupVersion || _isForceClose) return;
+            var aiCompleted = false;
+            string? aiError = null;
+            if (!res.Found && AiLookupConfigured)
+            {
+                using var lookupCancel = new CancellationTokenSource();
+                _lookupAiCts = lookupCancel;
+                SetStatus($"离线词库未收录 '{query}'，正在请求 AI 补全…");
+                try { res = await _aiService.LookupWordAsync(query, _settings, lookupCancel.Token); aiCompleted = true; }
+                catch (Exception ex) { aiError = ex.Message; }
+                finally { if (ReferenceEquals(_lookupAiCts, lookupCancel)) _lookupAiCts = null; }
+                if (requestVersion != _lookupVersion || _isForceClose) return;
+            }
             if (res.Found)
             {
                 ResultWordText.Text = res.Word;
@@ -334,7 +360,7 @@ public partial class MainWindow : Window
                     _currentExpansion = savedExpansion;
                     RenderExpansion(savedExpansion);
                 }
-                SetStatus($"查词成功: {res.Word} ({(personal == null ? "离线词库" : "私人词汇档案")})");
+                SetStatus($"查词成功: {res.Word} ({(aiCompleted ? "AI 补全" : personal == null ? "离线词库" : "私人词汇档案")})");
             }
             else
             {
@@ -343,7 +369,7 @@ public partial class MainWindow : Window
                 ManualTranslationInput.Text = "";
                 ManualDefinitionInput.Text = "";
                 LookupNotFoundCard.IsVisible = true;
-                SetStatus($"离线词库未收录 '{query}'，可手动补充录入。");
+                SetStatus(aiError == null ? $"离线词库未收录 '{query}'，可手动补充录入。" : $"离线词库未收录 '{query}'，AI 补全失败：{aiError}；可手动补充录入。");
             }
         }
         catch (Exception ex)
@@ -992,6 +1018,7 @@ public partial class MainWindow : Window
 
     private void LoadSettingsToUi()
     {
+        LoadLanguage();
         var provider = _settings.Provider?.ToLowerInvariant() ?? "deepseek";
         SettingsProviderCombo.SelectedIndex = provider switch
         {
@@ -1002,10 +1029,12 @@ public partial class MainWindow : Window
         };
 
         SettingsBaseUrlInput.Text = _settings.BaseUrl;
+        SettingsProtocolCombo.SelectedIndex = _settings.AiProtocol == "responses" ? 1 : 0;
         SettingsModelInput.Text = _settings.Model;
         SettingsApiKeyInput.Text = _settings.ApiKey;
         SettingsRememberKeyBox.IsChecked = _settings.RememberKey;
         LoadFoundationSettings();
+        LoadQuickActionSettings();
         SettingsThemeCombo.SelectedIndex = _settings.Theme == "Dark" ? 1 : 0;
         RequestedThemeVariant = _settings.Theme == "Dark" ? Avalonia.Styling.ThemeVariant.Dark : Avalonia.Styling.ThemeVariant.Light;
         LoadAppearance();
@@ -1014,6 +1043,8 @@ public partial class MainWindow : Window
         {
             5 => 0,
             30 => 2,
+            60 => 3,
+            120 => 4,
             _ => 1
         };
     }
@@ -1029,13 +1060,15 @@ public partial class MainWindow : Window
             _ => "custom"
         };
 
-        if (AiService.Presets.TryGetValue(key, out var preset))
+        // Choosing custom preserves the current editable configuration.
+        if (key != "custom" && AiService.Presets.TryGetValue(key, out var preset))
         {
             SettingsBaseUrlInput.Text = preset.BaseUrl;
             SettingsModelInput.Text = preset.Model;
             if (key != "custom")
             {
                 SettingsApiKeyInput.Text = "";
+                SettingsProtocolCombo.SelectedIndex = 0;
             }
         }
     }
@@ -1051,13 +1084,15 @@ public partial class MainWindow : Window
         {
             0 => 5,
             2 => 30,
+            3 => 60,
+            4 => 120,
             _ => 15
         };
 
         try
         {
             // Validate URL syntax
-            AiService.NormalizeEndpoint(baseUrl);
+            AiService.NormalizeEndpoint(baseUrl, SettingsProtocolCombo.SelectedIndex == 1 ? "responses" : "chat");
         }
         catch (Exception ex)
         {
@@ -1081,7 +1116,10 @@ public partial class MainWindow : Window
 
         _settings = new AppSettings
         {
+            UiLanguage = _settings.UiLanguage,
+            AiProtocol = SettingsProtocolCombo.SelectedIndex == 1 ? "responses" : "chat",
             Provider = providerKey,
+            LookupShortcut = _settings.LookupShortcut, TranslateShortcut = _settings.TranslateShortcut, QuoteShortcut = _settings.QuoteShortcut,
             BaseUrl = baseUrl,
             Model = model,
             ApiKey = apiKey,
@@ -1099,7 +1137,7 @@ public partial class MainWindow : Window
         try
         {
             _vocabService.SaveSettings(_settings);
-            SetStatus("设置已保存。基础查词不会调用模型。");
+            SetStatus("设置已保存。查词优先离线，缺词时按配置进行 AI 补全。");
         }
         catch (Exception ex) { SetStatus($"设置未能保存：{ex.Message}"); }
     }

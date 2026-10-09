@@ -108,7 +108,9 @@ public static class UiSmokeTests
             Call("OnSelectAllClicked");
             C<ComboBox>("BatchActionCombo").SelectedIndex = 3;
             Click("NavReview");
-            Check(C<Grid>("PageReview").IsVisible && !C<Grid>("PageVocab").IsVisible && C<TextBlock>("ReviewRemainingText").Text == "还剩 2 个词", "today action fills independent recall deck without management controls");
+            Check(C<Grid>("PageReview").IsVisible && !C<Grid>("PageVocab").IsVisible
+                && C<TextBlock>("ReviewRemainingText").Text?.StartsWith("已完成 0 / 2") == true,
+                "today action fills independent recall deck without management controls");
             Click("NavVocab");
             C<CheckBox>("SelectAllCheckBox").IsChecked = true;
             Call("OnSelectAllClicked");

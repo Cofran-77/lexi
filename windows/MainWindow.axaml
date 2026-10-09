@@ -1,7 +1,7 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="Lexi.MainWindow"
-        Title="Lexi · 记住每一次遇见"
+        Title="lexi"
         Width="1060" Height="760" MinWidth="840" MinHeight="600" CanResize="True"
         WindowStartupLocation="CenterScreen"
         Background="Transparent"
@@ -16,24 +16,24 @@
     <Grid RowDefinitions="60,*,36">
       <!-- Title Bar -->
       <Border Name="DragBar" Background="Transparent" BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,0,0,1" Padding="20,0">
-        <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto,Auto">
+        <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto,Auto,Auto">
           <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
-            <TextBlock Text="L✦" FontFamily="Georgia" FontStyle="Italic" FontSize="26" FontWeight="Bold" Foreground="{DynamicResource PrimaryGreen}" VerticalAlignment="Center"/>
+            <Image Source="avares://Lexi/Assets/lexi-logo.png" Width="30" Height="30" Stretch="Uniform" VerticalAlignment="Center"/>
             <TextBlock Text="lexi" FontSize="20" FontWeight="Bold" VerticalAlignment="Center"/>
-            <TextBlock Text="单词，慢慢记住。" Classes="muted" VerticalAlignment="Center" Margin="10,2,0,0"/>
           </StackPanel>
 
-          <Button Name="ThemeToggleBtn" Grid.Column="2" Classes="ghost" Content="切换浅色" ToolTip.Tip="切换浅色 / 深色主题，自动保存" Margin="0,0,12,0"/>
-          <TextBlock Grid.Column="3" Text="Alt+D" Classes="muted" VerticalAlignment="Center" Margin="0,0,15,0"/>
+          <Button Name="LanguageToggleBtn" Grid.Column="2" Classes="ghost" Content="EN" ToolTip.Tip="切换界面语言" Margin="0,0,6,0"/>
+          <Button Name="ThemeToggleBtn" Grid.Column="3" Classes="ghost" Content="切换深色" ToolTip.Tip="切换浅色 / 深色主题，自动保存" Margin="0,0,12,0"/>
+          <TextBlock Grid.Column="4" Text="Alt+D" Classes="muted" VerticalAlignment="Center" Margin="0,0,15,0"/>
 
           <!-- Centered vector Path caption buttons, no font glyphs -->
-          <Button Name="HideToTrayBtn" Grid.Column="4" Classes="window-control" ToolTip.Tip="最小化到任务栏" AutomationProperties.Name="最小化" Margin="0,0,6,0">
+          <Button Name="HideToTrayBtn" Grid.Column="5" Classes="window-control" ToolTip.Tip="最小化到任务栏" AutomationProperties.Name="最小化" Margin="0,0,6,0">
             <Path Data="M 3,8 L 13,8" Stroke="{DynamicResource MutedBrush}" StrokeThickness="1.5" StrokeLineCap="Round" Width="16" Height="16" HorizontalAlignment="Center" VerticalAlignment="Center"/>
           </Button>
-          <Button Name="MaximizeBtn" Grid.Column="5" Classes="window-control" ToolTip.Tip="最大化 / 还原" AutomationProperties.Name="最大化或还原" Margin="0,0,6,0">
+          <Button Name="MaximizeBtn" Grid.Column="6" Classes="window-control" ToolTip.Tip="最大化 / 还原" AutomationProperties.Name="最大化或还原" Margin="0,0,6,0">
             <Path Name="MaximizeGlyph" Data="M 3,3 L 13,3 L 13,13 L 3,13 Z" Stroke="{DynamicResource MutedBrush}" StrokeThickness="1.2" Width="16" Height="16"/>
           </Button>
-          <Button Name="QuitAppBtn" Grid.Column="6" Classes="window-control close" ToolTip.Tip="关闭到托盘；退出请用托盘菜单" AutomationProperties.Name="关闭到托盘">
+          <Button Name="QuitAppBtn" Grid.Column="7" Classes="window-control close" ToolTip.Tip="关闭到托盘；退出请用托盘菜单" AutomationProperties.Name="关闭到托盘">
             <Path Data="M 3.5,3.5 L 12.5,12.5 M 12.5,3.5 L 3.5,12.5" Stroke="{DynamicResource MutedBrush}" StrokeThickness="1.5" StrokeLineCap="Round" Width="16" Height="16" HorizontalAlignment="Center" VerticalAlignment="Center"/>
           </Button>
         </Grid>
@@ -81,12 +81,13 @@
             </Button>
 
             <!-- Bottom Offline Notice & Settings -->
+            <StackPanel Name="LearningNavHost" Grid.Row="3" VerticalAlignment="Top"/>
             <StackPanel Grid.Row="4" Spacing="4" Margin="6,0,6,16">
               <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-                <Ellipse Width="7" Height="7" Fill="#52A176"/>
+                <Ellipse Width="7" Height="7" Fill="#16815B"/>
                 <TextBlock Text="离线词库已就绪" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryGreen}"/>
               </StackPanel>
-              <TextBlock Text="59,026 个常用词 · 零 Token" Classes="muted" FontSize="10" Margin="13,0,0,0"/>
+              <TextBlock Text="59,026 个词条" Classes="muted" FontSize="10" Margin="13,0,0,0"/>
             </StackPanel>
 
             <Button Name="NavSettings" Grid.Row="5" Classes="nav">
@@ -102,21 +103,17 @@
         </Border>
 
         <!-- Pages Host Container -->
-        <Panel Grid.Column="1">
+        <Panel Name="PagesHost" Grid.Column="1">
           <!-- 1. LOOKUP PAGE -->
           <Grid Name="LookupPageHost" RowDefinitions="*,Auto">
           <!-- Keep spacing outside the ScrollViewer: its Fluent presenter does not
                subtract Padding from the reported viewport/maximum scroll offset. -->
           <ScrollViewer Name="PageLookup" HorizontalScrollBarVisibility="Disabled" Margin="36,24,36,24" IsVisible="True">
             <StackPanel Name="LookupPageContent" Spacing="18" MaxWidth="720" HorizontalAlignment="Stretch">
-              <StackPanel Spacing="4">
-                <TextBlock Text="A LITTLE EVERY DAY" Classes="eyebrow"/>
-                <TextBlock Text="今天，遇见了什么词？" Classes="h1"/>
-                <TextBlock Text="查清它的意思，再让它成为你的词汇。" Classes="muted"/>
-              </StackPanel>
+              <TextBlock Text="查词" Classes="h1" Margin="0,0,0,10"/>
 
               <!-- Search Input Bar with Soft Focus Glow and 150ms Fade-in Clear Button -->
-              <Grid ColumnDefinitions="*,Auto" Margin="0,6,0,0">
+              <Grid ColumnDefinitions="*,Auto">
                 <TextBox Name="LookupInput"
                          Watermark="输入一个英文单词 (例如: serendipity, resilient)..."
                          FontSize="15"
@@ -148,9 +145,8 @@
                 <StackPanel Spacing="14">
                   <Grid ColumnDefinitions="*,Auto">
                     <StackPanel Spacing="2">
-                      <TextBlock Text="YOUR NEXT WORD" Classes="eyebrow"/>
                       <WrapPanel Orientation="Horizontal" VerticalAlignment="Bottom">
-                        <TextBlock Name="ResultWordText" FontFamily="Georgia" FontSize="32" TextWrapping="Wrap" FontWeight="Bold" Foreground="{DynamicResource PrimaryGreen}"/>
+                        <TextBlock Name="ResultWordText" FontSize="30" TextWrapping="Wrap" FontWeight="Bold" Foreground="{DynamicResource InkBrush}"/>
                         <TextBlock Name="ResultPhoneticText" Classes="muted" FontSize="14" VerticalAlignment="Bottom" Margin="12,0,0,5"/>
                       </WrapPanel>
                     </StackPanel>
@@ -235,16 +231,13 @@
 
               <!-- Empty Placeholder Card -->
               <Border Name="LookupEmptyCard" Classes="card" IsVisible="True" Padding="36,28">
-                <StackPanel Spacing="14" HorizontalAlignment="Center">
-                  <TextBlock Text="✦" FontSize="36" HorizontalAlignment="Center" Foreground="{DynamicResource PrimaryGreen}"/>
-                  <TextBlock Text="每一个新词，都是新的风景" FontWeight="Bold" FontSize="16" HorizontalAlignment="Center"/>
-                  <TextBlock Text="输入单词，释义即刻呈现。&#x0a;按需生成例句，在熟悉的语境里记住它。" Classes="muted" TextAlignment="Center" LineHeight="22"/>
-                  <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center" Margin="0,10,0,0">
+                <StackPanel Spacing="16" HorizontalAlignment="Center">
+                  <TextBlock Text="输入单词查询" FontWeight="SemiBold" FontSize="16" HorizontalAlignment="Center"/>
+                  <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
                     <Button Name="QuickWord1" Classes="secondary" Content="serendipity ↗"/>
                     <Button Name="QuickWord2" Classes="secondary" Content="resilient ↗"/>
                     <Button Name="QuickWord3" Classes="secondary" Content="wander ↗"/>
                   </StackPanel>
-                  <TextBlock Text="01 → 02 → 04 → 07 → 15 · 在遗忘之前，恰好重逢。" Classes="muted" FontSize="11" HorizontalAlignment="Center" Margin="0,12,0,0"/>
                 </StackPanel>
               </Border>
             </StackPanel>
@@ -269,11 +262,13 @@
           <!-- 2. VOCAB NOTEBOOK PAGE -->
           <Grid Name="PageVocab" RowDefinitions="Auto,Auto,*,Auto" Margin="36,24,36,16" IsVisible="False">
             <!-- Header -->
-            <StackPanel Spacing="4">
-              <TextBlock Text="YOUR WORD COLLECTION" Classes="eyebrow"/>
-              <TextBlock Name="VocabPageTitle" Text="我的生词本" Classes="h1"/>
-              <TextBlock Name="VocabPageSubtitle" Text="把偶然遇见，变成牢牢记住。" Classes="muted"/>
-            </StackPanel>
+            <Grid ColumnDefinitions="*,Auto">
+              <StackPanel Spacing="4">
+                <TextBlock Name="VocabPageTitle" Text="词汇档案" Classes="h1"/>
+                <TextBlock Name="VocabPageSubtitle" Text="已收藏的词汇与学习记录" Classes="muted"/>
+              </StackPanel>
+              <StackPanel Name="VocabFocusActionHost" Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center"/>
+            </Grid>
 
             <!-- Filters Bar -->
             <Grid Grid.Row="1" ColumnDefinitions="*,Auto" Margin="0,16,0,10">
@@ -321,7 +316,7 @@
                             <!-- Word & Compact Meaning -->
                             <StackPanel Grid.Column="2" Spacing="2" VerticalAlignment="Center">
                               <WrapPanel Orientation="Horizontal">
-                                <TextBlock Text="{Binding Word}" TextWrapping="Wrap" Margin="0,0,8,0" FontFamily="Georgia" FontSize="17" FontWeight="Bold" Foreground="{DynamicResource InkBrush}"/>
+                                <TextBlock Text="{Binding Word}" TextWrapping="Wrap" Margin="0,0,8,0" FontSize="17" FontWeight="Bold" Foreground="{DynamicResource InkBrush}"/>
                                 <TextBlock Text="{Binding Phonetic}" Classes="muted" FontSize="13" VerticalAlignment="Center"/>
                               </WrapPanel>
                               <!-- Compact translation (single line with ellipsis) when collapsed -->
@@ -487,9 +482,10 @@
                   </ScrollViewer>
                   <Grid Grid.Row="1" Margin="0,16,0,0">
                     <Button Name="ReviewRevealBtn" Classes="primary" Content="查看释义" MinHeight="44" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"/>
-                    <Grid Name="ReviewRatingBar" ColumnDefinitions="*,16,*" IsVisible="False">
-                      <Button Name="ReviewUnfamiliarBtn" Classes="secondary" Content="还不熟" MinHeight="44" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"/>
-                      <Button Name="ReviewRememberBtn" Grid.Column="2" Classes="primary" Content="记得" MinHeight="44" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"/>
+                    <Grid Name="ReviewRatingBar" ColumnDefinitions="*,8,*,8,*" IsVisible="False">
+                      <Button Name="ReviewUnfamiliarBtn" Classes="secondary" Content="忘记" MinHeight="44" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"/>
+                      <Button Name="ReviewUnsureBtn" Grid.Column="2" Classes="secondary" Content="模糊" MinHeight="44" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"/>
+                      <Button Name="ReviewRememberBtn" Grid.Column="4" Classes="primary" Content="认识" MinHeight="44" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"/>
                     </Grid>
                   </Grid>
                 </Grid>
@@ -501,7 +497,10 @@
                 <TextBlock Text="词会在合适的日子再来。现在可以继续阅读，遇见新的表达。" Classes="muted" TextWrapping="Wrap"/>
               </StackPanel>
             </Border>
-            <TextBlock Grid.Row="2" Text="Space 查看释义 · ← 还不熟 · → 记得" Classes="muted" FontSize="11" TextAlignment="Center" TextWrapping="Wrap"/>
+            <StackPanel Grid.Row="2" Spacing="8">
+              <Button Name="ReviewRoundUndoBtn" Classes="secondary" Content="撤销上一次评价" HorizontalAlignment="Center" IsEnabled="False"/>
+              <TextBlock Text="Space 查看释义 · ← 忘记 · ↓ 模糊 · → 认识；模糊或忘记后需连续认识三次" Classes="muted" FontSize="11" TextAlignment="Center" TextWrapping="Wrap"/>
+            </StackPanel>
           </Grid>
 
           <!-- 3. SETTINGS PAGE -->
@@ -516,6 +515,11 @@
               <Border Name="ThemeSettingsCard" Classes="card">
                   <StackPanel Spacing="6">
                     <TextBlock Text="外观" FontWeight="SemiBold" FontSize="16"/>
+                    <TextBlock Text="界面语言" FontSize="12"/>
+                    <ComboBox Name="SettingsLanguageCombo">
+                      <ComboBoxItem Content="简体中文"/>
+                      <ComboBoxItem Content="English"/>
+                    </ComboBox>
                     <ComboBox Name="SettingsThemeCombo"><ComboBoxItem Content="浅色 · 晨雾"/><ComboBoxItem Content="深色 · 夜林"/></ComboBox>
                     <CheckBox Name="HighContrastBox" Content="高对比度 · 更清楚的文字和边界"/>
                     <CheckBox Name="OpaqueMaterialBox" Content="不透明背景 · 减少背景干扰"/>
@@ -527,7 +531,7 @@
               <Border Classes="card"><StackPanel Spacing="10">
                 <TextBlock Text="查词与快捷方式" FontSize="16" FontWeight="SemiBold"/>
                 <TextBlock Text="Alt+Space 将当前查询结果加入生词本（仅在 Lexi 查词页生效，已收藏的词不会重复入库）。" Classes="muted" TextWrapping="Wrap"/>
-                <TextBlock Text="选中英文后按 Alt+D 即查；未选中时仅唤醒输入框。查询使用本地离线词典，不调用 AI。" Classes="muted" TextWrapping="Wrap"/>
+                <TextBlock Text="选中英文后按 Alt+D 即查；未选中时唤醒输入框。优先使用本地词典，已配置 AI 时可补全未收录的词。" Classes="muted" TextWrapping="Wrap"/>
                 <TextBlock Text="× 隐藏到托盘 · 横线最小化 · 标题栏双击最大化 · 拖动边缘调整大小。完全退出请用托盘菜单。" Classes="muted" TextWrapping="Wrap"/>
               </StackPanel></Border>
               <Border Classes="card">
@@ -549,6 +553,15 @@
                   </StackPanel>
 
                   <StackPanel Spacing="6">
+                    <TextBlock Text="接口协议" FontWeight="SemiBold" FontSize="12"/>
+                    <ComboBox Name="SettingsProtocolCombo">
+                      <ComboBoxItem Content="Chat Completions · 通用兼容"/>
+                      <ComboBoxItem Content="Responses · 流式接口"/>
+                    </ComboBox>
+                    <TextBlock Text="按服务商支持的协议选择；完整接口地址也可填写。" Classes="muted" FontSize="11" TextWrapping="Wrap"/>
+                  </StackPanel>
+
+                  <StackPanel Spacing="6">
                     <TextBlock Text="模型名称 · Model Name" FontWeight="SemiBold" FontSize="12"/>
                     <TextBox Name="SettingsModelInput"/>
                   </StackPanel>
@@ -559,6 +572,10 @@
                   </StackPanel>
 
                   <CheckBox Name="SettingsRememberKeyBox" Content="记住 API Key（使用 Windows 当前用户加密保护）"/>
+                  <StackPanel Orientation="Horizontal" Spacing="10">
+                    <Button Name="SettingsTestConnectionBtn" Content="测试连接" Classes="secondary"/>
+                    <Button Name="SettingsCancelConnectionBtn" Content="取消测试" Classes="secondary" IsVisible="False"/>
+                  </StackPanel>
                   <StackPanel Spacing="6">
                     <TextBlock Text="AI 语境偏好" FontWeight="SemiBold" FontSize="12"/>
                     <ComboBox Name="SettingsContextCombo" SelectedIndex="0">
@@ -576,12 +593,14 @@
                       <ComboBoxItem Content="5 秒 · 快速响应"/>
                       <ComboBoxItem Content="15 秒 · 标准模型" IsSelected="True"/>
                       <ComboBoxItem Content="30 秒 · 深度推理"/>
+                      <ComboBoxItem Content="60 秒"/>
+                      <ComboBoxItem Content="120 秒"/>
                     </ComboBox>
                   </StackPanel>
 
                   <Border BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,1,0,0" Padding="0,14,0,0">
                     <Grid ColumnDefinitions="*,Auto">
-                      <TextBlock Text="查词绝不调用模型 · 仅勾选并点击生成时调用" Classes="muted" VerticalAlignment="Center" FontSize="11"/>
+                      <TextBlock Text="离线优先 · 缺词按配置 AI 补全 · 扩展需点击生成" Classes="muted" VerticalAlignment="Center" FontSize="11"/>
                       <Button Name="SettingsSaveBtn" Grid.Column="1" Classes="primary" Content="保存设置"/>
                     </Grid>
                   </Border>
@@ -620,7 +639,7 @@
       <Border Grid.Row="2" Background="{DynamicResource TintBrush}" Padding="20,0">
         <Grid ColumnDefinitions="*,Auto">
           <TextBlock Name="GlobalStatusText" Text="本地查词不调用 AI。关闭窗口后可通过快捷键或托盘重新打开。" VerticalAlignment="Center" FontSize="11"/>
-          <TextBlock Grid.Column="1" Text="Lexi 1.1" Classes="muted" VerticalAlignment="Center" FontSize="11"/>
+          <TextBlock Grid.Column="1" Text="Lexi 1.1.4" Classes="muted" VerticalAlignment="Center" FontSize="11"/>
         </Grid>
       </Border>
     </Grid>

@@ -2,11 +2,11 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
   <Styles.Resources>
     <ResourceDictionary>
-      <CornerRadius x:Key="ControlRadius">8</CornerRadius>
-      <CornerRadius x:Key="CardRadius">14</CornerRadius>
-      <Thickness x:Key="ControlPadding">14,8</Thickness>
+      <CornerRadius x:Key="ControlRadius">10</CornerRadius>
+      <CornerRadius x:Key="CardRadius">18</CornerRadius>
+      <Thickness x:Key="ControlPadding">13,7</Thickness>
       <Thickness x:Key="CardPadding">20</Thickness>
-      <FontFamily x:Key="BodyFont">Segoe UI, Microsoft YaHei UI, sans-serif</FontFamily>
+      <FontFamily x:Key="BodyFont">avares://Avalonia.Fonts.Inter/Assets#Inter, Microsoft YaHei UI</FontFamily>
       <!-- Standalone themes: replacing Template alone leaves Fluent's nested
            state selectors active on PART_ContentPresenter (square/blue fills). -->
       <ControlTheme x:Key="LexiButtonTheme" TargetType="Button">
@@ -19,63 +19,69 @@
         <Setter Property="FocusAdorner" Value="{x:Null}"/>
       </ControlTheme>
       <ResourceDictionary.ThemeDictionaries>
-        <!-- Light Theme: 72% Semi-transparent white card, refined sage-green, soft shadows -->
+        <!-- Glacier-white surfaces and deep blue accents match the macOS product palette. -->
         <ResourceDictionary x:Key="Light">
-          <SolidColorBrush x:Key="DialogSurfaceBrush">#F7FAF8</SolidColorBrush>
-          <SolidColorBrush x:Key="PaperBrush">#DFF4F7F5</SolidColorBrush>
-          <SolidColorBrush x:Key="CardBrush">#B8FFFFFF</SolidColorBrush>
-          <SolidColorBrush x:Key="InkBrush">#1D2E27</SolidColorBrush>
-          <SolidColorBrush x:Key="MutedBrush">#5E7369</SolidColorBrush>
-          <SolidColorBrush x:Key="TintBrush">#E3EEE7</SolidColorBrush>
-          <SolidColorBrush x:Key="LineBrush">#D1DFD7</SolidColorBrush>
+          <SolidColorBrush x:Key="DialogSurfaceBrush">#F6F9FD</SolidColorBrush>
+          <SolidColorBrush x:Key="PaperBrush">#F0F5FC</SolidColorBrush>
+          <SolidColorBrush x:Key="CardBrush">#E8FFFFFF</SolidColorBrush>
+          <SolidColorBrush x:Key="InkBrush">#1B2D43</SolidColorBrush>
+          <SolidColorBrush x:Key="MutedBrush">#455B74</SolidColorBrush>
+          <SolidColorBrush x:Key="TintBrush">#E8F0FA</SolidColorBrush>
+          <SolidColorBrush x:Key="LineBrush">#CDDAE9</SolidColorBrush>
           <SolidColorBrush x:Key="OnPrimaryBrush">#FFFFFF</SolidColorBrush>
-          <SolidColorBrush x:Key="PrimaryGreen">#2D6452</SolidColorBrush>
-          <SolidColorBrush x:Key="PrimaryGreenHover">#235242</SolidColorBrush>
-          <SolidColorBrush x:Key="PrimaryGreenPressed">#1C4135</SolidColorBrush>
-          <SolidColorBrush x:Key="InputBg">#B8FFFFFF</SolidColorBrush>
-          <SolidColorBrush x:Key="SelectionBrush">#E1ECE5</SolidColorBrush>
-          <SolidColorBrush x:Key="InsetBrush">#0C2D6452</SolidColorBrush>
-          <SolidColorBrush x:Key="InsetBorderBrush">#202D6452</SolidColorBrush>
+          <SolidColorBrush x:Key="PrimaryGreen">#245FAD</SolidColorBrush>
+          <SolidColorBrush x:Key="PrimaryGreenHover">#1E5299</SolidColorBrush>
+          <SolidColorBrush x:Key="PrimaryGreenPressed">#194581</SolidColorBrush>
+          <SolidColorBrush x:Key="InputBg">#E8FFFFFF</SolidColorBrush>
+          <SolidColorBrush x:Key="SelectionBrush">#DFECFB</SolidColorBrush>
+          <SolidColorBrush x:Key="InsetBrush">#0B245FAD</SolidColorBrush>
+          <SolidColorBrush x:Key="InsetBorderBrush">#20245FAD</SolidColorBrush>
+          <SolidColorBrush x:Key="PosBrush">#E9F0F8</SolidColorBrush>
+          <SolidColorBrush x:Key="PosVerbBrush">#DCEBFA</SolidColorBrush>
+          <SolidColorBrush x:Key="PosModifierBrush">#E3E9F5</SolidColorBrush>
 
           <LinearGradientBrush x:Key="CardBorderGradient" StartPoint="0%,0%" EndPoint="100%,100%">
             <GradientStop Color="#80FFFFFF" Offset="0.0"/>
-            <GradientStop Color="#252D6452" Offset="0.5"/>
+            <GradientStop Color="#25245FAD" Offset="0.5"/>
             <GradientStop Color="#12000000" Offset="1.0"/>
           </LinearGradientBrush>
 
-          <BoxShadows x:Key="SoftCardShadow">0 4 18 0 #0C000000, 0 1 3 0 #05000000</BoxShadows>
-          <BoxShadows x:Key="FloatingShadow">0 8 28 0 #18000000, 0 2 6 0 #0A000000</BoxShadows>
-          <BoxShadows x:Key="FocusGlowShadow">0 0 8 1 #402D6452</BoxShadows>
-          <BoxShadows x:Key="DrawerShadow">0 3 12 0 #0D000000</BoxShadows>
+          <BoxShadows x:Key="SoftCardShadow">0 3 18 0 #0926476B, 0 1 3 0 #0426476B</BoxShadows>
+          <BoxShadows x:Key="FloatingShadow">0 8 28 0 #1826476B, 0 2 6 0 #0A26476B</BoxShadows>
+          <BoxShadows x:Key="FocusGlowShadow">0 0 8 1 #50245FAD</BoxShadows>
+          <BoxShadows x:Key="DrawerShadow">0 3 12 0 #0D26476B</BoxShadows>
         </ResourceDictionary>
 
-        <!-- Dark Theme: 65% Semi-transparent (32,32,36) card, restrained sage-green, deep shadows -->
+        <!-- Dark navy-grey surfaces and ice-blue accents. -->
         <ResourceDictionary x:Key="Dark">
-          <SolidColorBrush x:Key="DialogSurfaceBrush">#202426</SolidColorBrush>
-          <SolidColorBrush x:Key="PaperBrush">#E818191C</SolidColorBrush>
-          <SolidColorBrush x:Key="CardBrush">#A6202024</SolidColorBrush>
-          <SolidColorBrush x:Key="InkBrush">#E4EDE7</SolidColorBrush>
-          <SolidColorBrush x:Key="MutedBrush">#8C9F95</SolidColorBrush>
-          <SolidColorBrush x:Key="TintBrush">#262F2A</SolidColorBrush>
-          <SolidColorBrush x:Key="LineBrush">#343E38</SolidColorBrush>
-          <SolidColorBrush x:Key="OnPrimaryBrush">#10281F</SolidColorBrush>
-          <SolidColorBrush x:Key="PrimaryGreen">#6EA990</SolidColorBrush>
-          <SolidColorBrush x:Key="PrimaryGreenHover">#82BEA5</SolidColorBrush>
-          <SolidColorBrush x:Key="PrimaryGreenPressed">#5B8F7A</SolidColorBrush>
-          <SolidColorBrush x:Key="InputBg">#A6202024</SolidColorBrush>
-          <SolidColorBrush x:Key="SelectionBrush">#2F3D36</SolidColorBrush>
-          <SolidColorBrush x:Key="InsetBrush">#121316</SolidColorBrush>
-          <SolidColorBrush x:Key="InsetBorderBrush">#256EA990</SolidColorBrush>
+          <SolidColorBrush x:Key="DialogSurfaceBrush">#202C3D</SolidColorBrush>
+          <SolidColorBrush x:Key="PaperBrush">#182232</SolidColorBrush>
+          <SolidColorBrush x:Key="CardBrush">#E8202C3D</SolidColorBrush>
+          <SolidColorBrush x:Key="InkBrush">#E8F0FC</SolidColorBrush>
+          <SolidColorBrush x:Key="MutedBrush">#ACBED4</SolidColorBrush>
+          <SolidColorBrush x:Key="TintBrush">#263A52</SolidColorBrush>
+          <SolidColorBrush x:Key="LineBrush">#3C516B</SolidColorBrush>
+          <SolidColorBrush x:Key="OnPrimaryBrush">#14243A</SolidColorBrush>
+          <SolidColorBrush x:Key="PrimaryGreen">#93C5F8</SolidColorBrush>
+          <SolidColorBrush x:Key="PrimaryGreenHover">#ADD6FF</SolidColorBrush>
+          <SolidColorBrush x:Key="PrimaryGreenPressed">#7CB5F0</SolidColorBrush>
+          <SolidColorBrush x:Key="InputBg">#E8202C3D</SolidColorBrush>
+          <SolidColorBrush x:Key="SelectionBrush">#2A4667</SolidColorBrush>
+          <SolidColorBrush x:Key="InsetBrush">#152235</SolidColorBrush>
+          <SolidColorBrush x:Key="InsetBorderBrush">#3393C5F8</SolidColorBrush>
+          <SolidColorBrush x:Key="PosBrush">#293C53</SolidColorBrush>
+          <SolidColorBrush x:Key="PosVerbBrush">#264463</SolidColorBrush>
+          <SolidColorBrush x:Key="PosModifierBrush">#333F5B</SolidColorBrush>
 
           <LinearGradientBrush x:Key="CardBorderGradient" StartPoint="0%,0%" EndPoint="100%,100%">
             <GradientStop Color="#35FFFFFF" Offset="0.0"/>
-            <GradientStop Color="#256EA990" Offset="0.5"/>
+            <GradientStop Color="#3393C5F8" Offset="0.5"/>
             <GradientStop Color="#0FFFFFFF" Offset="1.0"/>
           </LinearGradientBrush>
 
-          <BoxShadows x:Key="SoftCardShadow">0 6 22 0 #40000000, 0 1 4 0 #20000000</BoxShadows>
+          <BoxShadows x:Key="SoftCardShadow">0 5 20 0 #3008101C, 0 1 4 0 #1608101C</BoxShadows>
           <BoxShadows x:Key="FloatingShadow">0 10 32 0 #60000000, 0 3 10 0 #35000000</BoxShadows>
-          <BoxShadows x:Key="FocusGlowShadow">0 0 8 1 #406EA990</BoxShadows>
+          <BoxShadows x:Key="FocusGlowShadow">0 0 8 1 #5593C5F8</BoxShadows>
           <BoxShadows x:Key="DrawerShadow">0 4 16 0 #35000000</BoxShadows>
         </ResourceDictionary>
       </ResourceDictionary.ThemeDictionaries>
@@ -86,6 +92,7 @@
   <!-- Global Font and Foreground -->
   <Style Selector="Window">
     <Setter Property="FontFamily" Value="{DynamicResource BodyFont}"/>
+    <Setter Property="FontSize" Value="14"/>
     <Setter Property="Foreground" Value="{DynamicResource InkBrush}"/>
   </Style>
 
@@ -108,7 +115,7 @@
 
   <Style Selector="TextBlock.h1">
     <Setter Property="FontSize" Value="24"/>
-    <Setter Property="FontWeight" Value="Bold"/>
+    <Setter Property="FontWeight" Value="Medium"/>
     <Setter Property="Margin" Value="0,0,0,4"/>
   </Style>
 
@@ -256,7 +263,7 @@
     <Setter Property="Foreground" Value="{DynamicResource MutedBrush}"/>
     <Setter Property="HorizontalAlignment" Value="Stretch"/>
     <Setter Property="VerticalAlignment" Value="Center"/>
-    <Setter Property="TextAlignment" Value="Right"/>
+    <Setter Property="TextAlignment" Value="Center"/>
   </Style>
   <Style Selector="Border.badge.badge-accent">
     <Setter Property="Background" Value="{DynamicResource PrimaryGreen}"/>
@@ -512,14 +519,14 @@
     <Setter Property="Foreground" Value="{DynamicResource PrimaryGreen}"/>
   </Style>
   <Style Selector="Border.pos-chip">
-    <Setter Property="Background" Value="#E5EBEE"/>
+    <Setter Property="Background" Value="{DynamicResource PosBrush}"/>
     <Setter Property="CornerRadius" Value="6"/>
     <Setter Property="Padding" Value="8,3"/>
     <Setter Property="Margin" Value="0,0,6,0"/>
   </Style>
-  <Style Selector="Border.pos-chip.verb"><Setter Property="Background" Value="#E2EBE4"/></Style>
-  <Style Selector="Border.pos-chip.modifier"><Setter Property="Background" Value="#EEE7DF"/></Style>
-  <Style Selector="Border.pos-chip TextBlock"><Setter Property="Foreground" Value="#33413C"/></Style>
+  <Style Selector="Border.pos-chip.verb"><Setter Property="Background" Value="{DynamicResource PosVerbBrush}"/></Style>
+  <Style Selector="Border.pos-chip.modifier"><Setter Property="Background" Value="{DynamicResource PosModifierBrush}"/></Style>
+  <Style Selector="Border.pos-chip TextBlock"><Setter Property="Foreground" Value="{DynamicResource InkBrush}"/></Style>
   <Style Selector="Button:disabled"><Setter Property="Opacity" Value="0.45"/></Style>
   <Style Selector="Button.primary /template/ Border#ButtonSurface">
     <Setter Property="BoxShadow" Value="0 3 8 0 #18000000"/>

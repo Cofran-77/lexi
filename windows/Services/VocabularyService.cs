@@ -8,7 +8,7 @@ using Lexi.Core;
 
 namespace Lexi;
 
-public sealed partial class VocabularyService : IVocabularyArchive, IDisposable
+public sealed partial class VocabularyService : IVocabularyArchive, IQuoteArchive, ILearningMemoryStore, IDisposable
 {
     public static readonly int[] StageOffsets = ReviewSchedule.DefaultStageOffsets;
     public const int MaxStage = ReviewSchedule.DefaultMaxStage;
@@ -222,6 +222,8 @@ public sealed partial class VocabularyService : IVocabularyArchive, IDisposable
         cmd.ExecuteNonQuery();
 
         MigrateArchiveSchema();
+        MigrateQuoteSchema();
+        MigrateMemorySchema();
     }
 
     public List<WordItem> GetAllWords()
@@ -848,6 +850,11 @@ public sealed partial class VocabularyService : IVocabularyArchive, IDisposable
     }
 
     public bool UndoLastReview(long wordId)
+        => UndoLastAction(wordId, false);
+
+    public bool UndoLastLearningAction(long wordId) => UndoLastAction(wordId, true);
+
+    private bool UndoLastAction(long wordId, bool includeMaster)
     {
         using var tx = _connection.BeginTransaction();
 
@@ -857,11 +864,12 @@ public sealed partial class VocabularyService : IVocabularyArchive, IDisposable
             SELECT l.id, l.old_stage, l.old_status, l.old_next_review_date, l.old_learning_start_date,
                    s.last_reviewed_at, s.review_count, s.log_id
             FROM review_logs l LEFT JOIN review_snapshots s ON s.log_id=l.id
-            WHERE l.word_id = $wordId AND l.action IN ('batch_review', 'unfamiliar')
+            WHERE l.word_id = $wordId AND (l.action IN ('batch_review', 'unfamiliar', 'unsure', 'forgot') OR ($includeMaster = 1 AND l.action = 'batch_master'))
               AND l.id = (SELECT MAX(id) FROM review_logs WHERE word_id=$wordId)
             LIMIT 1
         ";
         queryCmd.Parameters.AddWithValue("$wordId", wordId);
+        queryCmd.Parameters.AddWithValue("$includeMaster", includeMaster ? 1 : 0);
 
         using var reader = queryCmd.ExecuteReader();
         if (!reader.Read())
@@ -931,7 +939,7 @@ public sealed partial class VocabularyService : IVocabularyArchive, IDisposable
     {
         using var cmd = _connection.CreateCommand();
         cmd.CommandText = @"SELECT l.word_id FROM review_logs l
-            WHERE l.action IN ('batch_review', 'unfamiliar')
+            WHERE l.action IN ('batch_review', 'unfamiliar', 'unsure', 'forgot')
               AND l.id=(SELECT MAX(id) FROM review_logs WHERE word_id=l.word_id)
             ORDER BY l.id DESC LIMIT 1";
         var id = cmd.ExecuteScalar();
@@ -950,6 +958,11 @@ public sealed partial class VocabularyService : IVocabularyArchive, IDisposable
         AppSettings settings;
         try { settings = JsonSerializer.Deserialize<AppSettings>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new AppSettings(); }
         catch (JsonException) { CredentialWarning = "设置格式损坏，已使用默认设置。原设置尚未覆盖，请先备份。"; return new AppSettings(); }
+        if (string.Equals(settings.Provider, "responses", StringComparison.OrdinalIgnoreCase))
+        {
+            settings.Provider = "custom";
+            settings.AiProtocol = "responses";
+        }
         CredentialWarning = "";
         try
         {
@@ -1001,7 +1014,9 @@ public sealed partial class VocabularyService : IVocabularyArchive, IDisposable
     {
         var persisted = new AppSettings
         {
-            Provider = settings.Provider, BaseUrl = settings.BaseUrl, Model = settings.Model,
+            UiLanguage = settings.UiLanguage == "en" ? "en" : "zh-CN",
+            LookupShortcut = settings.LookupShortcut, TranslateShortcut = settings.TranslateShortcut, QuoteShortcut = settings.QuoteShortcut,
+            AiProtocol = settings.AiProtocol, Provider = settings.Provider, BaseUrl = settings.BaseUrl, Model = settings.Model,
             RememberKey = settings.RememberKey, Clipboard = settings.Clipboard, Theme = settings.Theme,
             Timeout = settings.Timeout, ApiKey = "",
             AiContext = string.IsNullOrWhiteSpace(settings.AiContext) ? "日常表达" : settings.AiContext,
@@ -1034,5 +1049,7 @@ public sealed partial class VocabularyService : IVocabularyArchive, IDisposable
         _connection.Dispose();
     }
 }
+
+
 
 

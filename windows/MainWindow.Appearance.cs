@@ -8,7 +8,7 @@ namespace Lexi;
 public partial class MainWindow
 {
     private bool _loadingAppearance;
-    private static readonly string[] AppearanceBrushes = ["PaperBrush", "CardBrush", "DialogSurfaceBrush", "InputBg", "InkBrush", "MutedBrush", "LineBrush", "PrimaryGreen", "PrimaryGreenHover", "PrimaryGreenPressed", "OnPrimaryBrush", "TintBrush", "SelectionBrush", "InsetBrush", "InsetBorderBrush", "CardBorderGradient"];
+    private static readonly string[] AppearanceBrushes = ["PaperBrush", "CardBrush", "DialogSurfaceBrush", "InputBg", "InkBrush", "MutedBrush", "LineBrush", "PrimaryGreen", "PrimaryGreenHover", "PrimaryGreenPressed", "OnPrimaryBrush", "TintBrush", "SelectionBrush", "InsetBrush", "InsetBorderBrush", "CardBorderGradient", "PosBrush", "PosVerbBrush", "PosModifierBrush"];
 
     private void BindAppearanceEvents()
     {
@@ -52,11 +52,12 @@ public partial class MainWindow
             Brush("OnPrimaryBrush", dark ? "#000000" : "#FFFFFF");
             Brush("TintBrush", dark ? "#202020" : "#EEEEEE");
             Brush("SelectionBrush", dark ? "#303030" : "#DDDDDD");
+            foreach (var key in new[] { "PosBrush", "PosVerbBrush", "PosModifierBrush" }) Brush(key, bg);
         }
         else if (_settings.OpaqueMaterial)
         {
-            Resources["PaperBrush"] = new SolidColorBrush(Color.Parse(dark ? "#18191C" : "#F4F7F5"));
-            Resources["CardBrush"] = new SolidColorBrush(Color.Parse(dark ? "#202024" : "#FFFFFF"));
+            Resources["PaperBrush"] = new SolidColorBrush(Color.Parse(dark ? "#182232" : "#F5F9FF"));
+            Resources["CardBrush"] = new SolidColorBrush(Color.Parse(dark ? "#202C3D" : "#FFFFFF"));
             Resources["InputBg"] = Resources["CardBrush"];
         }
         TransparencyLevelHint = _settings.OpaqueMaterial || _settings.HighContrast

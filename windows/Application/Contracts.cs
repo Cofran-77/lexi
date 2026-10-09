@@ -10,6 +10,8 @@ public interface IDictionaryLookup : IDisposable
 
 public interface IAiExpansion
 {
+    Task<string> TranslateAsync(string text, AppSettings config, CancellationToken cancellationToken = default);
+    Task<LookupResult> LookupWordAsync(string word, AppSettings config, CancellationToken cancellationToken = default);
     Task<LlmResult> GenerateExpansionAsync(string word, IReadOnlyList<string> modules,
         AppSettings config, CancellationToken cancellationToken = default, string? sourceExcerpt = null);
 }
@@ -28,8 +30,11 @@ public interface IVocabularyArchive : IDisposable
     void SaveExpansion(long id, LlmResult result);
     void RecordEncounter(long id);
     void MarkUnfamiliar(long id);
+    void MarkUnsure(long id);
+    void MarkForgot(long id);
     void ExecuteBatch(IEnumerable<long> ids, string action, int? targetStage = null);
     bool UndoLastReview(long wordId);
+    bool UndoLastLearningAction(long wordId);
     bool UndoMostRecentReview();
     void EditWord(long id, string translation);
     AppSettings LoadSettings();
@@ -55,3 +60,11 @@ public interface IArchiveBackups
     string Restore(string stagedPath, string targetPath);
     void ReleaseStage(string stagedPath);
 }
+
+public interface IQuoteArchive
+{
+    List<QuoteItem> GetQuotes(string search = "", int limit = 200, int offset = 0);
+    QuoteItem SaveQuote(long? id, string original, string translation, string source, string notes);
+    void DeleteQuote(long id);
+}
+

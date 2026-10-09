@@ -36,7 +36,7 @@ public partial class App : Application
         {
             var mainWindow = new MainWindow();
             desktop.MainWindow = mainWindow;
-            if (Environment.GetCommandLineArgs().Any(a => a is "--ui-smoke" or "--visual-test"))
+            if (Environment.GetCommandLineArgs().Any(a => a is "--ui-smoke" or "--visual-test" or "--learning-integration" or "--focus-integration" or "--quick-test" or "--ai-settings-test" or "--language-test"))
             {
                 var started = false;
                 mainWindow.Opened += async (_, _) =>
@@ -44,7 +44,12 @@ public partial class App : Application
                     if (started) return;
                     started = true;
                     await System.Threading.Tasks.Task.Delay(300);
-                    if (Environment.GetCommandLineArgs().Contains("--visual-test")) await VisualAcceptanceTests.RunAsync(mainWindow);
+                    if (Environment.GetCommandLineArgs().Contains("--language-test")) await LanguageUiTests.RunAsync(mainWindow);
+                    else if (Environment.GetCommandLineArgs().Contains("--ai-settings-test")) await AiSettingsUiTests.RunAsync(mainWindow);
+                    else if (Environment.GetCommandLineArgs().Contains("--quick-test")) await QuickActionUiTests.RunAsync(mainWindow);
+                    else if (Environment.GetCommandLineArgs().Contains("--focus-integration")) await FocusIntegrationTests.RunAsync(mainWindow);
+                    else if (Environment.GetCommandLineArgs().Contains("--learning-integration")) await LearningIntegrationTests.RunAsync(mainWindow);
+                    else if (Environment.GetCommandLineArgs().Contains("--visual-test")) await VisualAcceptanceTests.RunAsync(mainWindow);
                     else await UiSmokeTests.RunAsync(mainWindow);
                 };
             }
@@ -74,17 +79,16 @@ public partial class App : Application
             // Bind global hotkey Alt+D
             if (Hotkey != null)
             {
-                Hotkey.HotkeyPressed += () =>
+                Hotkey.QuickActionPressed += action =>
                 {
                     var source = OperatingSystem.IsWindows() ? Win32SelectionClipboard.CurrentForeground : 0;
-                    Dispatcher.UIThread.Post(async () =>
-                    {
-                        if (desktop.MainWindow is MainWindow win)
-                        {
-                            await win.HandleSelectionHotkeyAsync(source);
-                        }
-                    });
+                    Dispatcher.UIThread.Post(async () => { if (desktop.MainWindow is MainWindow win) await win.HandleQuickActionAsync(action, source); });
                 };
+            }
+
+            if (Hotkey != null)
+            {
+
             }
         }
 

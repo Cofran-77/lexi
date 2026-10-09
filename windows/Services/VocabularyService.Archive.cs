@@ -52,8 +52,8 @@ public sealed partial class VocabularyService
             checkCmd.Transaction = tx;
             checkCmd.CommandText = "CREATE TABLE IF NOT EXISTS schema_migrations (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL); SELECT COALESCE(MAX(version),0) FROM schema_migrations;";
             var version = Convert.ToInt32(checkCmd.ExecuteScalar());
-            if (version > 1) throw new InvalidDataException("词库来自更新版本，当前版本无法写入。");
-            if (version == 1)
+            if (version > 2) throw new InvalidDataException("词库来自更新版本，当前版本无法写入。");
+            if (version >= 1)
             {
                 InstallArchiveRevisionTrigger(tx);
                 tx.Commit();
@@ -439,5 +439,121 @@ public sealed partial class VocabularyService
         BackupWarning = "";
         return backupPath;
     }
+    /// <summary>回忆评价「模糊」：等级不变，保持今日到期，本轮内会再次出现。</summary>
+    public void MarkUnsure(long id) => MarkRecallOutcome(id, "unsure", resetToFirstStage: false);
+
+    /// <summary>回忆评价「忘记」：等级归零重新学，保持今日到期，本轮重学后再测。</summary>
+    public void MarkForgot(long id) => MarkRecallOutcome(id, "forgot", resetToFirstStage: true);
+
+    private void MarkRecallOutcome(long id, string action, bool resetToFirstStage)
+    {
+        var todayStr = DateTime.Today.ToString("yyyy-MM-dd");
+        // 忘记后重新通过时，下一次复习落在明天：把学习起点回拨一个初始间隔。
+        var restartStart = DateTime.Today.AddDays(-StageOffsets[0]).ToString("yyyy-MM-dd");
+        var nowStr = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+
+        using var tx = _connection.BeginTransaction();
+        try
+        {
+            int currentStage;
+            string currentStatus;
+            string? currentNextReview;
+            string currentStart;
+            string? currentLastReviewed;
+            int currentReviewCount;
+
+            using (var queryCmd = _connection.CreateCommand())
+            {
+                queryCmd.Transaction = tx;
+                queryCmd.CommandText = @"
+                    SELECT stage, status, next_review_date, learning_start_date, last_reviewed_at, review_count
+                    FROM words
+                    WHERE id = $id
+                ";
+                queryCmd.Parameters.AddWithValue("$id", id);
+                using var reader = queryCmd.ExecuteReader();
+                if (!reader.Read())
+                {
+                    throw new InvalidOperationException($"未找到 ID 为 {id} 的单词。");
+                }
+                currentStage = reader.GetInt32(0);
+                currentStatus = reader.GetString(1);
+                currentNextReview = reader.IsDBNull(2) ? null : reader.GetString(2);
+                currentStart = reader.GetString(3);
+                currentLastReviewed = reader.IsDBNull(4) ? null : reader.GetString(4);
+                currentReviewCount = reader.GetInt32(5);
+            }
+
+            var newStage = resetToFirstStage ? 0 : currentStage;
+            var newStart = resetToFirstStage ? restartStart : currentStart;
+
+            using (var logCmd = _connection.CreateCommand())
+            {
+                logCmd.Transaction = tx;
+                logCmd.CommandText = @"
+                    INSERT INTO review_logs (
+                        word_id, action, old_stage, new_stage, old_status, new_status,
+                        old_next_review_date, new_next_review_date,
+                        old_learning_start_date, new_learning_start_date,
+                        log_time, log_date
+                    ) VALUES (
+                        $wordId, $action, $oldStage, $newStage, $oldStatus, 'learning',
+                        $oldNext, $newNext, $oldStart, $newStart,
+                        $now, $today
+                    );
+                ";
+                logCmd.Parameters.AddWithValue("$wordId", id);
+                logCmd.Parameters.AddWithValue("$action", action);
+                logCmd.Parameters.AddWithValue("$oldStage", currentStage);
+                logCmd.Parameters.AddWithValue("$newStage", newStage);
+                logCmd.Parameters.AddWithValue("$oldStatus", currentStatus);
+                logCmd.Parameters.AddWithValue("$oldNext", (object?)currentNextReview ?? DBNull.Value);
+                logCmd.Parameters.AddWithValue("$newNext", todayStr);
+                logCmd.Parameters.AddWithValue("$oldStart", currentStart);
+                logCmd.Parameters.AddWithValue("$newStart", newStart);
+                logCmd.Parameters.AddWithValue("$now", nowStr);
+                logCmd.Parameters.AddWithValue("$today", todayStr);
+                logCmd.ExecuteNonQuery();
+            }
+
+            using (var snapshotCmd = _connection.CreateCommand())
+            {
+                snapshotCmd.Transaction = tx;
+                snapshotCmd.CommandText = @"
+                    INSERT INTO review_snapshots (log_id, last_reviewed_at, review_count)
+                    VALUES (last_insert_rowid(), $last, $count);
+                ";
+                snapshotCmd.Parameters.AddWithValue("$last", (object?)currentLastReviewed ?? DBNull.Value);
+                snapshotCmd.Parameters.AddWithValue("$count", currentReviewCount);
+                snapshotCmd.ExecuteNonQuery();
+            }
+
+            using (var updateCmd = _connection.CreateCommand())
+            {
+                updateCmd.Transaction = tx;
+                updateCmd.CommandText = @"
+                    UPDATE words
+                    SET stage = $stage, status = 'learning',
+                        next_review_date = $today, learning_start_date = $start
+                    WHERE id = $id;
+                ";
+                updateCmd.Parameters.AddWithValue("$stage", newStage);
+                updateCmd.Parameters.AddWithValue("$today", todayStr);
+                updateCmd.Parameters.AddWithValue("$start", newStart);
+                updateCmd.Parameters.AddWithValue("$id", id);
+                updateCmd.ExecuteNonQuery();
+            }
+
+            tx.Commit();
+        }
+        catch
+        {
+            tx.Rollback();
+            throw;
+        }
+
+        BackupCommittedState();
+    }
 }
+
 

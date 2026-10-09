@@ -1,4 +1,4 @@
-param([string]$Version = '1.1.3')
+param([string]$Version = '1.1.4')
 $ErrorActionPreference = 'Stop'
 $project = Split-Path $PSScriptRoot -Parent
 $outputs = Split-Path $project -Parent
@@ -16,7 +16,7 @@ $zip = [IO.Compression.ZipArchive]::new($stream, [IO.Compression.ZipArchiveMode]
 try {
   Get-ChildItem -LiteralPath $project -Recurse -File | ForEach-Object {
     $relative = [IO.Path]::GetRelativePath($project, $_.FullName)
-    if ($relative -match '(^|[\\/])(bin|obj|publish|work|\.git)([\\/])') { return }
+    if ($relative -match '(^|[\\/])(bin|obj|publish|work|target|\.git)([\\/])') { return }
     if ($relative -match '(vocab\.sqlite3|\.dpapi|\.env$|appsettings\.local\.json)') { throw "Unexpected private file: $relative" }
     $entry = $zip.CreateEntry('lexi_avalonia/' + $relative.Replace('\','/'), [IO.Compression.CompressionLevel]::Optimal)
     $entryStream = $entry.Open()

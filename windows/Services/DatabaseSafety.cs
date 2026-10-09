@@ -20,6 +20,7 @@ public static class DatabaseSafety
         schema.CommandText = "SELECT id,word,phonetic,translation,definition,notes,stage,status,created_at,learning_start_date,next_review_date,last_reviewed_at,review_count FROM words LIMIT 0; SELECT id,settings_json FROM app_settings LIMIT 0; SELECT id,word_id,action,old_stage,new_stage,old_status,new_status,old_next_review_date,new_next_review_date,old_learning_start_date,new_learning_start_date,log_time,log_date FROM review_logs LIMIT 0;";
         using (var reader = schema.ExecuteReader()) { do { while (reader.Read()) { } } while (reader.NextResult()); }
         ValidateWordRecords(source);
+        VocabularyService.ValidateQuoteSchema(source);
         schema.CommandText = "SELECT count(*) FROM sqlite_master WHERE name='review_snapshots' AND type='table'";
         if (Convert.ToInt32(schema.ExecuteScalar()) > 0)
         {
@@ -38,7 +39,7 @@ public static class DatabaseSafety
         {
             while (reader.Read())
             {
-                if (reader.IsDBNull(0) || reader.GetInt32(0) != 1) throw new InvalidDataException("词库版本不受支持，请使用匹配版本打开。");
+                if (reader.IsDBNull(0) || reader.GetInt32(0) is not (1 or 2)) throw new InvalidDataException("词库版本不受支持，请使用匹配版本打开。");
                 hasCurrent = true;
             }
         }

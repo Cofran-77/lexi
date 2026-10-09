@@ -4,12 +4,16 @@ using System.Threading;
 
 namespace Lexi;
 
+public enum QuickAction { Lookup, Translate, SaveQuote }
+public readonly record struct HotkeyRegistrationStatus(string Key, bool IsRegistered, string? Error)
+{ public string Shortcut => "Alt+" + Key; }
+
 public sealed class HotkeyService : IDisposable
 {
     private const int HotkeyId = 9001;
     private const uint ModAlt = 0x0001;
     private const uint ModNoRepeat = 0x4000;
-    private const uint VkD = 0x44; // 'D'
+    private const uint ReconfigureMessage = 0x8001;
     private const int WmHotkey = 0x0312;
 
     [DllImport("user32.dll", SetLastError = true)]
@@ -88,13 +92,39 @@ public sealed class HotkeyService : IDisposable
     private IntPtr _hwnd = IntPtr.Zero;
     private WndProcDelegate? _wndProc;
     private readonly ManualResetEventSlim _started = new(false);
-    private bool _isRegistered;
+    private readonly object _gate = new();
+    private string[] _keys = ["D", "A", "S"];
+    private HotkeyRegistrationStatus[] _statuses = [new("D", false, null), new("A", false, null), new("S", false, null)];
+    public event Action<QuickAction>? QuickActionPressed;
+    public event Action? RegistrationChanged;
+    public HotkeyRegistrationStatus GetStatus(QuickAction action) { lock (_gate) return _statuses[(int)action]; }
+    public void Configure(string lookup, string translate, string quote)
+    {
+        var keys = new[] {lookup, translate, quote}.Select(k => (k ?? "").Trim().ToUpperInvariant()).ToArray();
+        if (keys.Any(k => k.Length != 1 || k[0] < 'A' || k[0] > 'Z') || keys.Distinct().Count() != 3)
+            throw new ArgumentException("请选择三个不同的英文字母。");
+        lock (_gate) _keys = keys;
+        if (_hwnd != IntPtr.Zero) PostMessage(_hwnd, ReconfigureMessage, IntPtr.Zero, IntPtr.Zero);
+    }
+    private void RegisterConfiguredKeys()
+    {
+        lock (_gate)
+        {
+            for (var i = 0; i < 3; i++) UnregisterHotKey(_hwnd, HotkeyId + i);
+            for (var i = 0; i < 3; i++)
+            {
+                var ok = RegisterHotKey(_hwnd, HotkeyId + i, ModAlt | ModNoRepeat, _keys[i][0]);
+                _statuses[i] = new(_keys[i], ok, ok ? null : "被其他程序占用，仍可从应用内打开。");
+            }
+        }
+    }
 
-    public bool IsRegistered => _isRegistered;
+    public bool IsRegistered => GetStatus(QuickAction.Lookup).IsRegistered;
     public event Action? HotkeyPressed;
 
     public void Start()
     {
+        if (_thread != null) return;
         if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
         {
             return;
@@ -138,12 +168,7 @@ public sealed class HotkeyService : IDisposable
 
             if (_hwnd != IntPtr.Zero)
             {
-                _isRegistered = RegisterHotKey(_hwnd, HotkeyId, ModAlt | ModNoRepeat, VkD);
-                if (!_isRegistered)
-                {
-                    // Try without MOD_NOREPEAT on older systems
-                    _isRegistered = RegisterHotKey(_hwnd, HotkeyId, ModAlt, VkD);
-                }
+                RegisterConfiguredKeys();
             }
 
             _started.Set();
@@ -164,14 +189,17 @@ public sealed class HotkeyService : IDisposable
     {
         if (msg == 0x0010)
         {
-            UnregisterHotKey(hWnd, HotkeyId);
+            for (var i = 0; i < 3; i++) UnregisterHotKey(hWnd, HotkeyId + i);
             DestroyWindow(hWnd);
             PostQuitMessage(0);
             return IntPtr.Zero;
         }
-        if (msg == WmHotkey && wParam.ToInt32() == HotkeyId)
+        if (msg == ReconfigureMessage) { RegisterConfiguredKeys(); RegistrationChanged?.Invoke(); return IntPtr.Zero; }
+        if (msg == WmHotkey && wParam.ToInt32() >= HotkeyId && wParam.ToInt32() < HotkeyId + 3)
         {
-            HotkeyPressed?.Invoke();
+            var action = (QuickAction)(wParam.ToInt32() - HotkeyId);
+            QuickActionPressed?.Invoke(action);
+            if (action == QuickAction.Lookup) HotkeyPressed?.Invoke();
             return IntPtr.Zero;
         }
 

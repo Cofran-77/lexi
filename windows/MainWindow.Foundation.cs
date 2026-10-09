@@ -234,6 +234,7 @@ public partial class MainWindow
     {
         if (_pendingRestore == null || _restoring) return;
         _restoring = true;
+        ++_captureEpoch; _quickCard?.Close(); _quickCard = null; ExitFocus(); _learningAudio?.Stop(); StopWindowsLearningAudio();
         _filterTimer.Stop();
         IsEnabled = false;
         RestoreConfirmBtn.IsEnabled = RestoreCancelBtn.IsEnabled = false;
@@ -244,7 +245,7 @@ public partial class MainWindow
         var replacementInstalled = false;
         try
         {
-            ++_lookupVersion; _aiCts?.Cancel();
+            CancelLookupFallback(); CancelAiConnectionTest(); _aiCts?.Cancel();
             foreach (var cts in _rowAiRequests.Values) cts.Cancel();
             // Freeze the selected file before CreateManualBackup rotates the oldest snapshot.
             staged = await Task.Run(() => _backups.Stage(selection, Path.GetDirectoryName(path)!));
@@ -258,7 +259,10 @@ public partial class MainWindow
             _settings = _vocabService.LoadSettings();
             _allWords.Clear();
             _reviewHandled.Clear();
-            RefreshWords(); LoadSettingsToUi(); UpdateLookupArchiveState();
+            _reviewRoundStarted = false;
+            _reviewUndo = null;
+            ReloadLearningPlans();
+            RefreshWords(); LoadSettingsToUi(); UpdateLookupArchiveState(); _quotePageIndex=0; if (_currentPage=="quotes") RenderQuotes();
             if (_currentPage == "review") OpenReviewDeck();
             _currentExpansion = null;
             LookupResultCard.IsVisible = LookupNotFoundCard.IsVisible = false;
@@ -281,7 +285,7 @@ public partial class MainWindow
                 {
                     _vocabService = ServiceFactory.OpenArchive(path); serviceDisposed = false;
                     _settings = _vocabService.LoadSettings();
-                    _allWords.Clear(); RefreshWords(); LoadSettingsToUi(); UpdateLookupArchiveState();
+                    _allWords.Clear(); RefreshWords(); LoadSettingsToUi(); UpdateLookupArchiveState(); _quotePageIndex=0; if (_currentPage=="quotes") RenderQuotes();
                     SetStatus(replacementInstalled
                         ? "备份已替换词库，但界面刷新未完整完成；当前已重新打开恢复后的词库。原库保存在 before-restore 文件夹。" + ex.Message
                         : "恢复未完成，当前词库已重新打开。" + ex.Message);

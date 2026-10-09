@@ -103,7 +103,7 @@ object PdfExporter {
             if(entries.isEmpty()) page!!.canvas.drawText("暂无词条", 46f, y + 25f, text)
             entries.forEach { entry ->
                 val word = layout(listOf(entry.word, entry.phonetic).filter(String::isNotBlank).joinToString("\n"), 142)
-                val meaning = layout(listOf(entry.translation, entry.definition).filter(String::isNotBlank).joinToString("\n"), 189)
+                val meaning = layout(entry.translation, 189)
                 val layouts = listOf(word, meaning); val indexes = intArrayOf(0,0); var first = true
                 while(first || indexes.indices.any { indexes[it] < layouts[it].lineCount }) {
                     if(y + 40f > 784f) next()

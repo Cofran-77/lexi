@@ -39,6 +39,6 @@ internal fun ContextPicker(vm: LexiViewModel) {
             label = { Text("自定义语境") },
             placeholder = { Text("例如：软件开发团队的日常沟通，用词自然简洁") }
         )
-        Text("选择后点击下方“保存设置”，后续生成将采用此语境。", style = MaterialTheme.typography.bodySmall)
+        Text("指定这个词实际使用的场合与表达方式，不是例句讨论的话题。选择后点击“保存设置”。", style = MaterialTheme.typography.bodySmall)
     }
 }

@@ -35,9 +35,11 @@ object ArchiveCsv {
         val decoder = Charsets.UTF_8.newDecoder().onMalformedInput(CodingErrorAction.REPORT).onUnmappableCharacter(CodingErrorAction.REPORT)
         val rows = parse(decoder.decode(ByteBuffer.wrap(bytes)).toString().removePrefix("\uFEFF"))
         require(rows.isNotEmpty()) { "CSV 为空" }
-        val names = rows.first().map { when(it.trim()) { "word" -> "单词"; "translation", "释义" -> "中文释义"; "phonetic" -> "音标"; else -> it.trim() } }
+        val legacy = rows.first().any { it.trim() in listOf("档案标识", "AI例句", "AI同义词", "AI反义词", "AI词组") }
+        val aliases = mapOf("学习阶段" to "阶段", "创建时间" to "入库日期", "学习开始日期" to "学习起始日期", "下次重逢日期" to "下次复习日期", "档案标识" to "UUID", "来源标题" to "来源", "首次收藏UTC" to "创建时间UTC", "最近遇见UTC" to "最后遇见时间UTC", "修订版本" to "版本")
+        val names = rows.first().map { aliases[it.trim()] ?: it }.map { when(it.trim()) { "word" -> "单词"; "translation", "释义" -> "中文释义"; "phonetic" -> "音标"; else -> it.trim() } }
         require(names.size == names.toSet().size && "单词" in names) { "CSV 需要单词列，且列名不能重复" }
-        require(names.all { it in headers }) { "CSV 包含不支持的列名" }
+        require(names.all { it in headers || (legacy && it in listOf("AI例句", "AI同义词", "AI反义词", "AI词组")) }) { "CSV 包含不支持的列名" }
         return rows.drop(1).filterNot { it.all(String::isBlank) }.mapIndexed { index, values ->
             require(values.size == names.size) { "CSV 第 ${index + 2} 行列数不一致" }
             val row = names.zip(values.map(::unprotect)).toMap(); val base = Entry()
@@ -46,15 +48,22 @@ object ArchiveCsv {
             fun pairs(en: String, zh: String): List<Pair<String,String>> {
                 val left = unpack(s(en)); val right = unpack(s(zh)); require(left.size == right.size) { "CSV $en 与 $zh 数量不一致" }; return left.zip(right)
             }
-            val status = s("状态", "learning"); val stage = num("阶段", if(status == "mastered") 5 else 0)
-            val hasAi = s("包含AI扩展", if(listOf("例句英文", "同义词", "反义词", "常用词组").any { s(it).isNotEmpty() }) "是" else "否")
+            fun legacyList(name: String) = s(name).split("; ").filter(String::isNotBlank)
+            fun legacyPairs(name: String) = s(name).split('\n').filter(String::isNotBlank).map { line ->
+                val separator = line.indexOf(" / ")
+                if (separator < 0) line to "" else line.substring(0, separator) to line.substring(separator + 3)
+            }
+            val status = when(val raw = s("状态", "learning")) { "学习中" -> "learning"; "已掌握" -> "mastered"; else -> raw }; val stage = num("阶段", if(status == "mastered") 5 else 0)
+            val hasAi = s("包含AI扩展", if(listOf("例句英文", "同义词", "反义词", "常用词组", "AI例句", "AI同义词", "AI反义词", "AI词组").any { s(it).isNotEmpty() }) "是" else "否")
             require(hasAi in listOf("是", "否")) { "包含AI扩展应为是或否" }
             Entry(word = s("单词").trim(), phonetic = s("音标"), translation = s("中文释义"), definition = s("英文释义"), notes = s("备注"),
                 stage = stage, status = status, createdAt = s("入库日期", base.createdAt), learningStartDate = s("学习起始日期", base.learningStartDate),
                 nextReviewDate = if (row.containsKey("下次复习日期")) s("下次复习日期").ifBlank { null } else if(status == "mastered") null else base.nextReviewDate,
                 lastReviewedAt = s("上次复习时间").ifBlank { null }, reviewCount = num("复习次数", 0),
-                archive = ArchiveMetadata(uuid = s("UUID", base.archive.uuid), sourceType = s("来源类型"), sourceTitle = s("来源"), sourceExcerpt = s("来源原句"), tags = unpack(s("标签")), encounterCount = num("遇见次数", 1), revision = num("版本", 1), createdAtUtc = s("创建时间UTC", base.archive.createdAtUtc), updatedAtUtc = s("更新时间UTC", base.archive.updatedAtUtc), lastEncounteredAtUtc = s("最后遇见时间UTC", base.archive.lastEncounteredAtUtc)),
-                aiResult = if (hasAi == "否") null else AIResult(examples = pairs("例句英文", "例句中文").map { Example(it.first,it.second) }, synonyms = unpack(s("同义词")), antonyms = unpack(s("反义词")), phrases = pairs("常用词组", "词组中文").map { Phrase(it.first,it.second) }))
+                archive = ArchiveMetadata(uuid = s("UUID", base.archive.uuid), sourceType = s("来源类型"), sourceTitle = s("来源"), sourceExcerpt = s("来源原句"), tags = if (legacy) legacyList("标签") else unpack(s("标签")), encounterCount = num("遇见次数", 1), revision = num("版本", 1), createdAtUtc = s("创建时间UTC", base.archive.createdAtUtc), updatedAtUtc = s("更新时间UTC", base.archive.updatedAtUtc), lastEncounteredAtUtc = s("最后遇见时间UTC", base.archive.lastEncounteredAtUtc)),
+                aiResult = if (hasAi == "否") null else if (legacy) AIResult(
+                    examples = legacyPairs("AI例句").map { Example(it.first, it.second) }, synonyms = legacyList("AI同义词"), antonyms = legacyList("AI反义词"), phrases = legacyPairs("AI词组").map { Phrase(it.first, it.second) }
+                ) else AIResult(examples = pairs("例句英文", "例句中文").map { Example(it.first,it.second) }, synonyms = unpack(s("同义词")), antonyms = unpack(s("反义词")), phrases = pairs("常用词组", "词组中文").map { Phrase(it.first,it.second) }))
         }.also(ArchiveJson::validate)
     }
     private fun parse(source: String): List<List<String>> {

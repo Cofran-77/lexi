@@ -487,6 +487,10 @@ fun LexiApp(vm: LexiViewModel, onExport: (String, Set<Long>?) -> Unit, onImport:
                 }
                 Toggle("减少动态效果", vm.reduceMotion) { vm.reduceMotion = it }
             }
+            SettingsGroup("选词即查", "选中文字 → 更多 → Lexi 查词") {
+                Text("在阅读器、浏览器等应用长按选中英文，打开文字菜单中的“更多”，选择“Lexi 查词”，即可自动查询。", style = MaterialTheme.typography.bodyMedium)
+                Text("菜单由原应用和系统决定；未显示时，可使用“分享 → Lexi”。无需开启悬浮窗或无障碍权限。", style = MaterialTheme.typography.bodySmall)
+            }
             SettingsGroup("AI 服务", "${vm.config.provider} · ${vm.config.model}") {
                 Box {
                     OutlinedButton(onClick = { providerMenu = true }) { Text("服务预设：${vm.config.provider}") }
@@ -520,7 +524,7 @@ fun LexiApp(vm: LexiViewModel, onExport: (String, Set<Long>?) -> Unit, onImport:
                 Text("私人档案位置", style = MaterialTheme.typography.labelLarge)
                 Text(vm.dataLocation, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            SettingsGroup("关于 Lexi", "0.2.1 · Android Alpha") {
+            SettingsGroup("关于 Lexi", "0.2.2 · Android Alpha") {
                 Text("为日常阅读留下一本私人词汇档案。\n本地保存 · 无需账户 · 无自动同步", style = MaterialTheme.typography.bodyMedium)
                 Text("离线词典：ECDICT（MIT License）。手机与平板根据窗口宽度自动适配。", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }

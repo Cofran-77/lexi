@@ -1,54 +1,54 @@
 # 发布许可与文档修订 · 2026-10-09
 
-当前原创内容改按 PolyForm Noncommercial 1.0.0 分发，保留作者商业授权权利；历史 MIT 授权不追溯撤回。重写项目与平台介绍，补齐许可沿革及教材授权核对说明。应用功能版本仍为 Windows 1.2.4、Android 0.2.2。
+当前原创内容改按 PolyForm Noncommercial 1.0.0 分发，保留作者商业授权权利；许可适用范围和沿革见 [LICENSE-POLICY.md](LICENSE-POLICY.md)。重写项目与平台介绍，补齐许可沿革及教材授权核对说明。应用功能版本仍为 Windows 1.2.4、Android 0.2.2。
 
 # 重要版本更新
 
-本文件精选适合公开发布的里程碑。所有 11 个 Windows、6 个 Android 快照均进入 Git 历史，完整索引见 [VERSION_HISTORY](docs/VERSION_HISTORY.md)。公开归档经过资源与隐私筛选，不是原始内部完整资料包。历史发布日期不伪造，公开 Release 使用实际发布日。
+本文件记录重要开发里程碑。旧 Release 下载已下架，当前下载见 [Releases](https://github.com/Cofran-77/lexi/releases)。所有 11 个 Windows、6 个 Android 快照均进入 Git 历史，完整索引见 [VERSION_HISTORY](docs/VERSION_HISTORY.md)。公开归档经过资源与隐私筛选，不是原始内部完整资料包。历史发布日期不伪造，公开 Release 使用实际发布日。
 
 ## Windows
 
-### [1.2.4 · 最新修复](https://github.com/Cofran-77/lexi/releases/tag/windows-v1.2.4)
+### 1.2.4 · 最新修复
 
 - 修复菜单动作已经创建目标页，却被全页模糊快照遮住的问题。
 - 玻璃材质限定到小浮框内部，正文背景保持清晰；关闭锚点脱离的菜单也能清理状态与图片。
 - 延续 1.2.3 的统一阅读宽度、完整设置页/计划表单、辅助拼写、金句本及原主题。
 - 此公开包去掉第三方 IELTS 教材/录音；可使用离线查词与个人档案，并按资源指南添加自己有权使用的资料。
 
-### [1.2.0 · 桌面重构与长期学习](https://github.com/Cofran-77/lexi/releases/tag/windows-v1.2.0)
+### 1.2.0 · 桌面重构与长期学习
 
 - 重构计划、学习工作区与档案式教材页面，收敛按钮层级并适配窄窗。
 - 今日重逢、计划学习、多来源到期与 FSRS-6 长期排期进一步整合，保留轮内强化、撤销和会话持久化。
 - 明确本地参数训练助手与自包含 Windows 安装打包流程。
 - 后续 1.2.1–1.2.4 修复了快捷键、页面可读性和浮框问题；日常使用优先最新版本。
 
-### [1.1.4 · 学习系统迁移节点](https://github.com/Cofran-77/lexi/releases/tag/windows-v1.1.4)
+### 1.1.4 · 学习系统迁移节点
 
 - 接入专注学习、每日计划、拼写、教材工作区、句子翻译与金句本等 macOS 功能参考。
 - 引入长期记忆模型及训练桥接，仍有界面/恢复能力边界，后续版本继续完善。
 - 兼容已有档案与跨端 CSV。具体历史实现以此标签源码为准，不把当时固定排期与新模型过渡描述成完全同步的算法。
 
-### [1.0.0 · 桌面源码基线](https://github.com/Cofran-77/lexi/releases/tag/windows-v1.0.0)
+### 1.0.0 · 桌面源码基线
 
 - 保存早期 Windows 桌面查词、词汇档案、复习、AI 与本地数据实现，作为后续迁移和界面改进的对照。
 - 此节点以源码归档为主，不推荐用它替换当前修复版。
 
 ## Android
 
-### [0.2.2-alpha · 最新预览](https://github.com/Cofran-77/lexi/releases/tag/android-v0.2.2)
+### 0.2.2-alpha · 最新预览
 
 - 与 Windows 1.1.3 起统一 29 列 CSV，兼容旧 CSV 与双语字段。
 - PROCESS_TEXT 入口显示“Lexi 查词”，连续接收传入词自动查询；未认证全部阅读器/荣耀设备的菜单支持。
 - 例句语境强调目标词的实际用法；默认复习 PDF 只打印中文释义，完整档案 PDF/CSV 保留双语内容。
 - 仍使用固定第 1、2、4、7、15 天复习规则，**尚未迁移 Windows FSRS-6**。
 
-### [0.2.0-alpha · 原生布局与 PDF](https://github.com/Cofran-77/lexi/releases/tag/android-v0.2.0)
+### 0.2.0-alpha · 原生布局与 PDF
 
 - 更紧凑的原生顶部栏、字号和操作层级；手机详情与平板双栏，草稿保存及明确编辑流程。
 - 原生 PdfDocument 直接导出多页 A4 PDF、系统文件位置选择，不依赖联网或远程网页。
 - 保留本地档案、复习、AI、备份恢复与旧迁移入口。
 
-### [0.1.0-alpha · Android 首个归档基线](https://github.com/Cofran-77/lexi/releases/tag/android-v0.1.0)
+### 0.1.0-alpha · Android 首个归档基线
 
 - Kotlin + Jetpack Compose 原生项目，基于 Windows 档案/查词功能的移动实现。
 - 保存离线词典、档案、固定排期复习、可配置 AI、导出与本地数据基础能力。

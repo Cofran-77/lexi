@@ -613,10 +613,21 @@ public sealed class FsrsParameterOptimizer : IFSRSParameterOptimizer
             catch (System.ComponentModel.Win32Exception) { }
         });
 
+        Exception? pipeError = null;
+        async Task<byte[]> ReadGuardedAsync(Stream stream, int limit)
+        {
+            try { return await ReadStreamWithLimitAsync(stream, limit, token); }
+            catch (FsrsOptimizationException ex)
+            {
+                Interlocked.CompareExchange(ref pipeError, ex, null);
+                linkedCts.Cancel();
+                throw;
+            }
+        }
         try
         {
-            var stdoutTask = ReadStreamWithLimitAsync(process.StandardOutput.BaseStream, Options.MaxStdoutBytes, token);
-            var stderrTask = ReadStreamWithLimitAsync(process.StandardError.BaseStream, Options.MaxStderrBytes, token);
+            var stdoutTask = ReadGuardedAsync(process.StandardOutput.BaseStream, Options.MaxStdoutBytes);
+            var stderrTask = ReadGuardedAsync(process.StandardError.BaseStream, Options.MaxStderrBytes);
 
             await process.StandardInput.BaseStream.WriteAsync(requestJsonBytes, token);
             await process.StandardInput.BaseStream.FlushAsync(token);
@@ -651,6 +662,8 @@ public sealed class FsrsParameterOptimizer : IFSRSParameterOptimizer
         catch (OperationCanceledException)
         {
             await CleanupProcessTreeAsync(process, Options.CleanupWaitBudget);
+
+            if (pipeError is { } exceeded) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(exceeded).Throw();
 
             if (timeoutCts.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
             {

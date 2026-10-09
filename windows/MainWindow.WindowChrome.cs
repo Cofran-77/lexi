@@ -1,4 +1,4 @@
-using Avalonia;
+﻿using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
@@ -23,6 +23,8 @@ public partial class MainWindow
             MaximizeGlyph.Data = Geometry.Parse(maximized
                 ? "M 5,3 L 13,3 L 13,11 M 3,5 L 11,5 L 11,13 L 3,13 Z"
                 : "M 3,3 L 13,3 L 13,13 L 3,13 Z");
+            ToolTip.SetTip(MaximizeBtn, maximized ? "还原" : "最大化");
+            Avalonia.Automation.AutomationProperties.SetName(MaximizeBtn, maximized ? "还原" : "最大化");
         };
         AddHandler(PointerPressedEvent, (_, e) =>
         {

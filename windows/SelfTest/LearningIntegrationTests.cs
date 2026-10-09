@@ -68,7 +68,7 @@ public static class LearningIntegrationTests
 
     private static async Task VerifyLearningPage(MainWindow window, Action<bool,string> check)
     {
-        check(window.FindControl<Panel>("PagesHost")!.Children.OfType<ScrollViewer>().Any(p => p.IsVisible),
+        check(window.FindControl<Panel>("PagesHost")!.Children.Any(p => p.Name == "LearningHubPage" && p.IsVisible),
             "learning page is reachable through actual page host");
         object? Call(string name, params object[] args) => typeof(MainWindow)
             .GetMethod(name, BindingFlags.NonPublic | BindingFlags.Instance)!.Invoke(window, args);
@@ -113,6 +113,37 @@ public static class LearningIntegrationTests
         }
         RevealAndRate(StudyRating.Known);
         check(!session.Round.IsFinished && session.Round.CurrentStreak == 1, "plan UI requires three recognitions");
+        await Task.Delay(100);
+        using (var studyBitmap = new RenderTargetBitmap(new PixelSize((int)window.Bounds.Width, (int)window.Bounds.Height), new Vector(96,96)))
+        {
+            studyBitmap.Render(window);
+            studyBitmap.Save(Path.Combine(Environment.GetEnvironmentVariable("LEXI_DATA_DIR")!, "study-active.png"));
+        }
+        var studyHost = Field<Grid>("_studyWorkspaceHost");
+        check(studyHost.RowDefinitions.Count == 3 && studyHost.Children.OfType<ScrollViewer>().Single().Bounds.Height > 0,
+            "study workspace keeps bounded content between fixed header and footer");
+        window.FindControl<Button>("ThemeToggleBtn")!.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        await Task.Delay(100);
+        using (var studyBitmap = new RenderTargetBitmap(new PixelSize((int)window.Bounds.Width, (int)window.Bounds.Height), new Vector(96,96)))
+        {
+            studyBitmap.Render(window);
+            studyBitmap.Save(Path.Combine(Environment.GetEnvironmentVariable("LEXI_DATA_DIR")!, "study-dark.png"));
+        }
+        window.FindControl<Button>("ThemeToggleBtn")!.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        window.Width = 760; window.Height = 520; await Task.Delay(100);
+        typeof(MainWindow).GetField("_planAnswerVisible", BindingFlags.NonPublic | BindingFlags.Instance)!.SetValue(window, true);
+        Call("RenderDailyLearning"); await Task.Delay(100);
+        using (var studyBitmap = new RenderTargetBitmap(new PixelSize((int)window.Bounds.Width, (int)window.Bounds.Height), new Vector(96,96)))
+        {
+            studyBitmap.Render(window);
+            studyBitmap.Save(Path.Combine(Environment.GetEnvironmentVariable("LEXI_DATA_DIR")!, "study-narrow.png"));
+        }
+        var ratingButtons = studyHost.GetLogicalDescendants().OfType<Button>()
+            .Where(b => b.Content?.ToString() is "忘记了 (1)" or "模糊 (2)" or "认识 (3)").ToList();
+        check(ratingButtons.Count == 3 && ratingButtons.All(b => b.TranslatePoint(default, window) is { } p
+            && p.X >= 0 && p.X + b.Bounds.Width <= window.Bounds.Width && p.Y + b.Bounds.Height <= window.Bounds.Height),
+            "three neutral rating actions remain entirely visible at 760 by 520");
+        window.Width = 1100; window.Height = 760;
         Call("ShowPage", "lookup"); Call("ShowPage", "learning");
         check(session.Round.CurrentStreak == 1, "plan streak survives navigation");
         RevealAndRate(StudyRating.Known); RevealAndRate(StudyRating.Known);
@@ -124,6 +155,8 @@ public static class LearningIntegrationTests
         var path = Path.Combine(Path.GetDirectoryName(Field<IVocabularyArchive>("_vocabService").DatabasePath)!, "daily-plans.json");
         check(new DailyStudyPlanStore(path).Load()[0].Status == DailyStudyPlanStatus.Completed,
             "completed plan is saved to disk by UI");
+        check(studyHost.GetLogicalDescendants().OfType<Button>().Any(b => b.Content?.ToString() == "撤销上一次" && b.IsEnabled),
+            "finished batch exposes an actual enabled undo action");
         Call("UndoDailyLearning");
         check(!session.Round.IsFinished && new DailyStudyPlanStore(path).Load()[0].Status == DailyStudyPlanStatus.Active,
             "UI undo restores both plan file and learning round");

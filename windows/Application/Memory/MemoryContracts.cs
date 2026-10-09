@@ -127,6 +127,14 @@ public interface ILearningMemoryStore
     }
 
     // —— FSRS ——
+    bool InvalidateCanonicalWithMutations(string canonicalId, DateTime atUtc,
+        LearningInteractionEvent undoEvent, MemorySessionCheckpoint? checkpoint,
+        IReadOnlyList<PendingMutation> mutations)
+        => throw new NotSupportedException("存储不支持原子撤销与跨存储进度。");
+    void AppendEventWithMutations(LearningInteractionEvent e, MemorySessionCheckpoint? checkpoint,
+        IReadOnlyList<PendingMutation> mutations)
+        => throw new NotSupportedException("存储不支持原子事件与跨存储进度。");
+
     FsrsCardState? GetCard(string wordKey);
     bool HasCard(string wordKey);
     IReadOnlyList<DueCard> QueryDue(DateTime nowUtc, int limit);

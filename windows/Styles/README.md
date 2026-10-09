@@ -1,52 +1,30 @@
-# Lexi 0.2.1 · 界面与词卡
+﻿# Lexi 1.2.0 · 样式与窗口系统设计
 
-`VisualTheme.axaml` 是完整可用的 Avalonia 11 全局样式，包含浅色/暗色资源字典、字体、半透明卡片、渐变边缘、阴影、按钮模板、焦点辉光及胶囊样式。在 `App.axaml` 的 FluentTheme 后引入。
+`VisualTheme.axaml` 是符合 Windows 桌面规范与 macOS 核心产品契约的完整 Avalonia 11 全局样式系统。在 `App.axaml` 的 FluentTheme 之后引入。
 
-## 词卡结构
+## 1. 按钮层次与设计契约 (Spec 第12节)
 
-完整生产布局见 `MainWindow.axaml` 的 `LookupResultCard`，不是独立演示页。以下为实际结构的精简片段（完整命名控件和事件在主窗口）：
+遵循现代 Windows 桌面交互规范，彻底杜绝“每个次要按钮都是浅蓝底看起来像已选中”的问题：
 
-```xml
-<Border Name="LookupResultCard" Classes="card">
-  <StackPanel Spacing="14">
-    <TextBlock Name="ResultWordText" FontSize="32" TextWrapping="Wrap"/>
-    <WrapPanel Name="ResultPosPanel"/>
-    <TextBlock Name="ResultTranslationText" FontSize="15" TextWrapping="Wrap"/>
-    <WrapPanel>
-      <CheckBox Name="AiOptExamples" Classes="capsule" Content="例句 (1–3 句)"/>
-      <CheckBox Name="AiOptSynonyms" Classes="capsule" Content="同义词 (3–5 个)"/>
-      <CheckBox Name="AiOptAntonyms" Classes="capsule" Content="反义词 (2–4 个)"/>
-      <Button Name="AiGenerateBtn" Classes="secondary" Content="生成"/>
-    </WrapPanel>
-    <Button Name="AiDrawerToggleBtn" Classes="ghost" Content="展开扩展 ↓"/>
-    <Border Name="AiDrawerSlot" Classes="drawer-slot"
-            Height="0" Opacity="0" IsVisible="False" ClipToBounds="True">
-      <Border Name="AiResultBox" Padding="16,14">
-        <StackPanel Spacing="12">
-          <StackPanel Name="AiResultExamplesContainer" Spacing="6"/>
-          <WrapPanel Name="AiResultSynonymsPanel"/>
-          <WrapPanel Name="AiResultAntonymsPanel"/>
-        </StackPanel>
-      </Border>
-    </Border>
-  </StackPanel>
-</Border>
-```
+| 按钮类型 / 类名 | 默认态 | 悬停态 (PointerOver) | 按下态 (Pressed) | 焦点态 (FocusVisible) | 语义与规则 |
+|---|---|---|---|---|---|
+| **默认 / 次要按钮** (`Button`, `Button.secondary`) | 中性白/深蓝灰表面 (`CardBrush`), 中性细边 (`LineBrush`), 中性墨色字 (`InkBrush`) | 轻微中性提亮 (`TintBrush`), 边框微调 (`MutedBorderBrush`) | 微深按压表面 (`PressedTintBrush`), `scale(0.97)` | 细蓝色对焦环 (`PrimaryGreen`, 1px), 柔和辉光 | 普通操作与次级动作，**绝不带有强调蓝色底** |
+| **任务主动作** (`Button.primary`) | 实心蓝底 (`PrimaryGreen`: #245FAD / #93C5F8), 高对比文字 (`OnPrimaryBrush`) | 饱和蓝悬停 (`PrimaryGreenHover`) | 深蓝按下 (`PrimaryGreenPressed`), `scale(0.97)` | 聚焦微光环 (`FocusGlowShadow`), 保留实心底 | 当前任务区域**唯一**最重要的下一步，每个区域最多一个 |
+| **幽灵次动作** (`Button.ghost`) | 透明背景, 次要文字 (`MutedBrush`), 无边框 | 浅中性底 (`TintBrush`), 主文字色 (`InkBrush`) | 按压底 (`PressedTintBrush`), `scale(0.97)` | 细对焦环 | 辅助操作、折叠展开、取消动作 |
+| **危险 / 删除** (`Button.danger`) | 中性表面, 红色警示字 (`DangerBrush`), 红细边 (`DangerBorder`) | 实心危险红 (`DangerBrush`), 白字 | 深红按下 (`DangerPressedBrush`), 白字 | 红色聚焦环 | 不可逆删除与销毁动作 |
+| **选中筛选 / 切换** (`Button.filter-active`, `Button.selected`, `ToggleButton:checked`) | 低饱和冰蓝底 (`SelectionBrush`), 细天蓝边框 (`FilterSelectedBorderBrush`), 粗体蓝字 (`PrimaryGreen`) | 保持浅蓝底微深 (`FilterSelectedHoverBrush`), 强调蓝字 | 浅蓝按压底 (`FilterSelectedPressedBrush`), `scale(0.97)` | 聚焦环 | 持久选中状态，与普通按钮及主动作样式**明确物理分离** |
+| **禁用态** (`:disabled`) | `Opacity: 0.45`, `Cursor: Arrow`, 中性边与字 | 无反馈 | 无反馈 | 无焦点 | 不可执行状态 |
 
-`MainWindow.axaml.cs` 的 `RenderExpansion` 将例句绘制为独立 `example-card`，英文 15px / 24px 行高、中文 13px / 21px 行高；所有前景色使用动态主题样式，切换系统主题不会保留错误颜色。
+## 2. 窗口标题栏与控件 (Spec 12.4)
 
-同反义词由 `micro-capsule` Button 呈现，Click 只调用 `PerformLookupAsync`，不会调用 AI。`RenderPartOfSpeech` 从已有词典信息提取词性，不生成假词性。
+- **紧凑 Windows 标尺**：`Button.window-control` 采用无边框、无大圆角、矩形贴靠标题栏设计 (46×32 DIP)。
+- **关闭按钮中性规范**：`Button.window-control.close` **默认完全中性透明，无红块**；仅在鼠标悬停时显现系统危险红 (`#E81123`)、按下时深红 (`#C42B1C`)，图标居中矢量 Path 变为纯白。
+- **快捷卡唯一关闭入口**：`QuickCardWindow` 使用 `ExtendClientAreaChromeHints.NoChrome` 消除双重标题栏，右上角单套紧凑 Windows 关闭按钮，内容区不再重复放置关闭按钮。
 
-`OpenDrawerAsync` / `CloseDrawerAsync`：260ms 展开、200ms 收起，CubicEaseOut；先测量内容高度，完成后恢复自动高度以适应换行。版本号取消旧动画，快速连击以最后一次请求为准。收起不丢弃本次结果，重新展开无需再次调用 API；换词会清理旧扩展。
+## 3. 浅深主题与无障碍支持
 
-按钮按下 80ms 缩至 0.96，恢复 200ms 使用轻微回弹曲线；微胶囊悬浮上移 1px、按下下沉并缩至 0.94。没有持续动画。搜索清除按钮在有内容时淡入并进入键盘焦点序列，无内容时不可点击且不可聚焦。
-
-生词本每行通过 `WordItem.IsExpanded` 独立展开，复选框仍只负责批量选择。展开状态仅属于当前界面，不改数据库和复习进度。
-
-## 材质与验收边界
-
-窗口依次请求 Mica / AcrylicBlur / Blur / None，核心内容只有一个裁剪圆角根容器；具体系统材质由 Windows 版本和透明效果设置决定。关闭到托盘、Alt+D、非置顶、单实例仍沿用原实现。默认软件渲染，未承诺内存低于 15 MB。
-
-`--visual-test` 必须配置隔离目录 `LEXI_DATA_DIR`：验证真实渲染按钮、抽屉连击、独立展开及主题更新，并生成截图。测试使用固定示例，不发送付费 AI 请求。`--ui-smoke` 验证基础流程，执行前退出占用 Alt+D 的 Lexi 实例。
-
-发布：.NET 8 SDK 执行 `dotnet publish -c Release -r win-x64 --self-contained true -o publish`；使用 PowerShell 7 执行 `packaging/build-installer.ps1 -Nsis <makensis.exe完整路径>`。可用 `-Dotnet` 指定 SDK 程序路径。目标机器无需安装 .NET 或 WebView2。
+- **双主题完整映射**：Light (冷白/深蓝灰) 与 Dark (深蓝夜空/冰蓝) 均具备完备的状态画刷字典。
+- **无障碍降级**：
+  - `HighContrast` 模式：完整映射到黑白高对比度前背景。
+  - `reduce-motion` 模式：消除所有 `Transitions` 动画，按下不再发生位移缩放。
+  - `OpaqueMaterial` 模式：透明度与材质安全回退为纯色不透明表面。

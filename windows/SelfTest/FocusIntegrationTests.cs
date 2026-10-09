@@ -42,11 +42,13 @@ public static class FocusIntegrationTests
             Call("ExitFocus"); Check(!Field<bool>("_focusActive") && window.FindControl<ScrollViewer>("PageLookup")!.IsVisible, "exit restores lookup visibility");
             var catalog = IeltsCatalog.Load(); Check(catalog.Sections.Count > 0 && catalog.AllWords.Any(), "IELTS catalog deployed with entries");
             Call("ShowIeltsCatalog"); Call("ShowIeltsResources");
-            Check(Field<StackPanel>("_ieltsPageContent").Children.Count > 0 && Field<ScrollViewer>("_ieltsPage").IsVisible,
+            Check(Field<StackPanel>("_ieltsSubContent").Children.Count > 0 && Field<Grid>("_ieltsPage").IsVisible,
                 "IELTS resources stay on the independent IELTS page");
             Call("ShowIeltsWriting"); Check(catalog.Sentences.Count == 100, "writing resource exercises available");
             Call("ShowIeltsCatalog");
-            Check(Field<ListBox>("_ieltsSections").SelectedItem is LearningSection, "IELTS actual chapter selector selects catalog section");
+            var workspace = Field<Lexi.Features.Ielts.IeltsWorkspaceControl>("_ieltsWorkspace");
+            Check(workspace.GetType().GetField("_selectedSection", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(workspace) is LearningSection,
+                "IELTS actual chapter selector selects catalog section");
             var entry = catalog.AllWords.First(w => !string.IsNullOrWhiteSpace(w.AudioPath));
             Call("StartLearningTyping", new List<LearningWord> { entry }, false);
             Field<TextBox>("_learningTypingInput").Text = entry.Word; Call("SubmitLearningTyping");

@@ -42,7 +42,7 @@ public static class RecallCardTests
             C<TextBox>("VocabSearchInput").Text = "does-not-match-anything";
             w.Width = 840; w.Height = 600;
             Click("NavReview");
-            check(C<TextBlock>("ReviewWordText").Text == "recall-one" && C<TextBlock>("ReviewRemainingText").Text?.StartsWith("已完成 0 / 2") == true, "recall ignores archive filters and excludes future words");
+            check(C<TextBlock>("ReviewWordText").Text == "recall-one" && C<TextBlock>("ReviewRemainingText").Text?.StartsWith("已完成 0 / 2") == true, "recall ignores archive filters and excludes future words; actual=" + C<TextBlock>("ReviewWordText").Text + " / " + C<TextBlock>("ReviewRemainingText").Text);
             check(!C<Border>("ReviewAnswer").IsVisible && C<TextBlock>("ReviewMeaningText").Text == "" && !C<Grid>("ReviewRatingBar").IsVisible, "recall front does not disclose answer or ratings");
             var before = store.GetAllWords().Single(x => x.Word == "recall-one");
             await (Task)Call("RateReviewAsync", true)!;
@@ -53,7 +53,7 @@ public static class RecallCardTests
             await Snapshot("review-back-long");
             var button = C<Button>("ReviewRememberBtn"); var corner = button.TranslatePoint(new Point(button.Bounds.Width, button.Bounds.Height), w);
             check(button.IsEffectivelyVisible && corner.HasValue && corner.Value.Y < 600 && corner.Value.X < 840, "long answer keeps rating actions inside 840x600");
-            Sql("CREATE TRIGGER recall_fail BEFORE UPDATE ON words BEGIN SELECT RAISE(ABORT,'fixture write blocked'); END;");
+            Sql("CREATE TRIGGER recall_fail BEFORE INSERT ON fsrs_cards BEGIN SELECT RAISE(ABORT,'fixture write blocked'); END;");
             try
             {
                 await (Task)Call("RateReviewAsync", true)!;
@@ -82,7 +82,8 @@ public static class RecallCardTests
             await Task.WhenAll(first, second);
             check(partialEntry, "next recall card enters progressively instead of flashing fully visible");
             check(monotonic && C<Border>("ReviewCard").Opacity == 1, "card opacity is monotonic across exit and entry with no snap-back");
-            check(store.GetAllWords().Single(x => x.Id == before.Id).Stage == before.Stage + 1, "double rating commits exactly one stage");
+            var ratedKey = WordKeyResolver.FromArchive(store.GetAllWords().Single(x => x.Id == before.Id)).Key;
+            check(store.GetAllWords().Single(x => x.Id == before.Id).Stage == before.Stage && ServiceFactory.OpenMemory(store).GetCard(ratedKey)?.Reps == 1, "double rating commits exactly one FSRS review without advancing legacy stage");
             check(C<TextBlock>("ReviewWordText").Text == "recall-two" && C<TextBlock>("ReviewMeaningText").Text == "", "next card hides its answer");
 
             Click("ReviewRoundUndoBtn");
@@ -93,7 +94,7 @@ public static class RecallCardTests
             await (Task)Call("RateReviewAsync", true)!;
             store.ExecuteBatch([before.Id], "today");
             Call("RefreshWords"); Click("NavLookup"); Click("NavReview");
-            check(C<TextBlock>("ReviewWordText").Text != "recall-one", "legacy today action cannot override an FSRS due date");
+            check(ServiceFactory.OpenMemory(store).GetCard(firstKey)?.NextReviewAtUtc?.ToLocalTime().Date == DateTime.Today, "explicit today action overrides the actual FSRS due date");
 
             Click("ReviewRevealBtn"); Click("NavLookup"); Click("NavReview");
             check(!C<Border>("ReviewAnswer").IsVisible, "re-entering deck hides current answer");

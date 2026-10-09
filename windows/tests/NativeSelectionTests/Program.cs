@@ -19,7 +19,7 @@ internal static class Program
                 Clipboard.SetText("lexi-test-original");
                 input.Focus(); input.SelectAll(); SetForegroundWindow(form.Handle);
                 await Task.Delay(150);
-                var selection = await new SelectionCaptureService(new Win32SelectionClipboard()).CaptureAsync(form.Handle);
+                var selection = await new SelectionCaptureService(new TraceClipboard(new Win32SelectionClipboard())).CaptureAsync(form.Handle);
                 if (selection != "resilient") throw new Exception("native selected text missing");
                 if (Clipboard.GetText() != "lexi-test-original") throw new Exception("native clipboard restore failed");
                 Console.WriteLine("PASS real Win32 Ctrl+C selected text and original clipboard restoration");
@@ -32,5 +32,17 @@ internal static class Program
             finally { original.Restore(original.Sequence); form.Close(); }
         };
         Application.Run(form);
+    }
+
+    private sealed class TraceClipboard(ISelectionClipboard inner) : ISelectionClipboard
+    {
+        public nint Foreground => inner.Foreground;
+        public bool ModifiersReleased => inner.ModifiersReleased;
+        public uint Sequence => inner.Sequence;
+        public bool TrySnapshot() { var ok = inner.TrySnapshot(); Console.WriteLine($"DIAGNOSTIC snapshot={ok}"); return ok; }
+        public bool SendCopy() { var ok = inner.SendCopy(); Console.WriteLine($"DIAGNOSTIC copy={ok}"); return ok; }
+        public (string? Text,uint Sequence) ReadText(nint source) { var r=inner.ReadText(source); Console.WriteLine($"DIAGNOSTIC text={r.Text}, sequence={r.Sequence}"); return r; }
+        public bool Restore(uint expectedSequence,nint source=0) => inner.Restore(expectedSequence,source);
+        public void Dispose() => inner.Dispose();
     }
 }

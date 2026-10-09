@@ -50,6 +50,7 @@ public partial class MainWindow
     private void ApplyUiLanguage()
     {
         UiText.Apply(_settings.UiLanguage);
+        RefreshIeltsLanguage();
         LanguageToggleBtn.Content = _settings.UiLanguage == "en" ? "中" : "EN";
         Title = UiText.Redisplay(Title);
         foreach (var control in this.GetLogicalDescendants().OfType<Control>())

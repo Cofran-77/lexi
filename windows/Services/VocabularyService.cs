@@ -304,6 +304,22 @@ public sealed partial class VocabularyService : IVocabularyArchive, IQuoteArchiv
             list.Add(item);
         }
 
+        reader.Close();
+        using var cards = _connection.CreateCommand();
+        cards.CommandText = $"SELECT {CardColumns} FROM fsrs_cards";
+        var memoryCards = new Dictionary<string, FsrsCardState>(StringComparer.Ordinal);
+        using (var cardReader = cards.ExecuteReader())
+            while (cardReader.Read()) { var card = ReadCard(cardReader); memoryCards[card.WordKey] = card; }
+        foreach (var word in list)
+        {
+            if (!memoryCards.TryGetValue(WordKeyResolver.FromArchive(word).Key, out var card)) continue;
+            word.UsesAdaptiveSchedule = true;
+            word.NextReviewDate = word.Status == "mastered" ? null : card.NextReviewAtUtc?.ToLocalTime().ToString("yyyy-MM-dd");
+            word.LastReviewedAt = card.LastReviewAtUtc?.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss");
+            // Older UI versions also wrote a legacy count for the same canonical.
+            // Keep that history without counting those overlapping writes twice.
+            word.ReviewCount = Math.Max(word.ReviewCount, checked((int)card.Reps));
+        }
         return list;
     }
 
@@ -587,6 +603,7 @@ public sealed partial class VocabularyService : IVocabularyArchive, IQuoteArchiv
                     logCmd.Parameters.AddWithValue("$now", nowStr);
                     logCmd.Parameters.AddWithValue("$today", todayStr);
                     logCmd.ExecuteNonQuery();
+                    SyncCardDueToLocalDate(tx, item.Id, today.AddDays(StageOffsets[0]), "manual-restart");
                 }
                 break;
 
@@ -628,6 +645,16 @@ public sealed partial class VocabularyService : IVocabularyArchive, IQuoteArchiv
                     logCmd.Parameters.AddWithValue("$newStart", startDateStr);
                     logCmd.Parameters.AddWithValue("$now", nowStr);
                     logCmd.ExecuteNonQuery();
+                    using var logIdentity = _connection.CreateCommand(); logIdentity.Transaction = tx;
+                    logIdentity.CommandText = "SELECT last_insert_rowid()";
+                    var todayLogId = Convert.ToInt64(logIdentity.ExecuteScalar());
+                    using var todaySnapshot = _connection.CreateCommand(); todaySnapshot.Transaction = tx;
+                    todaySnapshot.CommandText = "INSERT INTO review_snapshots(log_id,last_reviewed_at,review_count) VALUES($log,$last,$count)";
+                    todaySnapshot.Parameters.AddWithValue("$log", todayLogId);
+                    todaySnapshot.Parameters.AddWithValue("$last", (object?)item.LastReviewedAt ?? DBNull.Value);
+                    todaySnapshot.Parameters.AddWithValue("$count", item.ReviewCount);
+                    todaySnapshot.ExecuteNonQuery();
+                    ApplyTodayMemoryOverride(tx, item.Id, todayLogId);
                 }
                 break;
 
@@ -701,6 +728,7 @@ public sealed partial class VocabularyService : IVocabularyArchive, IQuoteArchiv
                         logCmd.Parameters.AddWithValue("$now", nowStr);
                         logCmd.Parameters.AddWithValue("$today", todayStr);
                         logCmd.ExecuteNonQuery();
+                        SyncCardDueToLocalDate(tx, item.Id, today.AddDays(StageOffsets[stageVal]), "manual-stage");
                     }
                 }
                 break;
@@ -864,7 +892,7 @@ public sealed partial class VocabularyService : IVocabularyArchive, IQuoteArchiv
             SELECT l.id, l.old_stage, l.old_status, l.old_next_review_date, l.old_learning_start_date,
                    s.last_reviewed_at, s.review_count, s.log_id
             FROM review_logs l LEFT JOIN review_snapshots s ON s.log_id=l.id
-            WHERE l.word_id = $wordId AND (l.action IN ('batch_review', 'unfamiliar', 'unsure', 'forgot') OR ($includeMaster = 1 AND l.action = 'batch_master'))
+            WHERE l.word_id = $wordId AND (l.action IN ('batch_review', 'unfamiliar', 'unsure', 'forgot') OR ($includeMaster = 1 AND l.action IN ('batch_master','batch_today')))
               AND l.id = (SELECT MAX(id) FROM review_logs WHERE word_id=$wordId)
             LIMIT 1
         ";
@@ -886,6 +914,8 @@ public sealed partial class VocabularyService : IVocabularyArchive, IQuoteArchiv
         int? oldReviewCount = reader.IsDBNull(6) ? null : reader.GetInt32(6);
         var hasSnapshot = !reader.IsDBNull(7);
         reader.Close();
+
+        if (!UndoTodayMemoryOverride(tx, logId)) return false;
 
         // Legacy logs do not have snapshots. Reconstruct the last timestamp from the
         // preceding actions that changed it (both review and mark-mastered do so).

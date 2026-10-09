@@ -21,6 +21,7 @@ public partial class MainWindow
     private DateTime _reviewDay = DateTime.Today;
     private WordItem? _reviewWord;
     private bool _reviewRevealed;
+    private bool _reviewRestoreRevealed;
     private bool _reviewBusy;
     private int _reviewEpoch;
 
@@ -44,15 +45,27 @@ public partial class MainWindow
 
     private void OpenReviewDeck()
     {
+        try { OpenReviewDeckCore(); }
+        catch (Exception ex)
+        {
+            _reviewWord = null; _reviewRoundStarted = false;
+            ReviewCardHost.IsVisible = false; ReviewEmptyCard.IsVisible = true;
+            ReviewRevealBtn.IsVisible = ReviewRatingBar.IsVisible = false;
+            SetStatus("复习断点暂时无法恢复，原记录已保留：" + ex.Message);
+        }
+    }
+
+    private void OpenReviewDeckCore()
+    {
         ++_reviewEpoch;
         var due = GetPendingReviewWords();
         var changedExternally = _allWords.Count != _reviewVersions.Count || _allWords.Any(w => !_reviewVersions.TryGetValue(w.Id, out var revision) || revision != w.Archive.Revision);
         if (!_reviewRoundStarted || changedExternally || _reviewRound.IsFinished && due.Count > 0)
         {
             _reviewRound.Reset(due.Select(w => w.Id), StudyMode.Review);
-            BeginReviewMemory(due.Count);
-            _reviewRoundStarted = true;
             _reviewUndo = null;
+            BeginReviewMemoryCore(due.Count, !_reviewRoundStarted);
+            _reviewRoundStarted = true;
             CaptureReviewVersions();
         }
         RenderReviewCard();
@@ -64,6 +77,7 @@ public partial class MainWindow
         var dueIds = DueArchiveIds();
         return _allWords.Where(w => dueIds.Contains(w.Id)
             && (!_reviewHandled.TryGetValue(w.Id, out var handledRevision) || handledRevision != w.Archive.Revision))
+            .Concat(SourceDueWords().Where(w => !_reviewHandled.ContainsKey(w.Id)))
             .OrderBy(w => w.NextReviewDate).ThenBy(w => w.Id).ToList();
     }
 
@@ -75,17 +89,17 @@ public partial class MainWindow
         if (!_reviewRoundStarted)
         {
             _reviewRound.Reset(due.Select(w => w.Id), StudyMode.Review);
+            _reviewUndo = null;
             BeginReviewMemory(due.Count);
             _reviewRoundStarted = true;
-            _reviewUndo = null;
             CaptureReviewVersions();
         }
         NavReviewBadge.Text = due.Count.ToString();
-        _reviewWord = _reviewRound.HasCurrent ? _allWords.FirstOrDefault(w => w.Id == _reviewRound.Current) : null;
+        _reviewWord = _reviewRound.HasCurrent ? ResolveReviewWord(_reviewRound.Current) : null;
         while (_reviewRound.HasCurrent && _reviewWord == null)
         {
             _reviewRound.CompleteCurrent();
-            _reviewWord = _reviewRound.HasCurrent ? _allWords.FirstOrDefault(w => w.Id == _reviewRound.Current) : null;
+            _reviewWord = _reviewRound.HasCurrent ? ResolveReviewWord(_reviewRound.Current) : null;
         }
         _reviewRevealed = false;
         ReviewRemainingText.Text = $"已完成 {_reviewRound.Completed} / {_reviewRound.Total} · 连续认识 {_reviewRound.CurrentStreak} / {_reviewRound.CurrentTarget}";
@@ -101,6 +115,7 @@ public partial class MainWindow
         ReviewPhoneticText.Text = _reviewWord?.Phonetic ?? "";
         ReviewHintText.Text = "先回忆再揭晓。首次认识即可完成；模糊或忘记后需连续认识三次。";
         PresentReviewMemory(_reviewWord);
+        if (_reviewRestoreRevealed) { _reviewRestoreRevealed = false; RevealReview(); }
         if (resetPose) SetReviewPose(0, 1);
         if (_reviewWord != null && _currentPage == "review") ReviewRevealBtn.Focus();
     }
@@ -140,6 +155,7 @@ public partial class MainWindow
         ReviewRevealBtn.IsVisible = false;
         ReviewHintText.Text = "按刚才的回忆判断，不必勉强。";
         ReviewRememberBtn.Focus();
+        PersistLearningSurface("review");
     }
 
     private Task RateReviewAsync(bool remembered) => RateReviewRatingAsync(remembered ? StudyRating.Known : StudyRating.Forgot);
@@ -160,16 +176,12 @@ public partial class MainWindow
             var result = _reviewRound.Commit(rating);
             RateReviewMemory(rating, before, result.Streak, result.Completed);
             memoryRated = true;
-            var persisted = false;
-            if (result.Completed) { _vocabService.ExecuteBatch([word.Id], "review"); persisted = true; }
-            else if (rating == StudyRating.Forgot) { _vocabService.MarkForgot(word.Id); persisted = true; }
-            else if (rating == StudyRating.Unsure) { _vocabService.MarkUnsure(word.Id); persisted = true; }
             _reviewUndo = checkpoint;
             _reviewUndoWord = word.Id;
-            _reviewUndoPersisted = persisted;
+            _reviewUndoPersisted = false;
             RefreshWords();
             CaptureReviewVersions();
-            var updated = _allWords.FirstOrDefault(w => w.Id == word.Id);
+            var updated = ResolveReviewWord(word.Id);
             _reviewUndoRevision = updated?.Archive.Revision ?? -1;
             if (result.Completed && updated != null) _reviewHandled[word.Id] = updated.Archive.Revision;
             UpdateReviewBadge();
@@ -183,7 +195,8 @@ public partial class MainWindow
                 SetReviewPose(0, 1);
             }
             else if (epoch == _reviewEpoch) RenderReviewCard();
-            SetStatus(result.Completed ? "已完成本轮并更新复习排期。" : rating == StudyRating.Forgot ? "连击已清零，将在本轮重学；已安排明日重逢。" : rating == StudyRating.Unsure ? "连击减一，将在本轮稍后再出现。" : "认识次数已记录，继续累计三次。" );
+            PersistLearningSurface("review");
+            SetStatus(result.Completed ? "已完成本轮并更新 FSRS 排期。" : rating == StudyRating.Forgot ? "连击已清零，将在本轮重学。" : rating == StudyRating.Unsure ? "连击减一，将在本轮稍后再出现。" : "认识次数已记录，继续累计三次。" );
         }
         catch (Exception ex)
         {
@@ -199,8 +212,8 @@ public partial class MainWindow
         if (_reviewUndo == null || _reviewBusy || _restoring || !_databaseAvailable) return;
         try
         {
-            var latest = _vocabService.GetAllWords().FirstOrDefault(w => w.Id == _reviewUndoWord);
-            if (latest == null || latest.Archive.Revision != _reviewUndoRevision)
+            var latest = ResolveReviewWord(_reviewUndoWord);
+            if (latest == null || _reviewUndoWord >= 0 && latest.Archive.Revision != _reviewUndoRevision)
             {
                 _reviewUndo = null;
                 RefreshWords(); OpenReviewDeck();
@@ -214,6 +227,7 @@ public partial class MainWindow
             _reviewHandled.Remove(_reviewUndoWord);
             _reviewUndo = null;
             RefreshWords(); CaptureReviewVersions(); RenderReviewCard();
+            PersistLearningSurface("review");
             SetStatus("已撤销上一次评价与对应排期变更。");
         }
         catch (Exception ex) { SetStatus("撤销未完成：" + ex.Message); }

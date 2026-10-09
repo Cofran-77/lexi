@@ -1,9 +1,9 @@
-<Styles xmlns="https://github.com/avaloniaui"
+﻿<Styles xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
   <Styles.Resources>
     <ResourceDictionary>
       <CornerRadius x:Key="ControlRadius">10</CornerRadius>
-      <CornerRadius x:Key="CardRadius">18</CornerRadius>
+      <CornerRadius x:Key="CardRadius">12</CornerRadius>
       <Thickness x:Key="ControlPadding">13,7</Thickness>
       <Thickness x:Key="CardPadding">20</Thickness>
       <FontFamily x:Key="BodyFont">avares://Avalonia.Fonts.Inter/Assets#Inter, Microsoft YaHei UI</FontFamily>
@@ -22,12 +22,12 @@
         <!-- Glacier-white surfaces and deep blue accents match the macOS product palette. -->
         <ResourceDictionary x:Key="Light">
           <SolidColorBrush x:Key="DialogSurfaceBrush">#F6F9FD</SolidColorBrush>
-          <SolidColorBrush x:Key="PaperBrush">#F0F5FC</SolidColorBrush>
-          <SolidColorBrush x:Key="CardBrush">#E8FFFFFF</SolidColorBrush>
+          <SolidColorBrush x:Key="PaperBrush">#F5F6F8</SolidColorBrush>
+          <SolidColorBrush x:Key="CardBrush">#FFFFFF</SolidColorBrush>
           <SolidColorBrush x:Key="InkBrush">#1B2D43</SolidColorBrush>
           <SolidColorBrush x:Key="MutedBrush">#455B74</SolidColorBrush>
-          <SolidColorBrush x:Key="TintBrush">#E8F0FA</SolidColorBrush>
-          <SolidColorBrush x:Key="LineBrush">#CDDAE9</SolidColorBrush>
+          <SolidColorBrush x:Key="TintBrush">#ECEEF1</SolidColorBrush>
+          <SolidColorBrush x:Key="LineBrush">#D9DDE3</SolidColorBrush>
           <SolidColorBrush x:Key="OnPrimaryBrush">#FFFFFF</SolidColorBrush>
           <SolidColorBrush x:Key="PrimaryGreen">#245FAD</SolidColorBrush>
           <SolidColorBrush x:Key="PrimaryGreenHover">#1E5299</SolidColorBrush>
@@ -39,6 +39,21 @@
           <SolidColorBrush x:Key="PosBrush">#E9F0F8</SolidColorBrush>
           <SolidColorBrush x:Key="PosVerbBrush">#DCEBFA</SolidColorBrush>
           <SolidColorBrush x:Key="PosModifierBrush">#E3E9F5</SolidColorBrush>
+
+          <!-- Neutral button pressed & border refinement -->
+          <SolidColorBrush x:Key="PressedTintBrush">#DFE3E8</SolidColorBrush>
+          <SolidColorBrush x:Key="MutedBorderBrush">#CBD2DC</SolidColorBrush>
+          <!-- Filter / selected item distinct state -->
+          <SolidColorBrush x:Key="FilterSelectedBorderBrush">#8AB4F8</SolidColorBrush>
+          <SolidColorBrush x:Key="FilterSelectedHoverBrush">#D0E3F7</SolidColorBrush>
+          <SolidColorBrush x:Key="FilterSelectedPressedBrush">#C2DBF3</SolidColorBrush>
+          <!-- Window caption button pressed -->
+          <SolidColorBrush x:Key="CaptionButtonPressedBrush">#D0D5DD</SolidColorBrush>
+          <!-- Danger actions -->
+          <SolidColorBrush x:Key="DangerBrush">#D32F2F</SolidColorBrush>
+          <SolidColorBrush x:Key="DangerHoverBrush">#C62828</SolidColorBrush>
+          <SolidColorBrush x:Key="DangerPressedBrush">#B71C1C</SolidColorBrush>
+          <SolidColorBrush x:Key="DangerBorder">#E0483A</SolidColorBrush>
 
           <LinearGradientBrush x:Key="CardBorderGradient" StartPoint="0%,0%" EndPoint="100%,100%">
             <GradientStop Color="#80FFFFFF" Offset="0.0"/>
@@ -56,10 +71,10 @@
         <ResourceDictionary x:Key="Dark">
           <SolidColorBrush x:Key="DialogSurfaceBrush">#202C3D</SolidColorBrush>
           <SolidColorBrush x:Key="PaperBrush">#182232</SolidColorBrush>
-          <SolidColorBrush x:Key="CardBrush">#E8202C3D</SolidColorBrush>
+          <SolidColorBrush x:Key="CardBrush">#202C3D</SolidColorBrush>
           <SolidColorBrush x:Key="InkBrush">#E8F0FC</SolidColorBrush>
           <SolidColorBrush x:Key="MutedBrush">#ACBED4</SolidColorBrush>
-          <SolidColorBrush x:Key="TintBrush">#263A52</SolidColorBrush>
+          <SolidColorBrush x:Key="TintBrush">#2C3542</SolidColorBrush>
           <SolidColorBrush x:Key="LineBrush">#3C516B</SolidColorBrush>
           <SolidColorBrush x:Key="OnPrimaryBrush">#14243A</SolidColorBrush>
           <SolidColorBrush x:Key="PrimaryGreen">#93C5F8</SolidColorBrush>
@@ -72,6 +87,21 @@
           <SolidColorBrush x:Key="PosBrush">#293C53</SolidColorBrush>
           <SolidColorBrush x:Key="PosVerbBrush">#264463</SolidColorBrush>
           <SolidColorBrush x:Key="PosModifierBrush">#333F5B</SolidColorBrush>
+
+          <!-- Neutral button pressed & border refinement -->
+          <SolidColorBrush x:Key="PressedTintBrush">#243142</SolidColorBrush>
+          <SolidColorBrush x:Key="MutedBorderBrush">#4A6382</SolidColorBrush>
+          <!-- Filter / selected item distinct state -->
+          <SolidColorBrush x:Key="FilterSelectedBorderBrush">#4A6E99</SolidColorBrush>
+          <SolidColorBrush x:Key="FilterSelectedHoverBrush">#325277</SolidColorBrush>
+          <SolidColorBrush x:Key="FilterSelectedPressedBrush">#253F5D</SolidColorBrush>
+          <!-- Window caption button pressed -->
+          <SolidColorBrush x:Key="CaptionButtonPressedBrush">#334356</SolidColorBrush>
+          <!-- Danger actions -->
+          <SolidColorBrush x:Key="DangerBrush">#E57373</SolidColorBrush>
+          <SolidColorBrush x:Key="DangerHoverBrush">#EF5350</SolidColorBrush>
+          <SolidColorBrush x:Key="DangerPressedBrush">#E53935</SolidColorBrush>
+          <SolidColorBrush x:Key="DangerBorder">#E57373</SolidColorBrush>
 
           <LinearGradientBrush x:Key="CardBorderGradient" StartPoint="0%,0%" EndPoint="100%,100%">
             <GradientStop Color="#35FFFFFF" Offset="0.0"/>
@@ -107,7 +137,7 @@
   </Style>
 
   <Style Selector="TextBlock.eyebrow">
-    <Setter Property="FontSize" Value="10"/>
+    <Setter Property="FontSize" Value="12"/>
     <Setter Property="FontWeight" Value="SemiBold"/>
     <Setter Property="Foreground" Value="{DynamicResource MutedBrush}"/>
     <Setter Property="Margin" Value="0,0,0,4"/>
@@ -121,6 +151,11 @@
 
   <!-- Global Buttons: Press 80ms to 0.96 scale, Restore 200ms with SplineEasing subtle rebound, no continuous animation -->
   <Style Selector="Button">
+    <Setter Property="Background" Value="{DynamicResource CardBrush}"/>
+    <Setter Property="Foreground" Value="{DynamicResource InkBrush}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource LineBrush}"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="MinHeight" Value="32"/>
     <Setter Property="Theme" Value="{StaticResource LexiButtonTheme}"/>
     <Setter Property="HorizontalContentAlignment" Value="Center"/>
     <Setter Property="VerticalContentAlignment" Value="Center"/>
@@ -152,11 +187,14 @@
   </Style>
 
   <Style Selector="Button:pointerover">
-    <Setter Property="Opacity" Value="0.92"/>
+    <Setter Property="Background" Value="{DynamicResource TintBrush}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource MutedBorderBrush}"/>
+    <Setter Property="Foreground" Value="{DynamicResource InkBrush}"/>
   </Style>
 
   <Style Selector="Button:pressed">
-    <Setter Property="RenderTransform" Value="scale(0.96)"/>
+    <Setter Property="Background" Value="{DynamicResource PressedTintBrush}"/>
+    <Setter Property="RenderTransform" Value="scale(0.97)"/>
     <Setter Property="Transitions">
       <Transitions>
         <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.08" Easing="CubicEaseOut"/>
@@ -164,6 +202,7 @@
     </Setter>
   </Style>
 
+  <!-- Primary Action: Solid Blue (Only for the primary task action) -->
   <Style Selector="Button.primary">
     <Setter Property="Background" Value="{DynamicResource PrimaryGreen}"/>
     <Setter Property="Foreground" Value="{DynamicResource OnPrimaryBrush}"/>
@@ -172,24 +211,35 @@
   </Style>
   <Style Selector="Button.primary:pointerover">
     <Setter Property="Background" Value="{DynamicResource PrimaryGreenHover}"/>
+    <Setter Property="Foreground" Value="{DynamicResource OnPrimaryBrush}"/>
     <Setter Property="Opacity" Value="1"/>
   </Style>
   <Style Selector="Button.primary:pressed">
     <Setter Property="Background" Value="{DynamicResource PrimaryGreenPressed}"/>
+    <Setter Property="Foreground" Value="{DynamicResource OnPrimaryBrush}"/>
+    <Setter Property="RenderTransform" Value="scale(0.97)"/>
   </Style>
 
+  <!-- Secondary Action: Explicitly Neutral (Non-blue, neutral surface & border) -->
   <Style Selector="Button.secondary">
-    <Setter Property="Background" Value="{DynamicResource TintBrush}"/>
-    <Setter Property="Foreground" Value="{DynamicResource PrimaryGreen}"/>
+    <Setter Property="Background" Value="{DynamicResource CardBrush}"/>
+    <Setter Property="Foreground" Value="{DynamicResource InkBrush}"/>
     <Setter Property="BorderBrush" Value="{DynamicResource LineBrush}"/>
     <Setter Property="BorderThickness" Value="1"/>
     <Setter Property="FontWeight" Value="Medium"/>
   </Style>
   <Style Selector="Button.secondary:pointerover">
-    <Setter Property="BorderBrush" Value="{DynamicResource PrimaryGreen}"/>
+    <Setter Property="Background" Value="{DynamicResource TintBrush}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource MutedBorderBrush}"/>
+    <Setter Property="Foreground" Value="{DynamicResource InkBrush}"/>
     <Setter Property="Opacity" Value="1"/>
   </Style>
+  <Style Selector="Button.secondary:pressed">
+    <Setter Property="Background" Value="{DynamicResource PressedTintBrush}"/>
+    <Setter Property="RenderTransform" Value="scale(0.97)"/>
+  </Style>
 
+  <!-- Ghost Action: Minimal borderless, muted text -->
   <Style Selector="Button.ghost">
     <Setter Property="Background" Value="Transparent"/>
     <Setter Property="Foreground" Value="{DynamicResource MutedBrush}"/>
@@ -199,6 +249,51 @@
     <Setter Property="Foreground" Value="{DynamicResource InkBrush}"/>
     <Setter Property="Background" Value="{DynamicResource TintBrush}"/>
     <Setter Property="Opacity" Value="1"/>
+  </Style>
+  <Style Selector="Button.ghost:pressed">
+    <Setter Property="Foreground" Value="{DynamicResource InkBrush}"/>
+    <Setter Property="Background" Value="{DynamicResource PressedTintBrush}"/>
+    <Setter Property="RenderTransform" Value="scale(0.97)"/>
+  </Style>
+
+  <!-- Danger Action: Neutral default with red text, solid red on hover/pressed -->
+  <Style Selector="Button.danger">
+    <Setter Property="Background" Value="{DynamicResource CardBrush}"/>
+    <Setter Property="Foreground" Value="{DynamicResource DangerBrush}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource DangerBorder}"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="FontWeight" Value="Medium"/>
+  </Style>
+  <Style Selector="Button.danger:pointerover">
+    <Setter Property="Background" Value="{DynamicResource DangerBrush}"/>
+    <Setter Property="Foreground" Value="#FFFFFF"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource DangerBrush}"/>
+    <Setter Property="Opacity" Value="1"/>
+  </Style>
+  <Style Selector="Button.danger:pressed">
+    <Setter Property="Background" Value="{DynamicResource DangerPressedBrush}"/>
+    <Setter Property="Foreground" Value="#FFFFFF"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource DangerPressedBrush}"/>
+    <Setter Property="RenderTransform" Value="scale(0.97)"/>
+  </Style>
+
+  <!-- Selected Filter & Toggle State: Distinct low-saturation blue, separated from neutral buttons -->
+  <Style Selector="Button.filter-active, Button.selected, ToggleButton.filter:checked">
+    <Setter Property="Background" Value="{DynamicResource SelectionBrush}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource FilterSelectedBorderBrush}"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="Foreground" Value="{DynamicResource PrimaryGreen}"/>
+    <Setter Property="FontWeight" Value="SemiBold"/>
+  </Style>
+  <Style Selector="Button.filter-active:pointerover, Button.selected:pointerover, ToggleButton.filter:checked:pointerover">
+    <Setter Property="Background" Value="{DynamicResource FilterSelectedHoverBrush}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource PrimaryGreen}"/>
+    <Setter Property="Foreground" Value="{DynamicResource PrimaryGreen}"/>
+  </Style>
+  <Style Selector="Button.filter-active:pressed, Button.selected:pressed, ToggleButton.filter:checked:pressed">
+    <Setter Property="Background" Value="{DynamicResource FilterSelectedPressedBrush}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource PrimaryGreen}"/>
+    <Setter Property="RenderTransform" Value="scale(0.97)"/>
   </Style>
 
   <!-- Navigation Sidebar Buttons -->
@@ -218,20 +313,24 @@
     <Setter Property="Opacity" Value="1"/>
   </Style>
   <Style Selector="Button.nav.active">
-    <Setter Property="Background" Value="{DynamicResource TintBrush}"/>
+    <Setter Property="Background" Value="{DynamicResource SelectionBrush}"/>
     <Setter Property="Foreground" Value="{DynamicResource PrimaryGreen}"/>
     <Setter Property="FontWeight" Value="SemiBold"/>
   </Style>
 
-  <!-- Window Caption Buttons (Minimize/Close with centered vector Path) -->
+  <!-- Window Caption Buttons (Windows compact titlebar controls: minimize, maximize, close) -->
   <Style Selector="Button.window-control">
     <Setter Property="Background" Value="Transparent"/>
     <Setter Property="BorderThickness" Value="0"/>
-    <Setter Property="CornerRadius" Value="8"/>
+    <Setter Property="CornerRadius" Value="0"/>
     <Setter Property="Padding" Value="0"/>
-    <Setter Property="Width" Value="34"/>
-    <Setter Property="Height" Value="34"/>
-    <Setter Property="Cursor" Value="Hand"/>
+    <Setter Property="Width" Value="46"/>
+    <Setter Property="Height" Value="32"/>
+    <Setter Property="Foreground" Value="{DynamicResource InkBrush}"/>
+    <Setter Property="Cursor" Value="Arrow"/>
+  </Style>
+  <Style Selector="Button.window-control Path">
+    <Setter Property="Stroke" Value="{DynamicResource MutedBrush}"/>
   </Style>
   <Style Selector="Button.window-control:pointerover">
     <Setter Property="Background" Value="{DynamicResource TintBrush}"/>
@@ -240,14 +339,42 @@
   <Style Selector="Button.window-control:pointerover Path">
     <Setter Property="Stroke" Value="{DynamicResource InkBrush}"/>
   </Style>
+  <Style Selector="Button.window-control:pressed">
+    <Setter Property="Background" Value="{DynamicResource CaptionButtonPressedBrush}"/>
+    <Setter Property="RenderTransform" Value="scale(1)"/>
+  </Style>
+  <Style Selector="Button.window-control:pressed Path">
+    <Setter Property="Stroke" Value="{DynamicResource InkBrush}"/>
+  </Style>
+  <Style Selector="Button.window-control:focus-visible /template/ Border#ButtonSurface">
+    <Setter Property="BorderBrush" Value="{DynamicResource LineBrush}"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="BoxShadow" Value="0 0 0 0 Transparent"/>
+  </Style>
+
+  <!-- Close Window Control: Neutral by default, turns red strictly on pointerover / pressed -->
+  <Style Selector="Button.window-control.close">
+    <Setter Property="Background" Value="Transparent"/>
+  </Style>
+  <Style Selector="Button.window-control.close Path">
+    <Setter Property="Stroke" Value="{DynamicResource MutedBrush}"/>
+  </Style>
   <Style Selector="Button.window-control.close:pointerover">
-    <Setter Property="Background" Value="#E0483A"/>
+    <Setter Property="Background" Value="#E81123"/>
+    <Setter Property="Opacity" Value="1"/>
   </Style>
   <Style Selector="Button.window-control.close:pointerover Path">
     <Setter Property="Stroke" Value="#FFFFFF"/>
   </Style>
+  <Style Selector="Button.window-control.close:pressed">
+    <Setter Property="Background" Value="#C42B1C"/>
+    <Setter Property="RenderTransform" Value="scale(1)"/>
+  </Style>
+  <Style Selector="Button.window-control.close:pressed Path">
+    <Setter Property="Stroke" Value="#FFFFFF"/>
+  </Style>
 
-  <!-- Sidebar Badges (Fixed Right-Column Alignment) -->
+    <!-- Sidebar Badges (Fixed Right-Column Alignment) -->
   <Style Selector="Border.badge">
     <Setter Property="MinWidth" Value="24"/>
     <Setter Property="Height" Value="19"/>
@@ -397,7 +524,7 @@
     <Setter Property="Foreground" Value="{DynamicResource InkBrush}"/>
   </Style>
   <Style Selector="CheckBox.capsule:checked">
-    <Setter Property="Background" Value="{DynamicResource TintBrush}"/>
+    <Setter Property="Background" Value="{DynamicResource SelectionBrush}"/>
     <Setter Property="BorderBrush" Value="{DynamicResource PrimaryGreen}"/>
     <Setter Property="Foreground" Value="{DynamicResource PrimaryGreen}"/>
     <Setter Property="FontWeight" Value="SemiBold"/>
@@ -527,7 +654,10 @@
   <Style Selector="Border.pos-chip.verb"><Setter Property="Background" Value="{DynamicResource PosVerbBrush}"/></Style>
   <Style Selector="Border.pos-chip.modifier"><Setter Property="Background" Value="{DynamicResource PosModifierBrush}"/></Style>
   <Style Selector="Border.pos-chip TextBlock"><Setter Property="Foreground" Value="{DynamicResource InkBrush}"/></Style>
-  <Style Selector="Button:disabled"><Setter Property="Opacity" Value="0.45"/></Style>
+    <Style Selector="Button:disabled, ToggleButton:disabled, CheckBox:disabled">
+    <Setter Property="Opacity" Value="0.45"/>
+    <Setter Property="Cursor" Value="Arrow"/>
+  </Style>
   <Style Selector="Button.primary /template/ Border#ButtonSurface">
     <Setter Property="BoxShadow" Value="0 3 8 0 #18000000"/>
     <Setter Property="Transitions"><Transitions><BoxShadowsTransition Property="BoxShadow" Duration="0:0:0.08"/></Transitions></Setter>
@@ -577,10 +707,10 @@
   <Style Selector="ListBox.vocabulary ListBoxItem:focus-visible /template/ Border#RowSurface">
     <Setter Property="BorderBrush" Value="{DynamicResource LineBrush}"/>
   </Style>
-  <Style Selector="Window.reduce-motion Button, Window.reduce-motion CheckBox, Window.reduce-motion TextBox">
+  <Style Selector="Window.reduce-motion Button, Window.reduce-motion CheckBox, Window.reduce-motion TextBox, Window.reduce-motion ToggleButton">
     <Setter Property="Transitions" Value="{x:Null}"/>
   </Style>
-  <Style Selector="Window.reduce-motion Button:pressed, Window.reduce-motion CheckBox:pressed">
+  <Style Selector="Window.reduce-motion Button:pressed, Window.reduce-motion CheckBox:pressed, Window.reduce-motion ToggleButton:pressed">
     <Setter Property="RenderTransform" Value="scale(1)"/>
     <Setter Property="Transitions" Value="{x:Null}"/>
   </Style>

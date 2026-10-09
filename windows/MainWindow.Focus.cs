@@ -25,6 +25,7 @@ public partial class MainWindow
     private StudyRound<string>.Checkpoint? _focusUndo;
     private long? _focusUndoArchiveId;
     private int? _focusUndoRevision;
+    private bool _focusUndoIsRating;
     private string _focusPreviousPage = "lookup";
     private bool _focusActive;
     private string? _focusRatedWord;
@@ -73,6 +74,9 @@ public partial class MainWindow
         bottom.Children.Add(_focusFeedback); bottom.Children.Add(_focusActions);
         Grid.SetRow(bottom, 2); layout.Children.Add(bottom);
         _focusHost = new Border { Name = "FocusHost", Child = layout, IsVisible = false };
+        _focusHost.Bind(Border.BackgroundProperty, this.GetResourceObservable("PaperBrush"));
+        Grid.SetRow(_focusHost, 1);
+        _focusHost.SetValue(Panel.ZIndexProperty, 100);
         ((Grid)RootWindowBorder.Child!).Children.Add(_focusHost);
         var archiveFocus = LearningButton("选中词汇专注学习", EnterArchiveFocus);
         archiveFocus.Name = "ArchiveFocusButton";
@@ -83,7 +87,7 @@ public partial class MainWindow
         };
         AddHandler(KeyDownEvent, (_, e) =>
         {
-            if (!_focusActive) return;
+            if (!_focusActive || e.Source is TextBox) return;
             if (e.Key == Key.Escape) { ExitFocus(); e.Handled = true; }
             else if (e.Key == Key.A) { GetLearningAudio().Play(_focusRated ? _focusRatedWord ?? "" : _focusRound?.HasCurrent == true ? _focusRound.Current : ""); e.Handled = true; }
             else if (e.Key == Key.C) { SaveFocusCurrent(); e.Handled = true; }
@@ -104,9 +108,9 @@ public partial class MainWindow
         var archive = _allWords.FirstOrDefault(w => w.Word.Equals(text, StringComparison.OrdinalIgnoreCase));
         _focusWordId = archive?.Id.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? text;
         _focusRound = new StudyRound<string>(); _focusRound.Reset([text], archive == null ? StudyMode.FirstLearn : StudyMode.Review, shuffle: false);
-        BeginFocusMemory(_focusRound.Mode, _focusRound.Total);
         _focusPreviousPage = _currentPage; _focusActive = true; _focusAnswerVisible = false; _focusRated = false; _focusUndo = null; _focusUndoArchiveId = null; _focusUndoRevision = null;
         _focusOriginalTranslation = ResultTranslationText.Text ?? "";
+        BeginFocusMemory(_focusRound.Mode, _focusRound.Total);
         PageLookup.IsVisible = false; LookupPageHost.IsVisible = false; _learningHubPage.IsVisible = false; _focusHost!.IsVisible = true;
         RenderFocus();
     }
@@ -114,6 +118,7 @@ public partial class MainWindow
     private void ExitFocus()
     {
         if (!_focusActive) return;
+        PersistLearningSurface("focus");
         _focusActive = false; _focusHost!.IsVisible = false; PageLookup.IsVisible = _focusPreviousPage == "lookup"; LookupPageHost.IsVisible = _focusPreviousPage == "lookup";
         PageVocab.IsVisible = _focusPreviousPage == "vocab"; PageReview.IsVisible = _focusPreviousPage == "review"; PageSettings.IsVisible = _focusPreviousPage == "settings"; _learningHubPage.IsVisible = _focusPreviousPage == "learning";
         if (_ieltsPage != null) _ieltsPage.IsVisible = _focusPreviousPage == "ielts";
@@ -126,9 +131,6 @@ public partial class MainWindow
         if (!_focusActive || _focusRound == null) return;
         _focusActions!.Children.Clear();
         _focusTopActions!.Children.Clear();
-        _focusHost!.Background = new SolidColorBrush(Avalonia.Media.Color.Parse(_settings.HighContrast
-            ? _settings.Theme == "Dark" ? "#101010" : "#FFFFFF"
-            : _settings.Theme == "Dark" ? "#1D3B50" : "#C6E7F3"));
         _focusProgress!.Text = $"专注学习 · 已完成 {_focusRound.Completed}/{_focusRound.Total} · 连击 {_focusRound.CurrentStreak}/{_focusRound.CurrentTarget}";
         _focusStreak!.Children.Clear();
         for (var index = 0; index < StudyRound<string>.RequiredStreak; index++)
@@ -146,6 +148,7 @@ public partial class MainWindow
             ? string.Equals(ResultWordText.Text, current, StringComparison.OrdinalIgnoreCase) ? ResultDefinitionText.Text ?? "" : ""
             : string.Join("\n", new[] { archive.Definition }.Concat(archive.AiExamples.Select(e => e.English + "\n" + e.Chinese)));
         _focusDetails.IsVisible = _focusAnswerVisible;
+        PersistLearningSurface("focus");
         _focusFeedback!.Text = _focusRound.IsFinished ? "本轮已完成。你可以退出专注。" : _focusRound.CurrentStep == StudyStep.Learn ? "学习卡：看过释义后开始回忆。" : _focusRated ? (_focusLastRating == StudyRating.Known ? "已记为认识。" : "稍后会再次出现。") : "先自己回忆，再揭晓释义。";
         _focusTopActions.Children.Add(FocusButton("朗读", () => GetLearningAudio().Play(current)));
         if (_focusRound.HasCurrent && !_focusRated)
@@ -175,7 +178,7 @@ public partial class MainWindow
             _focusActions.Children.Add(FocusButton("揭晓释义", () => { _focusAnswerVisible = true; RenderFocus(); }, true));
         else if (!_focusRated)
         {
-            _focusActions.Children.Add(FocusButton("认识 (Q)", () => RateFocus(StudyRating.Known), true));
+            _focusActions.Children.Add(FocusButton("认识 (Q)", () => RateFocus(StudyRating.Known)));
             _focusActions.Children.Add(FocusButton("模糊 (W)", () => RateFocus(StudyRating.Unsure)));
             _focusActions.Children.Add(FocusButton("忘记 (E)", () => RateFocus(StudyRating.Forgot)));
         }
@@ -202,15 +205,10 @@ public partial class MainWindow
             var result = _focusRound.Commit(rating); var archive = _allWords.FirstOrDefault(w => w.Word.Equals(word, StringComparison.OrdinalIgnoreCase));
             RateFocusMemory(rating, before, result.Streak, result.Completed, _focusRound.Mode);
             memoryRated = true;
-            var persisted = false;
-            if (archive != null)
-            {
-                if (result.Completed && rating == StudyRating.Known) { _vocabService.ExecuteBatch([archive.Id], "review"); persisted = true; }
-                else if (rating == StudyRating.Forgot) { _vocabService.MarkForgot(archive.Id); persisted = true; }
-                else if (rating == StudyRating.Unsure) { _vocabService.MarkUnsure(archive.Id); persisted = true; }
-                RefreshWords();
-            }
-            _focusUndo = checkpoint; _focusUndoArchiveId = persisted ? archive?.Id : null; _focusUndoRevision = persisted && archive != null ? _vocabService.GetAllWords().Single(w => w.Id == archive.Id).Archive.Revision : null; _focusLastRating = rating; _focusRated = true; _focusRatedWord = word;
+            _focusUndoIsRating = true;
+            RefreshWords();
+            _focusUndo = checkpoint; _focusUndoArchiveId = null; _focusUndoRevision = null; _focusLastRating = rating; _focusRated = true; _focusRatedWord = word;
+            PersistLearningSurface("focus");
             SetStatus(rating == StudyRating.Known ? "已记录认识。" : rating == StudyRating.Unsure ? "已记录模糊，将再次出现。" : "已记录忘记，将重新学习。"); RenderFocus();
         }
         catch (Exception ex) { if (memoryRated) { try { UndoFocusMemory(); } catch (Exception undoError) { SetStatus("专注回滚失败：" + undoError.Message); return; } } checkpoint.Restore(); SetStatus("专注评分失败：" + ex.Message); RenderFocus(); }
@@ -227,10 +225,11 @@ public partial class MainWindow
                 if (_focusUndoRevision is { } rev && current?.Archive.Revision != rev)
                     throw new InvalidOperationException("该词已有新的变更，无法撤销。");
             }
-            UndoFocusMemory();
+            if (_focusUndoIsRating) UndoFocusMemory();
             if (_focusUndoArchiveId is { } undoId && !_vocabService.UndoLastLearningAction(undoId))
                 throw new InvalidOperationException("该词已有新的变更，无法撤销。");
             _focusUndo.Restore(); _focusUndo = null; _focusUndoArchiveId = null; _focusUndoRevision = null; _focusRated = false; _focusAnswerVisible = true; RefreshWords(); RenderFocus(); SetStatus("已撤销上一次专注评分。");
+            PersistLearningSurface("focus");
         }
         catch (Exception ex) { SetStatus("撤销失败：" + ex.Message); }
     }
@@ -259,6 +258,7 @@ public partial class MainWindow
             if (item == null) { SaveFocusCurrent(); item = _allWords.FirstOrDefault(w => w.Word.Equals(word, StringComparison.OrdinalIgnoreCase)); }
             if (item == null) throw new InvalidOperationException("收藏单词失败。");
             _vocabService.ExecuteBatch([item.Id], "master"); _focusRound.CompleteCurrent(); RefreshWords();
+            _focusUndoIsRating = false;
             _focusUndo = checkpoint; _focusUndoArchiveId = item.Id; _focusUndoRevision = _vocabService.GetAllWords().Single(w => w.Id == item.Id).Archive.Revision; _focusLastRating = StudyRating.Known; _focusRated = true; _focusRatedWord = word; _focusAnswerVisible = true; RenderFocus();
         }
         catch (Exception ex) { checkpoint.Restore(); SetStatus("标记掌握失败：" + ex.Message); }
@@ -271,8 +271,8 @@ public partial class MainWindow
         if (first != null) { words.RemoveAll(w => w.Id == first.Id); words.Insert(0, first); }
         if (words.Count == 0) { SetStatus("词汇档案为空。"); return; }
         _focusPreviousPage = _currentPage; _focusRound = new StudyRound<string>(); _focusRound.Reset(words.Select(w => w.Word), StudyMode.Review);
-        BeginFocusMemory(_focusRound.Mode, _focusRound.Total);
         _focusActive = true; _focusAnswerVisible = false; _focusRated = false; _focusUndo = null; _focusUndoArchiveId = null; _focusUndoRevision = null;
+        BeginFocusMemory(_focusRound.Mode, _focusRound.Total);
         PageLookup.IsVisible = false; LookupPageHost.IsVisible = false; PageVocab.IsVisible = false; PageReview.IsVisible = false; PageSettings.IsVisible = false; _learningHubPage.IsVisible = false;
         if (_ieltsPage != null) _ieltsPage.IsVisible = false;
         if (_quotesPage != null) _quotesPage.IsVisible = false;

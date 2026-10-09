@@ -418,6 +418,7 @@ internal static class OptimizerIntegrationTests
     private static void WriteMockHelper(string path, string body)
     {
         File.WriteAllText(path, body);
+        if (OperatingSystem.IsWindows()) { WindowsOptimizerFixture.Materialize(path); return; }
         // 测试宿主只跑在 macOS；CA1416 只针对 Windows 目标报警，这里显式抑制。
 #pragma warning disable CA1416
         File.SetUnixFileMode(path,
@@ -1720,7 +1721,7 @@ internal static class OptimizerIntegrationTests
             System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic);
         Program.Check(resolver is not null, "helper 定位是纯静态函数 MemoryResolveOptimizerHelperPath");
 
-        var packaged = Path.Combine(AppContext.BaseDirectory, "fsrs-optimizer");
+        var packaged = Path.Combine(AppContext.BaseDirectory, OperatingSystem.IsWindows() ? "fsrs-optimizer.exe" : "fsrs-optimizer");
         Program.Check(File.Exists(packaged),
             $"构建输出里 helper 与 Lexi.dll 同级（{packaged}）——Lexi.csproj 的 Content(Link=fsrs-optimizer) 生效");
 
@@ -1737,7 +1738,7 @@ internal static class OptimizerIntegrationTests
             Environment.SetEnvironmentVariable("LEXI_FSRS_OPTIMIZER_BIN", null);
         }
         Program.Check((string?)resolver.Invoke(null, null) == packaged,
-            "无环境变量时按 AppContext.BaseDirectory/fsrs-optimizer 定位（.app 里就是 Contents/MacOS）");
+            "无环境变量时按打包平台同级 helper 定位");
     }
 
     // ==================================================================================

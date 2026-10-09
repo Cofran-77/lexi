@@ -89,7 +89,7 @@ public static class FoundationDataTests
             Test("future-schema", path =>
             {
                 using (var service = new VocabularyService(path)) service.AddWord("future", "", "未来", "");
-                Sql(path, "INSERT INTO schema_migrations VALUES(2,'2026-09-19T00:00:00Z')");
+                Sql(path, "INSERT INTO schema_migrations SELECT MAX(version)+1,'2026-09-19T00:00:00Z' FROM schema_migrations");
                 var hash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(path)));
                 Reject(() => { using var service = new VocabularyService(path); });
                 Assert(hash == Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(path))), "future schema rejection changed original DB");

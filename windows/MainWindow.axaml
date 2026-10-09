@@ -2,7 +2,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="Lexi.MainWindow"
         Title="lexi"
-        Width="1060" Height="760" MinWidth="840" MinHeight="600" CanResize="True"
+        Width="1100" Height="760" MinWidth="760" MinHeight="520" CanResize="True"
         WindowStartupLocation="CenterScreen"
         Background="Transparent"
         TransparencyLevelHint="Mica, AcrylicBlur, Blur, None"
@@ -13,9 +13,9 @@
   <Border Name="RootWindowBorder" CornerRadius="16" ClipToBounds="True" Background="{DynamicResource PaperBrush}" BorderBrush="{DynamicResource CardBorderGradient}" BorderThickness="1" BoxShadow="{DynamicResource FloatingShadow}">
   <Grid>
     <!-- Main Window Layout -->
-    <Grid RowDefinitions="60,*,36">
+    <Grid RowDefinitions="48,*,28">
       <!-- Title Bar -->
-      <Border Name="DragBar" Background="Transparent" BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,0,0,1" Padding="20,0">
+      <Border Name="DragBar" Background="Transparent" BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,0,0,1" Padding="16,0,0,0">
         <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto,Auto,Auto">
           <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
             <Image Source="avares://Lexi/Assets/lexi-logo.png" Width="30" Height="30" Stretch="Uniform" VerticalAlignment="Center"/>
@@ -27,10 +27,10 @@
           <TextBlock Grid.Column="4" Text="Alt+D" Classes="muted" VerticalAlignment="Center" Margin="0,0,15,0"/>
 
           <!-- Centered vector Path caption buttons, no font glyphs -->
-          <Button Name="HideToTrayBtn" Grid.Column="5" Classes="window-control" ToolTip.Tip="最小化到任务栏" AutomationProperties.Name="最小化" Margin="0,0,6,0">
+          <Button Name="HideToTrayBtn" Grid.Column="5" Classes="window-control" ToolTip.Tip="最小化到任务栏" AutomationProperties.Name="最小化" Margin="0">
             <Path Data="M 3,8 L 13,8" Stroke="{DynamicResource MutedBrush}" StrokeThickness="1.5" StrokeLineCap="Round" Width="16" Height="16" HorizontalAlignment="Center" VerticalAlignment="Center"/>
           </Button>
-          <Button Name="MaximizeBtn" Grid.Column="6" Classes="window-control" ToolTip.Tip="最大化 / 还原" AutomationProperties.Name="最大化或还原" Margin="0,0,6,0">
+          <Button Name="MaximizeBtn" Grid.Column="6" Classes="window-control" ToolTip.Tip="最大化 / 还原" AutomationProperties.Name="最大化或还原" Margin="0">
             <Path Name="MaximizeGlyph" Data="M 3,3 L 13,3 L 13,13 L 3,13 Z" Stroke="{DynamicResource MutedBrush}" StrokeThickness="1.2" Width="16" Height="16"/>
           </Button>
           <Button Name="QuitAppBtn" Grid.Column="7" Classes="window-control close" ToolTip.Tip="关闭到托盘；退出请用托盘菜单" AutomationProperties.Name="关闭到托盘">
@@ -40,9 +40,9 @@
       </Border>
 
       <!-- Central Body: Sidebar + Dynamic Page -->
-      <Grid Grid.Row="1" ColumnDefinitions="216,*">
+      <Grid Name="MainBodyGrid" Grid.Row="1" ColumnDefinitions="208,*">
         <!-- Sidebar Navigation -->
-        <Border BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,0,1,0" Padding="12,18,12,14" Background="Transparent">
+        <Border Name="SidebarBorder" BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,0,1,0" Padding="12,18,12,14" Background="Transparent">
           <Grid RowDefinitions="Auto,Auto,Auto,*,Auto,Auto">
             <Button Name="NavLookup" Classes="nav active">
               <Grid ColumnDefinitions="*,Auto">
@@ -485,7 +485,7 @@
                     <Grid Name="ReviewRatingBar" ColumnDefinitions="*,8,*,8,*" IsVisible="False">
                       <Button Name="ReviewUnfamiliarBtn" Classes="secondary" Content="忘记" MinHeight="44" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"/>
                       <Button Name="ReviewUnsureBtn" Grid.Column="2" Classes="secondary" Content="模糊" MinHeight="44" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"/>
-                      <Button Name="ReviewRememberBtn" Grid.Column="4" Classes="primary" Content="认识" MinHeight="44" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"/>
+                      <Button Name="ReviewRememberBtn" Grid.Column="4" Classes="secondary" Content="认识" MinHeight="44" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"/>
                     </Grid>
                   </Grid>
                 </Grid>
@@ -611,18 +611,39 @@
                   <TextBlock Text="数据与备份" FontWeight="SemiBold" FontSize="16"/>
                   <TextBlock Name="DataIdentityText" TextWrapping="Wrap" FontWeight="SemiBold"/>
                   <TextBlock Name="DataLocationText" Classes="muted" TextWrapping="Wrap"/>
-                  <TextBlock Name="LastBackupText" Classes="muted" TextWrapping="Wrap"/>
-                  <WrapPanel>
-                    <Button Name="BackupNowBtn" Classes="secondary" Content="立即备份" Margin="0,0,8,8"/>
-                    <Button Name="RestoreBackupBtn" Classes="ghost" Content="从备份恢复…" Margin="0,0,8,8"/>
-                    <Button Name="OpenDataFolderBtn" Classes="ghost" Content="打开数据目录" Margin="0,0,8,8"/>
-                  </WrapPanel>
-                  <WrapPanel>
-                    <Button Name="ImportCsvBtn" Classes="secondary" Content="导入 CSV / JSON" Margin="0,0,8,8"/>
-                    <Button Name="ExportCsvBtn" Classes="secondary" Content="导出 CSV" Margin="0,0,8,8"/>
-                    <Button Name="ExportJsonBtn" Classes="secondary" Content="导出完整档案 JSON" Margin="0,0,8,8"/>
-                  </WrapPanel>
-                  <TextBlock Text="导出遵循当前筛选与勾选；无勾选时导出当前筛选全部词。JSON 保留词汇、语境、AI 和当前复习状态；SQLite 备份另含完整复习历史。导出不含 API Key，恢复使用 SQLite 备份。旧版历史备份可能含未加密密钥，请自行保管。" Classes="muted" TextWrapping="Wrap" FontSize="11"/>
+                  <Button Name="OpenDataFolderBtn" Classes="ghost" Content="打开数据目录" HorizontalAlignment="Left"/>
+                  <Border BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,1,0,0" Padding="0,16,0,0">
+                    <StackPanel Spacing="10">
+                      <TextBlock Text="备份与恢复" FontWeight="SemiBold"/>
+                      <TextBlock Name="LastBackupText" Classes="muted" TextWrapping="Wrap"/>
+                      <WrapPanel>
+                        <Button Name="BackupNowBtn" Classes="primary" Content="立即备份" Margin="0,0,12,8"/>
+                        <Button Name="RestoreBackupBtn" Classes="secondary" Content="从备份恢复…" Margin="0,0,0,8"/>
+                      </WrapPanel>
+                    </StackPanel>
+                  </Border>
+                  <Border BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,1,0,0" Padding="0,16,0,0">
+                    <StackPanel Spacing="10">
+                      <TextBlock Text="导入与导出" FontWeight="SemiBold"/>
+                      <TextBlock Text="导出当前勾选的词；没有勾选时，导出当前筛选结果。" Classes="muted" TextWrapping="Wrap"/>
+                      <WrapPanel>
+                        <Button Name="ImportCsvBtn" Classes="secondary" Content="导入 CSV / JSON" Margin="0,0,12,8"/>
+                        <Button Name="ArchiveExportMenuBtn" Classes="secondary" Content="导出…" Margin="0,0,0,8">
+                          <Button.Flyout>
+                            <Flyout Placement="Bottom">
+                              <StackPanel Spacing="8">
+                                <Button Name="ExportCsvBtn" Classes="ghost" Content="导出 CSV" HorizontalAlignment="Stretch"/>
+                                <Button Name="ExportJsonBtn" Classes="ghost" Content="导出完整档案 JSON" HorizontalAlignment="Stretch"/>
+                              </StackPanel>
+                            </Flyout>
+                          </Button.Flyout>
+                        </Button>
+                      </WrapPanel>
+                      <Expander Header="格式与备份范围说明">
+                        <TextBlock Text="导出遵循当前筛选与勾选；无勾选时导出当前筛选全部词。JSON 保留词汇、语境、AI 和当前复习状态；SQLite 备份另含完整复习历史。导出不含 API Key，恢复使用 SQLite 备份。旧版历史备份可能含未加密密钥，请自行保管。" Classes="muted" TextWrapping="Wrap" FontSize="12"/>
+                      </Expander>
+                    </StackPanel>
+                  </Border>
                 </StackPanel>
               </Border>
               <Border Classes="card"><StackPanel Spacing="10">
@@ -639,7 +660,7 @@
       <Border Grid.Row="2" Background="{DynamicResource TintBrush}" Padding="20,0">
         <Grid ColumnDefinitions="*,Auto">
           <TextBlock Name="GlobalStatusText" Text="本地查词不调用 AI。关闭窗口后可通过快捷键或托盘重新打开。" VerticalAlignment="Center" FontSize="11"/>
-          <TextBlock Grid.Column="1" Text="Lexi 1.1.4" Classes="muted" VerticalAlignment="Center" FontSize="11"/>
+          <TextBlock Grid.Column="1" Text="Lexi 1.2.0" Classes="muted" VerticalAlignment="Center" FontSize="11"/>
         </Grid>
       </Border>
     </Grid>
@@ -720,7 +741,7 @@
           <TextBlock Text="删除后将清除该单词及其所有历史复习记录，无法撤销。" Classes="muted" TextWrapping="Wrap"/>
           <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Right">
             <Button Name="DialogDeleteCancelBtn" Classes="ghost" Content="取消"/>
-            <Button Name="DialogDeleteConfirmBtn" Classes="primary" Background="#C53929" Content="确认删除"/>
+            <Button Name="DialogDeleteConfirmBtn" Classes="danger" Content="确认删除"/>
           </StackPanel>
         </StackPanel>
       </Border>

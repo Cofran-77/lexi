@@ -30,11 +30,40 @@ public sealed class DailyStudyPlanSession
     public Action<string>? OnWordCompleted { get; set; }
     public Action<string, StudyRating, StudyCommitResult>? OnRatingApplied { get; set; }
     public Action<string>? OnRatingFailed { get; set; }
+    public Action? OnUndoApplied { get; set; }
 
     public StudyRound<string> Round { get; }
     public IReadOnlyList<DailyStudyPlanWord> BatchWords => _plan.CurrentBatchWordIds
         .Select(id => _plan.Words.Single(w => w.Id == id)).ToList();
     public bool CanUndo => _beforeLastRating != null && _beforeLastRound != null && Round.CanUndo;
+
+    private sealed record DurableUndo(string Round, HashSet<string> Completed, HashSet<string> Forgot,
+        DailyStudyPlanStatus Status, DateOnly? BatchDate);
+    public string? CaptureUndoJson()
+    {
+        if (_beforeLastRating == null || _beforeLastRound == null) return null;
+        var after = Round.CaptureCheckpoint();
+        _beforeLastRound.Restore();
+        var json = Round.CaptureJson(w => w);
+        after.Restore();
+        return System.Text.Json.JsonSerializer.Serialize(new DurableUndo(json, _beforeLastRating.Completed,
+            _beforeLastRating.Forgot, _beforeLastRating.Status, _beforeLastRating.BatchDate));
+    }
+
+    public void RestoreUndoJson(string? json)
+    {
+        if (json == null || !Round.CanUndo) return;
+        var saved = System.Text.Json.JsonSerializer.Deserialize<DurableUndo>(json)
+            ?? throw new InvalidDataException("计划撤销断点为空。");
+        var after = Round.CaptureCheckpoint();
+        try
+        {
+            Round.RestoreJson(saved.Round, id => _plan.Words.Single(w => w.Id == id).Id);
+            _beforeLastRound = Round.CaptureCheckpoint();
+            _beforeLastRating = new(saved.Completed, saved.Forgot, saved.Status, saved.BatchDate);
+        }
+        finally { after.Restore(); }
+    }
 
     public void CompleteLearn()
     {
@@ -47,6 +76,7 @@ public sealed class DailyStudyPlanSession
         var checkpoint = Round.CaptureCheckpoint();
         var progress = CaptureProgress();
         var previousUndo = _beforeLastRating;
+        var previousRoundUndo = _beforeLastRound;
         var wordId = Round.Current;
         var result = Round.Commit(rating);
         if (rating == StudyRating.Forgot) _plan.ForgotWordIds.Add(wordId);
@@ -57,6 +87,7 @@ public sealed class DailyStudyPlanSession
             return null;
         }
         var finalized = false;
+        _beforeLastRating = progress; _beforeLastRound = checkpoint;
         try
         {
             OnRatingApplied?.Invoke(wordId, rating, result);
@@ -71,7 +102,7 @@ public sealed class DailyStudyPlanSession
                 throw new PendingLearningWriteException(wordId, result, error);
             }
             OnRatingFailed?.Invoke(wordId);
-            checkpoint.Restore(); RestoreProgress(progress); _beforeLastRating = previousUndo;
+            checkpoint.Restore(); RestoreProgress(progress); _beforeLastRating = previousUndo; _beforeLastRound = previousRoundUndo;
             return null;
         }
         _beforeLastRating = progress; _beforeLastRound = checkpoint;
@@ -83,7 +114,17 @@ public sealed class DailyStudyPlanSession
         if (!CanUndo) return false;
         var checkpoint = Round.CaptureCheckpoint(); var current = CaptureProgress();
         _beforeLastRound!.Restore(); RestoreProgress(_beforeLastRating!);
-        if (!TrySave(save)) { checkpoint.Restore(); RestoreProgress(current); return false; }
+        try { OnUndoApplied?.Invoke(); }
+        catch { checkpoint.Restore(); RestoreProgress(current); throw; }
+        if (!TrySave(save))
+        {
+            if (OnUndoApplied is not null)
+            {
+                _beforeLastRating = null; _beforeLastRound = null;
+                throw new IOException("撤销已持久化，计划进度等待写回，请重试恢复。");
+            }
+            checkpoint.Restore(); RestoreProgress(current); return false;
+        }
         _beforeLastRating = null; _beforeLastRound = null;
         return true;
     }

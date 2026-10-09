@@ -209,6 +209,8 @@ public partial class MainWindow : Window
     public void ForceClose()
     {
         if (_restoring) return;
+        if (_databaseAvailable) PersistPausedSurfaces();
+        _memoryLifetime.Cancel();
         _aiCts?.Cancel();
         CancelLookupFallback();
         ++_lookupVersion;
@@ -254,6 +256,7 @@ public partial class MainWindow : Window
     private void ShowPage(string page)
     {
         if (!_databaseAvailable) return;
+        PersistPausedSurfaces();
         if (_focusActive) ExitFocus();
         StopWindowsLearningAudio();
         ++_reviewEpoch; // Invalidate any in-flight card transition before page navigation.

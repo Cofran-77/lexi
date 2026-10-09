@@ -1,4 +1,4 @@
-using Avalonia;
+﻿using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media;
 using Avalonia.Animation;
@@ -8,7 +8,7 @@ namespace Lexi;
 public partial class MainWindow
 {
     private bool _loadingAppearance;
-    private static readonly string[] AppearanceBrushes = ["PaperBrush", "CardBrush", "DialogSurfaceBrush", "InputBg", "InkBrush", "MutedBrush", "LineBrush", "PrimaryGreen", "PrimaryGreenHover", "PrimaryGreenPressed", "OnPrimaryBrush", "TintBrush", "SelectionBrush", "InsetBrush", "InsetBorderBrush", "CardBorderGradient", "PosBrush", "PosVerbBrush", "PosModifierBrush"];
+    private static readonly string[] AppearanceBrushes = ["PaperBrush", "CardBrush", "DialogSurfaceBrush", "InputBg", "InkBrush", "MutedBrush", "LineBrush", "PrimaryGreen", "PrimaryGreenHover", "PrimaryGreenPressed", "OnPrimaryBrush", "TintBrush", "SelectionBrush", "InsetBrush", "InsetBorderBrush", "CardBorderGradient", "PosBrush", "PosVerbBrush", "PosModifierBrush", "PressedTintBrush", "MutedBorderBrush", "FilterSelectedBorderBrush", "FilterSelectedHoverBrush", "FilterSelectedPressedBrush", "CaptionButtonPressedBrush", "DangerBrush", "DangerHoverBrush", "DangerPressedBrush", "DangerBorder"];
 
     private void BindAppearanceEvents()
     {
@@ -53,6 +53,16 @@ public partial class MainWindow
             Brush("TintBrush", dark ? "#202020" : "#EEEEEE");
             Brush("SelectionBrush", dark ? "#303030" : "#DDDDDD");
             foreach (var key in new[] { "PosBrush", "PosVerbBrush", "PosModifierBrush" }) Brush(key, bg);
+            Brush("PressedTintBrush", dark ? "#303030" : "#DDDDDD");
+            Brush("MutedBorderBrush", fg);
+            Brush("FilterSelectedBorderBrush", fg);
+            Brush("FilterSelectedHoverBrush", dark ? "#404040" : "#CCCCCC");
+            Brush("FilterSelectedPressedBrush", dark ? "#505050" : "#BBBBBB");
+            Brush("CaptionButtonPressedBrush", dark ? "#303030" : "#DDDDDD");
+            Brush("DangerBrush", dark ? "#FF6B6B" : "#B00020");
+            Brush("DangerHoverBrush", dark ? "#FF8E8E" : "#D32F2F");
+            Brush("DangerPressedBrush", dark ? "#FF5252" : "#8E0000");
+            Brush("DangerBorder", dark ? "#FF6B6B" : "#B00020");
         }
         else if (_settings.OpaqueMaterial)
         {

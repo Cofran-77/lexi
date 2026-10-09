@@ -1,9 +1,12 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Layout;
+using Avalonia.Media;
+using Lexi.Features.Learning;
 
 namespace Lexi;
 
@@ -13,7 +16,7 @@ public partial class MainWindow
     {
         if (_learningPlansLoadFailed || !_databaseAvailable || _restoring)
         {
-            SetStatus("计划数据暂不可用，请先完成恢复。");
+            SetStatus("计划数据暂不可用，请先完成词库恢复。");
             return;
         }
 
@@ -24,6 +27,7 @@ public partial class MainWindow
         }
 
         var sections = _ieltsCatalog?.Sections.Where(s => s.Kind == "vocabulary").ToList() ?? [];
+        if (initialSection != null) initialSection = sections.FirstOrDefault(s => s.Id == initialSection.Id);
         if (source == DailyStudyPlanSource.Ielts && sections.Count == 0)
         {
             SetStatus("IELTS 词汇目录为空。");
@@ -32,171 +36,803 @@ public partial class MainWindow
 
         var archiveWords = _allWords.Select(w => new DailyStudyPlanWord
         {
-            Id = w.Id.ToString(System.Globalization.CultureInfo.InvariantCulture), Word = w.Word,
-            Meaning = w.Translation, Phonetic = w.Phonetic, Definition = w.Definition,
+            Id = w.Id.ToString(CultureInfo.InvariantCulture),
+            Word = w.Word,
+            Meaning = w.Translation,
+            Phonetic = w.Phonetic,
+            Definition = w.Definition,
             Example = string.Join("\n", w.AiExamples.Select(e => e.English + "\n" + e.Chinese))
         }).ToList();
+
         var selected = new HashSet<string>(StringComparer.Ordinal);
+        var preselectedNotice = "";
+
         if (source == DailyStudyPlanSource.Archive)
         {
-            var marked = _allWords.Where(w => w.Selected).Select(w => w.Id.ToString(System.Globalization.CultureInfo.InvariantCulture));
-            selected.UnionWith(marked);
-            if (selected.Count == 0) selected.UnionWith(archiveWords.Select(w => w.Id));
+            var marked = _allWords.Where(w => w.Selected)
+                .Select(w => w.Id.ToString(CultureInfo.InvariantCulture))
+                .ToList();
+            if (marked.Count > 0)
+            {
+                selected.UnionWith(marked);
+                preselectedNotice = $"已预置词汇档案中已勾选的 {marked.Count} 个词条。";
+            }
+            else
+            {
+                // 通用创建默认不全选整个档案
+                preselectedNotice = "通用创建：未默认全选，请按需选择本页或搜索词条。";
+            }
         }
         else
         {
-            if (initialSection == null || !sections.Contains(initialSection)) initialSection = sections[0];
-            var availableIds = sections.SelectMany(s => s.Entries).Select(w => w.Id).ToHashSet(StringComparer.Ordinal);
-            selected.UnionWith(_ieltsSelected.Where(availableIds.Contains));
-            if (selected.Count == 0) selected.UnionWith(initialSection.Entries.Select(w => w.Id));
+            if (initialSection != null && sections.Contains(initialSection))
+            {
+                var availableIds = initialSection.Entries.Select(w => w.Id).ToHashSet(StringComparer.Ordinal);
+                var matchedIelts = _ieltsSelected.Where(availableIds.Contains).ToList();
+                if (matchedIelts.Count > 0)
+                {
+                    selected.UnionWith(matchedIelts);
+                    preselectedNotice = $"已从当前章节勾选中预选 {matchedIelts.Count} 个词条。";
+                }
+                else
+                {
+                    selected.UnionWith(availableIds);
+                    preselectedNotice = $"已预置章节「{initialSection.Title}」的全部 {availableIds.Count} 个词条。";
+                }
+            }
+            else
+            {
+                if (sections.Count > 0) initialSection = sections[0];
+                var availableIds = sections.SelectMany(s => s.Entries).Select(w => w.Id).ToHashSet(StringComparer.Ordinal);
+                var matched = _ieltsSelected.Where(availableIds.Contains).ToList();
+                if (matched.Count > 0)
+                {
+                    selected.UnionWith(matched);
+                    preselectedNotice = $"已预置当前选中的 {matched.Count} 个词条。";
+                }
+                else
+                {
+                    // 通用 IELTS 创建不全选整本教材
+                    preselectedNotice = "通用创建：未默认全选教材，请在上方选择章节并勾选所需词条。";
+                }
+            }
         }
 
         var dialog = new Window
         {
-            Title = "创建每日学习计划", Width = 620, Height = 730,
-            MinWidth = 460, MinHeight = 540, MaxWidth = 760,
+            Title = "创建每日学习计划",
+            Width = 720,
+            Height = 600,
+            MinWidth = 520,
+            MinHeight = 480,
+            MaxWidth = 840,
+            MaxHeight = 720,
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
-            CanResize = true, Background = RootWindowBorder.Background,
+            CanResize = true,
+            Background = RootWindowBorder.Background,
             RequestedThemeVariant = RequestedThemeVariant
         };
-        var root = new Grid { RowDefinitions = new RowDefinitions("Auto,*,Auto"), Margin = new Thickness(24), RowSpacing = 14 };
-        var header = new StackPanel { Spacing = 12 };
-        header.Children.Add(LearningText("创建每日学习计划", 22));
+
+        var rootGrid = new Grid();
+
+        // ==================== Step 1: 选词视图 ====================
+        var step1View = new Grid
+        {
+            RowDefinitions = new RowDefinitions("Auto,*,Auto"),
+            Margin = new Thickness(24, 20),
+            RowSpacing = 12
+        };
+
+        // Step 1 Header
+        var step1Header = new StackPanel { Spacing = 10 };
+        var step1TitleRow = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto") };
+        step1TitleRow.Children.Add(new TextBlock { Text = "创建每日学习计划", FontSize = 20, FontWeight = FontWeight.SemiBold });
+        var step1Badge = new TextBlock
+        {
+            Text = "第 1 步 / 共 2 步 · 选择词条",
+            FontSize = 13,
+            Opacity = 0.7,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        Grid.SetColumn(step1Badge, 1);
+        step1TitleRow.Children.Add(step1Badge);
+        step1Header.Children.Add(step1TitleRow);
+
+        var scopeNoticeText = new TextBlock
+        {
+            Text = preselectedNotice,
+            FontSize = 12,
+            Opacity = 0.75,
+            TextWrapping = TextWrapping.Wrap
+        };
+        step1Header.Children.Add(scopeNoticeText);
+
         ComboBox? sectionPicker = null;
         if (source == DailyStudyPlanSource.Ielts)
         {
-            sectionPicker = new ComboBox { ItemsSource = sections, SelectedItem = initialSection, HorizontalAlignment = HorizontalAlignment.Stretch };
-            header.Children.Add(sectionPicker);
+            var sectionRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, VerticalAlignment = VerticalAlignment.Center };
+            sectionRow.Children.Add(new TextBlock { Text = "章节：", VerticalAlignment = VerticalAlignment.Center, FontSize = 13 });
+            sectionPicker = new ComboBox
+            {
+                ItemsSource = sections,
+                SelectedItem = initialSection,
+                MinWidth = 280,
+                HorizontalAlignment = HorizontalAlignment.Left
+            };
+            sectionRow.Children.Add(sectionPicker);
+            step1Header.Children.Add(sectionRow);
         }
-        var search = new TextBox { Name = "PlanCreatorSearch", Watermark = "搜索计划词条" };
-        header.Children.Add(search);
-        var selectionActions = new WrapPanel();
-        var selectAll = LearningButton("全选", () => { });
-        var clear = LearningButton("清空选择", () => { });
-        selectionActions.Children.Add(selectAll);
-        selectionActions.Children.Add(clear);
-        header.Children.Add(selectionActions);
-        Grid.SetRow(header, 0); root.Children.Add(header);
 
-        var rows = new StackPanel { Spacing = 6 };
-        var pageLabel = LearningText("");
-        var previous = LearningButton("上一页", () => { });
-        var next = LearningButton("下一页", () => { });
-        var pager = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 12, VerticalAlignment = VerticalAlignment.Center };
-        pager.Children.Add(previous); pager.Children.Add(pageLabel); pager.Children.Add(next);
-        var list = new StackPanel { Spacing = 12 };
-        list.Children.Add(new ScrollViewer
+        var searchBox = new TextBox
         {
-            Content = rows, MaxHeight = 340,
+            Name = "PlanCreatorSearch",
+            Watermark = "搜索词条（按英文单词或中文释义）"
+        };
+        step1Header.Children.Add(searchBox);
+
+        var selectionToolbar = new WrapPanel { Orientation = Orientation.Horizontal };
+        var btnSelectPage = LearningButton("选本页", () => { });
+        var btnSelectFiltered = LearningButton("选当前筛选结果", () => { });
+        var btnClearFiltered = LearningButton("清空当前筛选", () => { });
+        var btnClearAll = LearningButton("清空全部选择", () => { });
+        var chkOnlySelected = new CheckBox
+        {
+            Name = "PlanCreatorOnlySelected",
+            Content = "仅看已选",
+            IsChecked = false,
+            Margin = new Thickness(12, 0, 0, 0),
+            VerticalAlignment = VerticalAlignment.Center
+        };
+
+        selectionToolbar.Children.Add(btnSelectPage);
+        selectionToolbar.Children.Add(btnSelectFiltered);
+        selectionToolbar.Children.Add(btnClearFiltered);
+        selectionToolbar.Children.Add(btnClearAll);
+        selectionToolbar.Children.Add(chkOnlySelected);
+        step1Header.Children.Add(selectionToolbar);
+
+        Grid.SetRow(step1Header, 0);
+        step1View.Children.Add(step1Header);
+
+        // Step 1 Middle Word List (Bounded * row)
+        var listContainer = new Grid
+        {
+            RowDefinitions = new RowDefinitions("Auto,*,Auto"),
+            RowSpacing = 6
+        };
+
+        var listHeaderBar = new Border
+        {
+            Padding = new Thickness(8, 4),
+            BorderThickness = new Thickness(0, 0, 0, 1),
+            BorderBrush = this.FindResource("LineBrush") as IBrush ?? Brushes.LightGray
+        };
+        var listHeaderCols = new Grid { ColumnDefinitions = new ColumnDefinitions("44,180,*") };
+        listHeaderCols.Children.Add(new TextBlock { Text = "选择", FontSize = 12, Opacity = 0.6 });
+        var colWord = new TextBlock { Text = "单词 · 音标", FontSize = 12, Opacity = 0.6 };
+        Grid.SetColumn(colWord, 1);
+        listHeaderCols.Children.Add(colWord);
+        var colMeaning = new TextBlock { Text = "中文释义与例句", FontSize = 12, Opacity = 0.6 };
+        Grid.SetColumn(colMeaning, 2);
+        listHeaderCols.Children.Add(colMeaning);
+        listHeaderBar.Child = listHeaderCols;
+        Grid.SetRow(listHeaderBar, 0);
+        listContainer.Children.Add(listHeaderBar);
+
+        var rowsPanel = new StackPanel { Spacing = 4 };
+        var listScroll = new ScrollViewer
+        {
+            Content = rowsPanel,
             HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled,
-            VerticalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Hidden
-        });
-        list.Children.Add(pager);
-        Grid.SetRow(list, 1); root.Children.Add(list);
+            VerticalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Auto
+        };
+        Grid.SetRow(listScroll, 1);
+        listContainer.Children.Add(listScroll);
 
-        var footer = new StackPanel { Spacing = 10 };
-        var selectedLabel = LearningText("");
-        var planName = new TextBox { Name = "PlanCreatorName", Watermark = "计划名称", Text = source == DailyStudyPlanSource.Ielts ? "我的 IELTS 计划" : "我的词汇计划" };
-        var quotaLabel = LearningText("每日学习词数");
-        var quota = new NumericUpDown { Name = "PlanCreatorQuota", Minimum = 1, Maximum = 10000, Value = 20, Increment = 1, FormatString = "0" };
-        var random = new CheckBox { Name = "PlanCreatorRandom", Content = "随机顺序", IsChecked = false };
-        var estimate = LearningText("");
-        var error = LearningText("");
-        var cancel = LearningButton("取消", dialog.Close);
-        var confirm = LearningButton("创建计划", () => { }, true);
-        var buttons = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 12, HorizontalAlignment = HorizontalAlignment.Right };
-        buttons.Children.Add(cancel); buttons.Children.Add(confirm);
-        footer.Children.Add(selectedLabel); footer.Children.Add(planName);
-        footer.Children.Add(quotaLabel); footer.Children.Add(quota);
-        footer.Children.Add(random); footer.Children.Add(estimate); footer.Children.Add(error); footer.Children.Add(buttons);
-        Grid.SetRow(footer, 2); root.Children.Add(footer);
-        dialog.Content = root;
+        var pagerBar = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 12,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            Margin = new Thickness(0, 4, 0, 0)
+        };
+        var btnPrevPage = LearningButton("上一页", () => { });
+        var pageIndicator = new TextBlock
+        {
+            Text = "第 1 / 1 页",
+            VerticalAlignment = VerticalAlignment.Center,
+            FontSize = 13
+        };
+        var btnNextPage = LearningButton("下一页", () => { });
+        pagerBar.Children.Add(btnPrevPage);
+        pagerBar.Children.Add(pageIndicator);
+        pagerBar.Children.Add(btnNextPage);
+        Grid.SetRow(pagerBar, 2);
+        listContainer.Children.Add(pagerBar);
 
+        Grid.SetRow(listContainer, 1);
+        step1View.Children.Add(listContainer);
+
+        // Step 1 Footer
+        var step1Footer = new Border
+        {
+            Padding = new Thickness(0, 10, 0, 0),
+            BorderThickness = new Thickness(0, 1, 0, 0),
+            BorderBrush = this.FindResource("LineBrush") as IBrush ?? Brushes.LightGray
+        };
+        var footerGrid = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto") };
+        var selectedCountText = new TextBlock
+        {
+            Text = "已选 0 词",
+            VerticalAlignment = VerticalAlignment.Center,
+            FontSize = 14,
+            FontWeight = FontWeight.Medium
+        };
+        footerGrid.Children.Add(selectedCountText);
+
+        var step1Buttons = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10 };
+        var btnCancel1 = LearningButton("取消", dialog.Close);
+        var btnNextToStep2 = LearningButton("下一步：安排计划 →", () => { }, primary: true);
+        step1Buttons.Children.Add(btnCancel1);
+        step1Buttons.Children.Add(btnNextToStep2);
+        Grid.SetColumn(step1Buttons, 1);
+        footerGrid.Children.Add(step1Buttons);
+        step1Footer.Child = footerGrid;
+
+        Grid.SetRow(step1Footer, 2);
+        step1View.Children.Add(step1Footer);
+
+        // ==================== Step 2: 安排视图 ====================
+        var step2View = new Grid
+        {
+            RowDefinitions = new RowDefinitions("Auto,*,Auto"),
+            Margin = new Thickness(24, 20),
+            RowSpacing = 14,
+            IsVisible = false
+        };
+
+        // Step 2 Header
+        var step2Header = new StackPanel { Spacing = 10 };
+        var step2TitleRow = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto") };
+        step2TitleRow.Children.Add(new TextBlock { Text = "创建每日学习计划", FontSize = 20, FontWeight = FontWeight.SemiBold });
+        var step2Badge = new TextBlock
+        {
+            Text = "第 2 步 / 共 2 步 · 安排计划",
+            FontSize = 13,
+            Opacity = 0.7,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        Grid.SetColumn(step2Badge, 1);
+        step2TitleRow.Children.Add(step2Badge);
+        step2Header.Children.Add(step2TitleRow);
+
+        var step2SummaryCard = new Border
+        {
+            Padding = new Thickness(14, 10),
+            CornerRadius = new CornerRadius(8),
+            Background = Brushes.Transparent
+        };
+        step2SummaryCard.Bind(Border.BackgroundProperty, this.GetResourceObservable("CardBrush"));
+        var step2SummaryText = new TextBlock
+        {
+            Text = "",
+            FontSize = 13,
+            FontWeight = FontWeight.Medium
+        };
+        step2SummaryCard.Child = step2SummaryText;
+        step2Header.Children.Add(step2SummaryCard);
+
+        Grid.SetRow(step2Header, 0);
+        step2View.Children.Add(step2Header);
+
+        // Step 2 Form Body (ScrollViewer bounded)
+        var step2FormScroll = new ScrollViewer
+        {
+            HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled,
+            VerticalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Auto
+        };
+        var step2Form = new StackPanel { Spacing = 14, MaxWidth = 640, HorizontalAlignment = HorizontalAlignment.Stretch };
+
+        var nameLabel = new TextBlock { Text = "计划名称", FontSize = 13, FontWeight = FontWeight.Medium };
+        var defaultPlanName = source == DailyStudyPlanSource.Ielts ? "我的 IELTS 计划" : "我的词汇计划";
+        var planNameInput = new TextBox
+        {
+            Name = "PlanCreatorName",
+            Watermark = "请输入计划名称",
+            Text = defaultPlanName
+        };
+        step2Form.Children.Add(nameLabel);
+        step2Form.Children.Add(planNameInput);
+
+        var quotaLabel = new TextBlock { Text = "每日学习词数", FontSize = 13, FontWeight = FontWeight.Medium };
+        var quotaInput = new NumericUpDown
+        {
+            Name = "PlanCreatorQuota",
+            Minimum = 1,
+            Maximum = 10000,
+            Value = 20,
+            Increment = 1,
+            FormatString = "0",
+            HorizontalAlignment = HorizontalAlignment.Left,
+            Width = 140
+        };
+        step2Form.Children.Add(quotaLabel);
+        step2Form.Children.Add(quotaInput);
+
+        var randomCheckbox = new CheckBox
+        {
+            Name = "PlanCreatorRandom",
+            Content = "随机打乱顺序（在创建时生成固定乱序并持久化）",
+            IsChecked = false
+        };
+        step2Form.Children.Add(randomCheckbox);
+
+        // Estimate Card
+        var estimateCard = new Border
+        {
+            Padding = new Thickness(14),
+            CornerRadius = new CornerRadius(8),
+            Background = Brushes.Transparent
+        };
+        estimateCard.Bind(Border.BackgroundProperty, this.GetResourceObservable("CardBrush"));
+        var estimateLayout = new StackPanel { Spacing = 6 };
+        var estimateHeader = new TextBlock { Text = "学习排期估算", FontSize = 14, FontWeight = FontWeight.SemiBold };
+        var estimateBody = new TextBlock { Text = "", FontSize = 13, Opacity = 0.85, TextWrapping = TextWrapping.Wrap };
+        estimateLayout.Children.Add(estimateHeader);
+        estimateLayout.Children.Add(estimateBody);
+        estimateCard.Child = estimateLayout;
+        step2Form.Children.Add(estimateCard);
+
+        // Conflict Warning Panel (Explicit Confirmation Area)
+        var conflictPanel = new Border
+        {
+            Padding = new Thickness(14),
+            CornerRadius = new CornerRadius(8),
+            BorderThickness = new Thickness(1),
+            BorderBrush = Brushes.Orange,
+            Background = Brushes.Transparent,
+            IsVisible = false
+        };
+        conflictPanel.Bind(Border.BackgroundProperty, this.GetResourceObservable("CardBrush"));
+        var conflictLayout = new StackPanel { Spacing = 10 };
+        var conflictTitle = new TextBlock
+        {
+            Text = "⚠️ 检测到与其他进行中计划存在重复词条",
+            FontSize = 14,
+            FontWeight = FontWeight.Bold,
+            Foreground = Brushes.DarkOrange
+        };
+        var conflictDetails = new TextBlock
+        {
+            Text = "",
+            FontSize = 13,
+            TextWrapping = TextWrapping.Wrap
+        };
+        var conflictExplanation = new TextBlock
+        {
+            Text = "说明：每个计划的学习进度独立记录。若确认在不同计划中同时学习这些词条，请点击下方确认继续；亦可返回上一步调整选词。",
+            FontSize = 12,
+            Opacity = 0.8,
+            TextWrapping = TextWrapping.Wrap
+        };
+        var conflictActions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10, HorizontalAlignment = HorizontalAlignment.Right };
+        var btnBackToStep1FromConflict = LearningButton("返回修改选词", () => { });
+        var btnConfirmConflictContinue = LearningButton("我已知晓，仍然创建计划", () => { }, primary: true);
+        conflictActions.Children.Add(btnBackToStep1FromConflict);
+        conflictActions.Children.Add(btnConfirmConflictContinue);
+
+        conflictLayout.Children.Add(conflictTitle);
+        conflictLayout.Children.Add(conflictDetails);
+        conflictLayout.Children.Add(conflictExplanation);
+        conflictLayout.Children.Add(conflictActions);
+        conflictPanel.Child = conflictLayout;
+        step2Form.Children.Add(conflictPanel);
+
+        var formErrorText = new TextBlock
+        {
+            Text = "",
+            FontSize = 13,
+            Foreground = Brushes.IndianRed,
+            TextWrapping = TextWrapping.Wrap
+        };
+        step2Form.Children.Add(formErrorText);
+
+        step2FormScroll.Content = step2Form;
+        Grid.SetRow(step2FormScroll, 1);
+        step2View.Children.Add(step2FormScroll);
+
+        // Step 2 Footer
+        var step2Footer = new Border
+        {
+            Padding = new Thickness(0, 10, 0, 0),
+            BorderThickness = new Thickness(0, 1, 0, 0),
+            BorderBrush = this.FindResource("LineBrush") as IBrush ?? Brushes.LightGray
+        };
+        var footer2Grid = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto") };
+        var btnBackToStep1 = LearningButton("← 上一步：重新选词", () => { });
+        footer2Grid.Children.Add(btnBackToStep1);
+
+        var step2Buttons = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10 };
+        var btnCancel2 = LearningButton("取消", dialog.Close);
+        var btnSubmitPlan = LearningButton("创建计划", () => { }, primary: true);
+        step2Buttons.Children.Add(btnCancel2);
+        step2Buttons.Children.Add(btnSubmitPlan);
+        Grid.SetColumn(step2Buttons, 1);
+        footer2Grid.Children.Add(step2Buttons);
+        step2Footer.Child = footer2Grid;
+
+        Grid.SetRow(step2Footer, 2);
+        step2View.Children.Add(step2Footer);
+
+        rootGrid.Children.Add(step1View);
+        rootGrid.Children.Add(step2View);
+        dialog.Content = rootGrid;
+
+        // ==================== 数据筛选与联动逻辑 ====================
         var page = 0;
-        var overlapConfirmed = false;
-        IReadOnlyList<DailyStudyPlanWord> CurrentWords()
+        const int pageSize = PlanCreationState.PageSize;
+        var isSubmitting = false;
+
+        IReadOnlyList<DailyStudyPlanWord> CurrentCatalogWords()
         {
             if (source == DailyStudyPlanSource.Archive) return archiveWords;
             return (sectionPicker?.SelectedItem as LearningSection)?.Entries.Select(ToPlanWord).ToList() ?? [];
         }
-        List<DailyStudyPlanWord> Filtered() => CurrentWords()
-            .Where(w => string.IsNullOrWhiteSpace(search.Text) ||
-                w.Word.Contains(search.Text.Trim(), StringComparison.OrdinalIgnoreCase) ||
-                w.Meaning.Contains(search.Text.Trim(), StringComparison.OrdinalIgnoreCase))
-            .ToList();
+
+        List<DailyStudyPlanWord> FilteredWords()
+        {
+            var baseList = CurrentCatalogWords();
+            var keyword = searchBox.Text?.Trim();
+            var query = baseList.AsEnumerable();
+
+            if (!string.IsNullOrWhiteSpace(keyword))
+            {
+                query = query.Where(w =>
+                    w.Word.Contains(keyword, StringComparison.OrdinalIgnoreCase) ||
+                    w.Meaning.Contains(keyword, StringComparison.OrdinalIgnoreCase) ||
+                    w.Definition.Contains(keyword, StringComparison.OrdinalIgnoreCase));
+            }
+
+            if (chkOnlySelected.IsChecked == true)
+            {
+                query = query.Where(w => selected.Contains(w.Id));
+            }
+
+            return query.ToList();
+        }
+
         List<DailyStudyPlanWord> SelectedWords()
         {
-            var sourceWords = source == DailyStudyPlanSource.Archive
-                ? archiveWords : sections.SelectMany(s => s.Entries).Select(ToPlanWord).ToList();
-            return sourceWords.Where(w => selected.Contains(w.Id)).DistinctBy(w => w.Id).ToList();
+            var allSourceWords = source == DailyStudyPlanSource.Archive
+                ? archiveWords
+                : sections.SelectMany(s => s.Entries).Select(ToPlanWord).ToList();
+
+            return allSourceWords.Where(w => selected.Contains(w.Id)).DistinctBy(w => w.Id).ToList();
         }
-        void RefreshSummary()
+
+        void RefreshStep1Summary()
         {
-            var count = SelectedWords().Count;
-            var daily = (int)(quota.Value ?? 20);
-            selectedLabel.Text = $"{(source == DailyStudyPlanSource.Archive ? "词汇档案" : "IELTS 专题")} · 已选 {count} 词";
-            estimate.Text = $"每日 {daily} 词 · 预计 {((count + daily - 1) / daily)} 天完成";
-            confirm.IsEnabled = count > 0;
+            var count = selected.Count;
+            selectedCountText.Text = $"已选 {count} 词 (跨章节与搜索保留)";
+            btnNextToStep2.IsEnabled = count > 0;
         }
-        void RenderPage()
-        {
-            rows.Children.Clear();
-            var filtered = Filtered();
-            var pages = Math.Max(1, (filtered.Count + 7) / 8);
-            page = Math.Clamp(page, 0, pages - 1);
-            foreach (var word in filtered.Skip(page * 8).Take(8))
-            {
-                var check = new CheckBox { Content = $"{word.Word} · {word.Meaning}", IsChecked = selected.Contains(word.Id) };
-                check.IsCheckedChanged += (_, _) =>
-                {
-                    if (check.IsChecked == true) selected.Add(word.Id); else selected.Remove(word.Id);
-                    overlapConfirmed = false; error.Text = ""; RefreshSummary();
-                };
-                rows.Children.Add(check);
-            }
-            if (filtered.Count == 0) rows.Children.Add(LearningText("没有匹配词条。"));
-            pageLabel.Text = $"{page + 1} / {pages}";
-            previous.IsEnabled = page > 0; next.IsEnabled = page < pages - 1;
-            RefreshSummary();
-        }
-        selectAll.Click += (_, _) => { selected.UnionWith(Filtered().Select(w => w.Id)); overlapConfirmed = false; error.Text = ""; RenderPage(); };
-        clear.Click += (_, _) => { selected.ExceptWith(Filtered().Select(w => w.Id)); overlapConfirmed = false; error.Text = ""; RenderPage(); };
-        previous.Click += (_, _) => { page--; RenderPage(); };
-        next.Click += (_, _) => { page++; RenderPage(); };
-        search.TextChanged += (_, _) => { page = 0; RenderPage(); };
-        if (sectionPicker != null) sectionPicker.SelectionChanged += (_, _) => { page = 0; RenderPage(); };
-        quota.ValueChanged += (_, _) => { overlapConfirmed = false; error.Text = ""; RefreshSummary(); };
-        planName.TextChanged += (_, _) => { overlapConfirmed = false; error.Text = ""; };
-        confirm.Click += (_, _) =>
+
+        void RefreshStep2Summary()
         {
             var words = SelectedWords();
-            if (words.Count == 0 || string.IsNullOrWhiteSpace(planName.Text)) { error.Text = "请选择词条并输入计划名称。"; return; }
-            var count = (int)(quota.Value ?? 0);
-            if (count is < 1 or > 10000) { error.Text = "每日词数应为 1–10000。"; return; }
-            var sourceLabel = source == DailyStudyPlanSource.Archive ? "词汇档案" : "IELTS 专题";
-            var plan = DailyStudyPlanRules.Create(planName.Text, source, sourceLabel, words, count, random.IsChecked == true, Random.Shared.Next());
-            var overlaps = DailyStudyPlanRules.FindOverlaps(_learningPlans, plan);
-            if (overlaps.Count > 0 && !overlapConfirmed)
+            var count = words.Count;
+            var quota = (int)(quotaInput.Value ?? 20);
+            var sourceName = source == DailyStudyPlanSource.Archive ? "词汇档案" : "IELTS 专题";
+
+            step2SummaryText.Text = $"{sourceName} · 已选 {count} 个词条";
+            var (_, desc) = PlanCreationState.CalculateEstimate(count, quota);
+            estimateBody.Text = desc;
+        }
+
+        void RenderStep1Page()
+        {
+            rowsPanel.Children.Clear();
+            var filtered = FilteredWords();
+            var pages = Math.Max(1, (filtered.Count + pageSize - 1) / pageSize);
+            page = Math.Clamp(page, 0, pages - 1);
+
+            var pageWords = filtered.Skip(page * pageSize).Take(pageSize).ToList();
+            foreach (var word in pageWords)
             {
-                var names = string.Join("、", overlaps.Select(o => o.PlanName).Distinct().Take(3));
-                var examples = string.Join("、", overlaps.Select(o => o.Word).Distinct().Take(4));
-                error.Text = $"与 {names} 重叠 {overlaps.Select(o => o.Word).Distinct().Count()} 词（{examples}）。再次点击可继续创建。";
-                overlapConfirmed = true;
+                var rowBorder = new Border
+                {
+                    CornerRadius = new CornerRadius(6),
+                    Padding = new Thickness(8, 6),
+                    Background = Brushes.Transparent
+                };
+                void UpdateSelectionPaint()
+                {
+                    if (selected.Contains(word.Id)) rowBorder.Bind(Border.BackgroundProperty, dialog.GetResourceObservable("SelectionBrush"));
+                    else rowBorder.Background = Brushes.Transparent;
+                }
+                UpdateSelectionPaint();
+
+                var rowGrid = new Grid { ColumnDefinitions = new ColumnDefinitions("44,180,*") };
+                var check = new CheckBox
+                {
+                    IsChecked = selected.Contains(word.Id),
+                    VerticalAlignment = VerticalAlignment.Center
+                };
+
+                check.IsCheckedChanged += (_, _) =>
+                {
+                    if (check.IsChecked == true) selected.Add(word.Id);
+                    else selected.Remove(word.Id);
+
+                    UpdateSelectionPaint();
+
+                    conflictPanel.IsVisible = false;
+                    formErrorText.Text = "";
+                    RefreshStep1Summary();
+                };
+
+                rowGrid.Children.Add(check);
+
+                var wordStack = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
+                wordStack.Children.Add(new TextBlock
+                {
+                    Text = word.Word,
+                    FontWeight = FontWeight.SemiBold,
+                    FontSize = 14
+                });
+                if (!string.IsNullOrWhiteSpace(word.Phonetic))
+                {
+                    wordStack.Children.Add(new TextBlock
+                    {
+                        Text = $"/{word.Phonetic}/",
+                        FontSize = 11,
+                        Opacity = 0.65
+                    });
+                }
+                Grid.SetColumn(wordStack, 1);
+                rowGrid.Children.Add(wordStack);
+
+                var meaningBlock = new TextBlock
+                {
+                    Text = word.Meaning + (string.IsNullOrWhiteSpace(word.Definition) ? "" : $" · {word.Definition}"),
+                    FontSize = 13,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    TextWrapping = TextWrapping.Wrap,
+                    Opacity = 0.9
+                };
+                Grid.SetColumn(meaningBlock, 2);
+                rowGrid.Children.Add(meaningBlock);
+
+                rowBorder.Child = rowGrid;
+                rowsPanel.Children.Add(rowBorder);
+            }
+
+            if (filtered.Count == 0)
+            {
+                rowsPanel.Children.Add(new TextBlock
+                {
+                    Text = chkOnlySelected.IsChecked == true ? "当前暂无已选词条。" : "没有匹配的词条。",
+                    Opacity = 0.6,
+                    Margin = new Thickness(12)
+                });
+            }
+
+            pageIndicator.Text = $"第 {page + 1} / {pages} 页 (范围共 {filtered.Count} 词)";
+            btnPrevPage.IsEnabled = page > 0;
+            btnNextPage.IsEnabled = page < pages - 1;
+            RefreshStep1Summary();
+        }
+
+        // ==================== 事件交互绑定 ====================
+
+        // Step 1 批量选择操作
+        btnSelectPage.Click += (_, _) =>
+        {
+            var filtered = FilteredWords();
+            var pageWords = filtered.Skip(page * pageSize).Take(pageSize).ToList();
+            selected.UnionWith(pageWords.Select(w => w.Id));
+            conflictPanel.IsVisible = false;
+            formErrorText.Text = "";
+            RenderStep1Page();
+        };
+
+        btnSelectFiltered.Click += (_, _) =>
+        {
+            var filtered = FilteredWords();
+            selected.UnionWith(filtered.Select(w => w.Id));
+            conflictPanel.IsVisible = false;
+            formErrorText.Text = "";
+            RenderStep1Page();
+        };
+
+        btnClearFiltered.Click += (_, _) =>
+        {
+            var filtered = FilteredWords();
+            selected.ExceptWith(filtered.Select(w => w.Id));
+            conflictPanel.IsVisible = false;
+            formErrorText.Text = "";
+            RenderStep1Page();
+        };
+
+        btnClearAll.Click += (_, _) =>
+        {
+            selected.Clear();
+            conflictPanel.IsVisible = false;
+            formErrorText.Text = "";
+            RenderStep1Page();
+        };
+
+        chkOnlySelected.IsCheckedChanged += (_, _) =>
+        {
+            page = 0;
+            RenderStep1Page();
+        };
+
+        btnPrevPage.Click += (_, _) => { page--; RenderStep1Page(); };
+        btnNextPage.Click += (_, _) => { page++; RenderStep1Page(); };
+
+        searchBox.TextChanged += (_, _) => { page = 0; RenderStep1Page(); };
+
+        if (sectionPicker != null)
+        {
+            sectionPicker.SelectionChanged += (_, _) =>
+            {
+                page = 0;
+                RenderStep1Page();
+            };
+        }
+
+        // Step 1 -> Step 2 切换
+        btnNextToStep2.Click += (_, _) =>
+        {
+            if (selected.Count == 0)
+            {
+                SetStatus("请至少选择 1 个词条后再安排计划。");
                 return;
             }
-            var updated = _learningPlans.Append(plan).ToList();
-            if (!SaveLearningPlans(updated)) { error.Text = "保存失败，请检查计划文件。"; return; }
-            _learningPlans = updated; RenderLearningPlans();
-            SetStatus($"计划已创建，共 {words.Count} 词。");
-            dialog.Close();
+            step1View.IsVisible = false;
+            step2View.IsVisible = true;
+            RefreshStep2Summary();
         };
-        RenderPage();
+
+        // Step 2 -> Step 1 切换（保留全部已选与输入）
+        void SwitchBackToStep1()
+        {
+            conflictPanel.IsVisible = false;
+            formErrorText.Text = "";
+            step2View.IsVisible = false;
+            step1View.IsVisible = true;
+            RenderStep1Page();
+        }
+
+        btnBackToStep1.Click += (_, _) => SwitchBackToStep1();
+        btnBackToStep1FromConflict.Click += (_, _) => SwitchBackToStep1();
+
+        quotaInput.ValueChanged += (_, _) => RefreshStep2Summary();
+
+        // 提交创建执行函数
+        void ExecuteCreation(DailyStudyPlan planToCreate, int wordCount)
+        {
+            if (isSubmitting) return;
+            isSubmitting = true;
+            btnSubmitPlan.IsEnabled = false;
+            btnConfirmConflictContinue.IsEnabled = false;
+
+            try
+            {
+                var updated = _learningPlans.Append(planToCreate).ToList();
+                if (!SaveLearningPlans(updated))
+                {
+                    formErrorText.Text = "保存失败，请检查计划文件权限或磁盘状态。";
+                    isSubmitting = false;
+                    btnSubmitPlan.IsEnabled = true;
+                    btnConfirmConflictContinue.IsEnabled = true;
+                    return;
+                }
+
+                _learningPlans = updated;
+                RenderLearningPlans();
+                SetStatus($"计划「{planToCreate.Name}」已成功创建，共 {wordCount} 词。");
+                dialog.Close();
+            }
+            catch (Exception ex)
+            {
+                formErrorText.Text = "创建计划出错：" + ex.Message;
+                isSubmitting = false;
+                btnSubmitPlan.IsEnabled = true;
+                btnConfirmConflictContinue.IsEnabled = true;
+            }
+        }
+
+        // Step 2 提交校验与冲突处理
+        btnSubmitPlan.Click += (_, _) =>
+        {
+            formErrorText.Text = "";
+            var words = SelectedWords();
+            if (words.Count == 0)
+            {
+                formErrorText.Text = "已选词数必须大于 0，请返回上一步选择词条。";
+                return;
+            }
+
+            var planName = planNameInput.Text?.Trim();
+            if (string.IsNullOrWhiteSpace(planName))
+            {
+                formErrorText.Text = "请输入计划名称。";
+                return;
+            }
+
+            var dailyCount = (int)(quotaInput.Value ?? 0);
+            if (dailyCount is < 1 or > 10000)
+            {
+                formErrorText.Text = "每日词数应在 1–10000 之间。";
+                return;
+            }
+
+            var sourceLabel = source == DailyStudyPlanSource.Archive ? "词汇档案" : "IELTS 专题";
+            var plan = DailyStudyPlanRules.Create(
+                planName,
+                source,
+                sourceLabel,
+                words,
+                dailyCount,
+                randomCheckbox.IsChecked == true,
+                Random.Shared.Next());
+
+            var overlaps = DailyStudyPlanRules.FindOverlaps(_learningPlans, plan);
+            if (overlaps.Count > 0)
+            {
+                // 冲突明确展示，并要求用户点击专用的「我已知晓，仍然创建计划」按钮，杜绝同按钮二次隐式点击
+                var grouped = overlaps.GroupBy(o => o.PlanName).ToList();
+                var summaryLines = grouped.Select(g =>
+                {
+                    var sampleWords = g.Select(x => x.Word).Distinct().Take(4).ToList();
+                    var totalOverlap = g.Select(x => x.Word).Distinct().Count();
+                    return $"• 计划《{g.Key}》: 重叠 {totalOverlap} 词（{string.Join("、", sampleWords)}{(totalOverlap > 4 ? " 等" : "")}）";
+                });
+
+                conflictDetails.Text = $"当前选词中有 {overlaps.Select(o => o.Word).Distinct().Count()} 个词正在以下计划中学习：\n" +
+                                       string.Join("\n", summaryLines);
+                conflictPanel.IsVisible = true;
+                formErrorText.Text = "检测到重复词条，请在上方核对并确认是否继续创建。";
+                return;
+            }
+
+            ExecuteCreation(plan, words.Count);
+        };
+
+        // 冲突明确确认按钮
+        btnConfirmConflictContinue.Click += (_, _) =>
+        {
+            var words = SelectedWords();
+            var planName = planNameInput.Text?.Trim() ?? defaultPlanName;
+            var dailyCount = (int)(quotaInput.Value ?? 20);
+            var sourceLabel = source == DailyStudyPlanSource.Archive ? "词汇档案" : "IELTS 专题";
+
+            var plan = DailyStudyPlanRules.Create(
+                planName,
+                source,
+                sourceLabel,
+                words,
+                dailyCount,
+                randomCheckbox.IsChecked == true,
+                Random.Shared.Next());
+
+            ExecuteCreation(plan, words.Count);
+        };
+
+        RenderStep1Page();
         _ = dialog.ShowDialog(this);
     }
 
     private static DailyStudyPlanWord ToPlanWord(LearningWord word) => new()
     {
-        Id = word.Id, Word = word.Word, Meaning = word.Meaning, Phonetic = word.Phonetic,
-        Definition = word.Extra, Example = word.Example, AudioPath = word.AudioPath
+        Id = word.Id,
+        Word = word.Word,
+        Meaning = word.Meaning,
+        Phonetic = word.Phonetic,
+        Definition = word.Extra,
+        Example = word.Example,
+        AudioPath = word.AudioPath
     };
 }

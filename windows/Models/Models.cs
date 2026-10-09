@@ -124,9 +124,10 @@ public sealed class WordItem : INotifyPropertyChanged
 
     public bool IsMastered => Status == "mastered";
 
-    public string StatusLabel => Status == "mastered" ? "已掌握" : $"阶段 {Stage + 1} / 5";
+    public bool UsesAdaptiveSchedule { get; set; }
+    public string StatusLabel => Status == "mastered" ? "已掌握" : UsesAdaptiveSchedule ? "FSRS 自适应" : $"阶段 {Stage + 1} / 5";
 
-    public string StageDescription => Status == "mastered" ? "全部完成" : $"第 {Stage + 1} 阶段 (共 5 阶段)";
+    public string StageDescription => Status == "mastered" ? "全部完成" : UsesAdaptiveSchedule ? "按记忆表现动态排期" : $"第 {Stage + 1} 阶段 (共 5 阶段)";
 
     public string NextReviewDisplay => Status == "mastered" ? "完成学习" : (NextReviewDate ?? "待安排");
 

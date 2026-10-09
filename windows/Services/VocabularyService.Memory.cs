@@ -1250,8 +1250,25 @@ public sealed partial class VocabularyService
         return InvalidateCanonicalCore(canonicalId, atUtc, reason, undoEvent, checkpoint);
     }
 
+    public bool InvalidateCanonicalWithMutations(string canonicalId, DateTime atUtc,
+        LearningInteractionEvent undoEvent, MemorySessionCheckpoint? checkpoint,
+        IReadOnlyList<PendingMutation> mutations)
+        => InvalidateCanonicalCore(canonicalId, atUtc, "undo", undoEvent, checkpoint, mutations);
+
+    public void AppendEventWithMutations(LearningInteractionEvent e, MemorySessionCheckpoint? checkpoint,
+        IReadOnlyList<PendingMutation> mutations)
+    {
+        using var tx = _connection.BeginTransaction();
+        InsertEvent(_connection, tx, e);
+        if (checkpoint != null) UpsertSessionCheckpoint(_connection, tx, checkpoint);
+        EnqueueMutations(_connection, tx, mutations, DateTime.UtcNow);
+        tx.Commit();
+        BackupAfterMemoryWrite();
+    }
+
     private bool InvalidateCanonicalCore(string canonicalId, DateTime atUtc, string reason,
-        LearningInteractionEvent? undoEvent, MemorySessionCheckpoint? checkpoint)
+        LearningInteractionEvent? undoEvent, MemorySessionCheckpoint? checkpoint,
+        IReadOnlyList<PendingMutation>? mutations = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(canonicalId);
 
@@ -1404,6 +1421,7 @@ public sealed partial class VocabularyService
 
                 if (undoEvent is not null) InsertEvent(_connection, tx, undoEvent);
                 if (checkpoint is not null) UpsertSessionCheckpoint(_connection, tx, checkpoint);
+                if (mutations is not null) EnqueueMutations(_connection, tx, mutations, DateTime.UtcNow);
                 tx.Commit();
             }
             catch
@@ -1450,6 +1468,39 @@ public sealed partial class VocabularyService
         cmd.Parameters.AddWithValue("$wordKey", wordKey);
         using var r = cmd.ExecuteReader();
         return r.Read() ? ReadCard(r) : null;
+    }
+
+    public IReadOnlyList<FsrsCardState> GetMemoryCards()
+    {
+        using var cmd = _connection.CreateCommand(); cmd.CommandText = $"SELECT {CardColumns} FROM fsrs_cards";
+        var cards = new List<FsrsCardState>();
+        using var reader = cmd.ExecuteReader(); while (reader.Read()) cards.Add(ReadCard(reader));
+        return cards;
+    }
+
+    public void SaveSourceWordDetails(string wordKey, string word, string phonetic, string translation, string definition)
+    {
+        using var cmd = _connection.CreateCommand();
+        cmd.CommandText = """
+            CREATE TABLE IF NOT EXISTS memory_source_details(word_key TEXT PRIMARY KEY, details_json TEXT NOT NULL);
+            INSERT INTO memory_source_details(word_key,details_json) VALUES($key,$json)
+            ON CONFLICT(word_key) DO UPDATE SET details_json=excluded.details_json;
+            """;
+        cmd.Parameters.AddWithValue("$key", wordKey);
+        cmd.Parameters.AddWithValue("$json", System.Text.Json.JsonSerializer.Serialize(new[] {word,phonetic,translation,definition}));
+        cmd.ExecuteNonQuery();
+    }
+
+    public string[]? LoadSourceWordDetails(string wordKey)
+    {
+        using var exists = _connection.CreateCommand(); exists.CommandText = "SELECT 1 FROM sqlite_master WHERE name='memory_source_details'";
+        if (exists.ExecuteScalar() == null) return null;
+        using var cmd = _connection.CreateCommand(); cmd.CommandText = "SELECT details_json FROM memory_source_details WHERE word_key=$key";
+        cmd.Parameters.AddWithValue("$key", wordKey);
+        if (cmd.ExecuteScalar() is not string json) return null;
+        var details = System.Text.Json.JsonSerializer.Deserialize<string[]>(json);
+        if (details is not {Length:4}) throw new InvalidDataException("来源词条详情损坏，已保留原记录。");
+        return details;
     }
 
     /// <summary>All memory-card identities, including paused cards with a null due date.</summary>

@@ -327,7 +327,7 @@ public sealed class LearningMemoryCoordinator
 
     /// <summary>撤销上一次作答（同一 presentation）。只追加事件，绝不删除任何历史。</summary>
     public void OnUndone(WordKey key, string presentationId, MemorySessionCheckpoint? checkpoint = null,
-        string? canonicalId = null)
+        string? canonicalId = null, IReadOnlyList<PendingMutation>? outboxMutations = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(presentationId);
         lock (_gate)
@@ -343,9 +343,13 @@ public sealed class LearningMemoryCoordinator
                 response: null, previousResponse: null, supersedes, recognition, recognition, latencyMs: null);
             if (canonicalId is not null)
             {
-                if (!_store.InvalidateCanonicalWithEvent(canonicalId, now, "undo", e, checkpoint))
+                var undone = outboxMutations is { Count: > 0 }
+                    ? _store.InvalidateCanonicalWithMutations(canonicalId, now, e, checkpoint, outboxMutations)
+                    : _store.InvalidateCanonicalWithEvent(canonicalId, now, "undo", e, checkpoint);
+                if (!undone)
                     throw new InvalidOperationException("长期复习记录已改变，不能撤销此评分。");
             }
+            else if (outboxMutations is { Count: > 0 }) _store.AppendEventWithMutations(e, checkpoint, outboxMutations);
             else if (checkpoint is null) _store.AppendEvent(e);
             else _store.AppendEventWithCheckpoint(e, checkpoint);
             if (state.StandingEventIds.Count > 0) state.StandingEventIds.RemoveAt(state.StandingEventIds.Count - 1);

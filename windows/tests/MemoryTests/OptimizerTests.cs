@@ -984,6 +984,7 @@ internal static class OptimizerTests
 
     private static void MakeExecutable(string path)
     {
+        if (OperatingSystem.IsWindows()) { WindowsOptimizerFixture.Materialize(path); return; }
         try
         {
             var p = Process.Start(new ProcessStartInfo

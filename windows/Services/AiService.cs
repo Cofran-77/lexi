@@ -11,7 +11,7 @@ using System.Threading.Tasks;
 
 namespace Lexi;
 
-public sealed class AiService
+public sealed class AiService : IAiExpansion
 {
     private static readonly HttpClient _httpClient = new(new SocketsHttpHandler
     {

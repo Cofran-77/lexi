@@ -1,4 +1,4 @@
-param([string]$Version = '1.0.0')
+param([string]$Version = '1.1.0')
 $ErrorActionPreference = 'Stop'
 $project = Split-Path $PSScriptRoot -Parent
 $outputs = Split-Path $project -Parent
@@ -7,6 +7,7 @@ $installer = Join-Path $release "Lexi-$Version-x64-setup.exe"
 if (!(Test-Path -LiteralPath $installer)) { throw 'Build the installer first.' }
 Copy-Item -LiteralPath (Join-Path $project 'README.md') -Destination (Join-Path $release '使用说明.md') -Force
 Copy-Item -LiteralPath (Join-Path $project 'RELEASE-NOTES.md') -Destination (Join-Path $release '版本说明.md') -Force
+Copy-Item -LiteralPath (Join-Path $project 'PHASE-ONE-STATUS.md') -Destination (Join-Path $release '阶段一完成情况.md') -Force
 Copy-Item -LiteralPath (Join-Path $project 'Notices') -Destination (Join-Path $release '第三方许可') -Recurse -Force
 $sourceZip = Join-Path $outputs "Lexi-$Version-Avalonia-源码.zip"
 Add-Type -AssemblyName System.IO.Compression

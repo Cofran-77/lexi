@@ -11,7 +11,7 @@ internal interface ISelectionClipboard : IDisposable
     bool Restore(uint expectedSequence, nint source = 0);
 }
 
-public sealed class SelectionCaptureService
+public sealed class SelectionCaptureService : ISelectionCapture
 {
     private readonly ISelectionClipboard _clipboard;
     internal SelectionCaptureService(ISelectionClipboard clipboard) => _clipboard = clipboard;

@@ -5,5 +5,7 @@
     <Nullable>enable</Nullable>
     <RootNamespace>Lexi.Core</RootNamespace>
     <AssemblyName>Lexi.Core</AssemblyName>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
   </PropertyGroup>
+  <ItemGroup><ProjectReference Include="../Application/Lexi.Application.csproj" /></ItemGroup>
 </Project>

@@ -2,6 +2,11 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
   <Styles.Resources>
     <ResourceDictionary>
+      <CornerRadius x:Key="ControlRadius">8</CornerRadius>
+      <CornerRadius x:Key="CardRadius">14</CornerRadius>
+      <Thickness x:Key="ControlPadding">14,8</Thickness>
+      <Thickness x:Key="CardPadding">20</Thickness>
+      <FontFamily x:Key="BodyFont">Segoe UI, Microsoft YaHei UI, sans-serif</FontFamily>
       <!-- Standalone themes: replacing Template alone leaves Fluent's nested
            state selectors active on PART_ContentPresenter (square/blue fills). -->
       <ControlTheme x:Key="LexiButtonTheme" TargetType="Button">
@@ -80,12 +85,12 @@
 
   <!-- Global Font and Foreground -->
   <Style Selector="Window">
-    <Setter Property="FontFamily" Value="Segoe UI, Microsoft YaHei UI, -apple-system, sans-serif"/>
+    <Setter Property="FontFamily" Value="{DynamicResource BodyFont}"/>
     <Setter Property="Foreground" Value="{DynamicResource InkBrush}"/>
   </Style>
 
   <Style Selector="TextBlock">
-    <Setter Property="FontFamily" Value="Segoe UI, Microsoft YaHei UI, -apple-system, sans-serif"/>
+    <Setter Property="FontFamily" Value="{DynamicResource BodyFont}"/>
     <Setter Property="Foreground" Value="{DynamicResource InkBrush}"/>
   </Style>
 
@@ -125,8 +130,8 @@
         </Border>
       </ControlTemplate>
     </Setter>
-    <Setter Property="CornerRadius" Value="8"/>
-    <Setter Property="Padding" Value="14,8"/>
+    <Setter Property="CornerRadius" Value="{DynamicResource ControlRadius}"/>
+    <Setter Property="Padding" Value="{DynamicResource ControlPadding}"/>
     <Setter Property="Cursor" Value="Hand"/>
     <Setter Property="RenderTransform" Value="scale(1)"/>
     <Setter Property="Transitions">
@@ -265,8 +270,8 @@
     <Setter Property="Background" Value="{DynamicResource CardBrush}"/>
     <Setter Property="BorderBrush" Value="{DynamicResource CardBorderGradient}"/>
     <Setter Property="BorderThickness" Value="1"/>
-    <Setter Property="CornerRadius" Value="14"/>
-    <Setter Property="Padding" Value="20"/>
+    <Setter Property="CornerRadius" Value="{DynamicResource CardRadius}"/>
+    <Setter Property="Padding" Value="{DynamicResource CardPadding}"/>
     <Setter Property="BoxShadow" Value="{DynamicResource SoftCardShadow}"/>
   </Style>
 
@@ -565,4 +570,16 @@
   <Style Selector="ListBox.vocabulary ListBoxItem:focus-visible /template/ Border#RowSurface">
     <Setter Property="BorderBrush" Value="{DynamicResource LineBrush}"/>
   </Style>
+  <Style Selector="Window.reduce-motion Button, Window.reduce-motion CheckBox, Window.reduce-motion TextBox">
+    <Setter Property="Transitions" Value="{x:Null}"/>
+  </Style>
+  <Style Selector="Window.reduce-motion Button:pressed, Window.reduce-motion CheckBox:pressed">
+    <Setter Property="RenderTransform" Value="scale(1)"/>
+    <Setter Property="Transitions" Value="{x:Null}"/>
+  </Style>
+  <Style Selector="Window.reduce-motion TextBox /template/ Border#PART_BorderElement">
+    <Setter Property="Transitions" Value="{x:Null}"/>
+  </Style>
+  <Style Selector="Window.compact Border.card"><Setter Property="Padding" Value="16"/></Style>
+  <Style Selector="Window.expanded Border.card"><Setter Property="Padding" Value="24"/></Style>
 </Styles>

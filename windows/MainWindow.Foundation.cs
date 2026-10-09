@@ -151,6 +151,7 @@ public partial class MainWindow
     private void UpdateDataInfo()
     {
         DataLocationText.Text = _vocabService.DatabasePath;
+        DataIdentityText.Text = $"当前词库 · {_allWords.Count} 个词 · 最近收藏 {(_allWords.Count > 0 ? _allWords.Max(w => w.CreatedAt) : "暂无")}";
         var folder = Path.Combine(Path.GetDirectoryName(_vocabService.DatabasePath)!, "backups");
         var path = Directory.Exists(folder) ? Directory.EnumerateFiles(folder, "lexi-*.sqlite3").OrderByDescending(Path.GetFileName, StringComparer.Ordinal).FirstOrDefault() : null;
         LastBackupText.Text = path != null && File.Exists(path) ? "最近备份：" + File.GetLastWriteTime(path).ToString("yyyy-MM-dd HH:mm:ss") : "暂无备份，收藏后自动备份。";
@@ -162,12 +163,7 @@ public partial class MainWindow
         try
         {
             var databasePath = _vocabService.DatabasePath;
-            var backup = await Task.Run(() =>
-            {
-                using var db = new Microsoft.Data.Sqlite.SqliteConnection(new Microsoft.Data.Sqlite.SqliteConnectionStringBuilder { DataSource = databasePath, Mode = Microsoft.Data.Sqlite.SqliteOpenMode.ReadOnly, Pooling = false }.ToString());
-                db.Open();
-                return DatabaseSafety.CreateBackup(db, databasePath);
-            });
+            var backup = await Task.Run(() => _backups.Create(databasePath));
             LastBackupText.Text = "最近备份：" + File.GetLastWriteTime(backup).ToString("yyyy-MM-dd HH:mm:ss");
             SetStatus("备份已保存：" + backup);
         }
@@ -208,10 +204,7 @@ public partial class MainWindow
             var path = files[0].TryGetLocalPath();
             if (path == null) throw new IOException("请选择本机文件。");
             // Open a read-only connection; never migrate or modify an unconfirmed backup.
-            using var db = new Microsoft.Data.Sqlite.SqliteConnection(new Microsoft.Data.Sqlite.SqliteConnectionStringBuilder { DataSource = path, Mode = Microsoft.Data.Sqlite.SqliteOpenMode.ReadOnly, Pooling = false }.ToString());
-            db.Open(); DatabaseSafety.Validate(db); DatabaseSafety.ValidateApplicationSchema(db);
-            using var cmd = db.CreateCommand(); cmd.CommandText = "SELECT count(*) FROM words";
-            var count = Convert.ToInt64(cmd.ExecuteScalar());
+            var count = await Task.Run(() => _backups.Inspect(path));
             _pendingRestore = path;
             RestoreDescriptionText.Text = $"{Path.GetFileName(path)}\n包含 {count} 个词。";
             RestoreOverlay.IsVisible = true;
@@ -236,17 +229,19 @@ public partial class MainWindow
             ++_lookupVersion; _aiCts?.Cancel();
             foreach (var cts in _rowAiRequests.Values) cts.Cancel();
             // Freeze the selected file before CreateManualBackup rotates the oldest snapshot.
-            staged = await Task.Run(() => DatabaseSafety.StageRestoreSelection(selection, Path.GetDirectoryName(path)!));
+            staged = await Task.Run(() => _backups.Stage(selection, Path.GetDirectoryName(path)!));
             _vocabService.CreateManualBackup();
             _vocabService.Dispose();
             serviceDisposed = true;
-            await Task.Run(() => DatabaseSafety.RestoreBackup(staged, path));
+            await Task.Run(() => _backups.Restore(staged, path));
             replacementInstalled = true;
-            _vocabService = new VocabularyService(path);
+            _vocabService = ServiceFactory.OpenArchive(path);
             serviceDisposed = false;
             _settings = _vocabService.LoadSettings();
             _allWords.Clear();
+            _reviewHandled.Clear();
             RefreshWords(); LoadSettingsToUi(); UpdateLookupArchiveState();
+            if (_currentPage == "review") OpenReviewDeck();
             _currentExpansion = null;
             LookupResultCard.IsVisible = LookupNotFoundCard.IsVisible = false;
             LookupEmptyCard.IsVisible = true;
@@ -266,7 +261,7 @@ public partial class MainWindow
                 if (!serviceDisposed) { _vocabService.Dispose(); serviceDisposed = true; }
                 try
                 {
-                    _vocabService = new VocabularyService(path); serviceDisposed = false;
+                    _vocabService = ServiceFactory.OpenArchive(path); serviceDisposed = false;
                     _settings = _vocabService.LoadSettings();
                     _allWords.Clear(); RefreshWords(); LoadSettingsToUi(); UpdateLookupArchiveState();
                     SetStatus(replacementInstalled
@@ -277,7 +272,7 @@ public partial class MainWindow
                 {
                     if (!serviceDisposed) { _vocabService.Dispose(); serviceDisposed = true; }
                     _databaseAvailable = false;
-                    PageLookup.IsEnabled = PageVocab.IsEnabled = PageSettings.IsEnabled = false;
+                    PageLookup.IsEnabled = PageVocab.IsEnabled = PageSettings.IsEnabled = PageReview.IsEnabled = false;
                     NavLookup.IsEnabled = NavVocab.IsEnabled = NavReview.IsEnabled = NavSettings.IsEnabled = false;
                     ThemeToggleBtn.IsEnabled = false;
                     SetStatus(replacementInstalled
@@ -292,7 +287,7 @@ public partial class MainWindow
             IsEnabled = true;
             RestoreOverlay.IsVisible = false;
             RestoreConfirmBtn.IsEnabled = RestoreCancelBtn.IsEnabled = true;
-            if (staged != null) DatabaseSafety.DeleteRestoreSelection(staged);
+            if (staged != null) _backups.ReleaseStage(staged);
             if (_databaseAvailable) UpdateDataInfo();
         }
     }

@@ -4,7 +4,7 @@ using Microsoft.Data.Sqlite;
 
 namespace Lexi;
 
-public sealed class DictionaryService : IDisposable
+public sealed class DictionaryService : IDictionaryLookup, IDisposable
 {
     private readonly SqliteConnection _connection;
     private readonly object _gate = new();

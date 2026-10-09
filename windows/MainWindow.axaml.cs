@@ -18,9 +18,10 @@ namespace Lexi;
 
 public partial class MainWindow : Window
 {
-    private readonly DictionaryService _dictService;
-    private VocabularyService _vocabService;
-    private readonly AiService _aiService;
+    private readonly IDictionaryLookup _dictService;
+    private IVocabularyArchive _vocabService;
+    private readonly IAiExpansion _aiService;
+    private readonly IArchiveBackups _backups = ServiceFactory.CreateBackups();
     private AppSettings _settings;
 
     private List<WordItem> _allWords = new();
@@ -47,9 +48,9 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
 
-        _dictService = new DictionaryService();
-        _vocabService = new VocabularyService();
-        _aiService = new AiService();
+        _dictService = ServiceFactory.OpenDictionary();
+        _vocabService = ServiceFactory.OpenArchive();
+        _aiService = ServiceFactory.CreateAi();
         _settings = _vocabService.LoadSettings();
 
         VocabListBox.ItemsSource = _displayedWords;
@@ -57,6 +58,8 @@ public partial class MainWindow : Window
         BindEvents();
         ConfigureWindowChrome();
         BindFoundationEvents();
+        BindReviewEvents();
+        BindAppearanceEvents();
         LoadSettingsToUi();
         RefreshWords();
 
@@ -156,6 +159,7 @@ public partial class MainWindow : Window
             if (_settings.Theme == theme) return;
             var oldTheme = _settings.Theme;
             _settings.Theme = theme;
+            ApplyAppearance();
             try { _vocabService.SaveSettings(_settings); }
             catch (Exception ex) { _settings.Theme = oldTheme; SetStatus("主题已预览，但未能保存：" + ex.Message); }
         };
@@ -242,7 +246,7 @@ public partial class MainWindow : Window
     {
         if (!_databaseAvailable) return;
         _currentPage = page;
-        _isReviewMode = page == "review";
+        _isReviewMode = false; // Review deck owns its queue; archive filters never change it.
 
         NavLookup.Classes.Set("active", page == "lookup");
         NavVocab.Classes.Set("active", page == "vocab");
@@ -251,14 +255,19 @@ public partial class MainWindow : Window
 
         PageLookup.IsVisible = page == "lookup";
         LookupPageHost.IsVisible = page == "lookup";
-        PageVocab.IsVisible = page == "vocab" || page == "review";
+        PageVocab.IsVisible = page == "vocab";
+        PageReview.IsVisible = page == "review";
         PageSettings.IsVisible = page == "settings";
 
         if (page == "lookup")
         {
             LookupInput.Focus();
         }
-        else if (page == "vocab" || page == "review")
+        else if (page == "review")
+        {
+            OpenReviewDeck();
+        }
+        else if (page == "vocab")
         {
             VocabPageTitle.Text = _isReviewMode ? "今日重逢" : "词汇档案";
             VocabPageSubtitle.Text = _isReviewMode ? "记得，就走向下个节点；还不熟，明日再见。" : "保存真正遇见的词，也留下当时的语境。";
@@ -437,7 +446,7 @@ public partial class MainWindow : Window
 
         var startOpacity = AiDrawerSlot.Opacity;
 
-        var duration = TimeSpan.FromMilliseconds(260);
+        var duration = TimeSpan.FromMilliseconds(_settings.ReduceMotion ? 0 : 260);
         var sw = System.Diagnostics.Stopwatch.StartNew();
         var easing = new Avalonia.Animation.Easings.CubicEaseOut();
 
@@ -473,7 +482,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        if (immediate)
+        if (immediate || _settings.ReduceMotion)
         {
             AiDrawerSlot.Height = 0;
             AiDrawerSlot.Opacity = 0;
@@ -1000,6 +1009,7 @@ public partial class MainWindow : Window
         LoadFoundationSettings();
         SettingsThemeCombo.SelectedIndex = _settings.Theme == "Dark" ? 1 : 0;
         RequestedThemeVariant = _settings.Theme == "Dark" ? Avalonia.Styling.ThemeVariant.Dark : Avalonia.Styling.ThemeVariant.Light;
+        LoadAppearance();
 
         SettingsTimeoutCombo.SelectedIndex = _settings.Timeout switch
         {
@@ -1079,6 +1089,9 @@ public partial class MainWindow : Window
             RememberKey = rememberKey,
             Clipboard = false,
             Theme = SettingsThemeCombo.SelectedIndex == 1 ? "Dark" : "Light",
+            HighContrast = HighContrastBox.IsChecked == true,
+            OpaqueMaterial = OpaqueMaterialBox.IsChecked == true,
+            ReduceMotion = ReduceMotionBox.IsChecked == true,
             Timeout = timeout
         };
         _settings.AiContext = SelectedAiContext();

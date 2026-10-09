@@ -96,7 +96,8 @@ public static class UiSmokeTests
             Call("OnSelectAllClicked");
             C<ComboBox>("BatchActionCombo").SelectedIndex = 3;
             Click("NavReview");
-            Check(list.ItemCount >= 2 && list.Items.Cast<WordItem>().All(w => w.NextReviewDate == DateTime.Today.ToString("yyyy-MM-dd")), "today action fills daily review list");
+            Check(C<Grid>("PageReview").IsVisible && !C<Grid>("PageVocab").IsVisible && C<TextBlock>("ReviewRemainingText").Text == "还剩 2 个词", "today action fills independent recall deck without management controls");
+            Click("NavVocab");
             C<CheckBox>("SelectAllCheckBox").IsChecked = true;
             Call("OnSelectAllClicked");
             C<ComboBox>("BatchActionCombo").SelectedIndex = 6;
@@ -111,6 +112,7 @@ public static class UiSmokeTests
             Check(C<TextBlock>("GlobalStatusText").Text?.Contains("设置已保存") == true, "editable model settings saved");
 
             await FoundationUiTests.RunAsync(window, Check);
+            await RecallCardTests.RunAsync(window, Check);
             await FoundationFinalRegressionTests.RunAsync(window, Check);
             window.Close();
             Check(!window.IsVisible, "close hides window without ending application");

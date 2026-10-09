@@ -1,0 +1,122 @@
+using System.Reflection;
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Input;
+using Avalonia.Interactivity;
+using Avalonia.Media.Imaging;
+using Microsoft.Data.Sqlite;
+
+namespace Lexi;
+
+public static class RecallCardTests
+{
+    public static async Task RunAsync(MainWindow w, Action<bool, string> check)
+    {
+        var folder = Environment.GetEnvironmentVariable("LEXI_DATA_DIR");
+        if (string.IsNullOrWhiteSpace(folder)) throw new InvalidOperationException("Requires isolated data.");
+        T C<T>(string name) where T : Control => w.FindControl<T>(name)!;
+        object? Call(string name, params object[] args) => typeof(MainWindow).GetMethod(name, BindingFlags.NonPublic | BindingFlags.Instance)!.Invoke(w, args);
+        void Click(string name) => C<Button>(name).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        var store = (IVocabularyArchive)typeof(MainWindow).GetField("_vocabService", BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(w)!;
+        using var db = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = store.DatabasePath, Pooling = false }.ToString()); db.Open();
+        void Sql(string query) { using var command = db.CreateCommand(); command.CommandText = query; command.ExecuteNonQuery(); }
+        var originals = store.GetAllWords();
+        var settings = store.LoadSettings();
+        var size = w.ClientSize;
+        async Task Snapshot(string name)
+        {
+            await Task.Delay(80);
+            using var bmp = new RenderTargetBitmap(new PixelSize((int)w.Bounds.Width, (int)w.Bounds.Height), new Vector(96,96));
+            bmp.Render(w); bmp.Save(Path.Combine(folder, name + ".png"));
+        }
+        try
+        {
+            Sql("UPDATE words SET next_review_date='2999-01-01' WHERE status='learning'");
+            store.AddWord("recall-one", "/wʌn/", "第一张的隐藏释义", string.Join(" ", Enumerable.Repeat("A long definition for scrolling.", 100)));
+            store.AddWord("recall-two", "/tuː/", "第二张的隐藏释义", "Second definition");
+            store.AddWord("recall-future", "", "未来，不应显示", "");
+            var ids = store.GetAllWords().Where(x => x.Word is "recall-one" or "recall-two").Select(x => x.Id).ToArray();
+            store.ExecuteBatch(ids, "today");
+            Call("RefreshWords");
+            C<TextBox>("VocabSearchInput").Text = "does-not-match-anything";
+            w.Width = 840; w.Height = 600;
+            Click("NavReview");
+            check(C<TextBlock>("ReviewWordText").Text == "recall-one" && C<TextBlock>("ReviewRemainingText").Text == "还剩 2 个词", "recall ignores archive filters and excludes future words");
+            check(!C<Border>("ReviewAnswer").IsVisible && C<TextBlock>("ReviewMeaningText").Text == "" && !C<Grid>("ReviewRatingBar").IsVisible, "recall front does not disclose answer or ratings");
+            var before = store.GetAllWords().Single(x => x.Word == "recall-one");
+            await (Task)Call("RateReviewAsync", true)!;
+            check(store.GetAllWords().Single(x => x.Id == before.Id).Stage == before.Stage, "rating before reveal does not write progress");
+            await Snapshot("review-front");
+            C<Grid>("PageReview").RaiseEvent(new KeyEventArgs { RoutedEvent = InputElement.KeyDownEvent, Key = Key.Space });
+            check(C<Border>("ReviewAnswer").IsVisible && C<TextBlock>("ReviewMeaningText").Text == before.Translation, "Space reveals current answer");
+            await Snapshot("review-back-long");
+            var button = C<Button>("ReviewRememberBtn"); var corner = button.TranslatePoint(new Point(button.Bounds.Width, button.Bounds.Height), w);
+            check(button.IsEffectivelyVisible && corner.HasValue && corner.Value.Y < 600 && corner.Value.X < 840, "long answer keeps rating actions inside 840x600");
+            Sql("CREATE TRIGGER recall_fail BEFORE UPDATE ON words BEGIN SELECT RAISE(ABORT,'fixture write blocked'); END;");
+            try
+            {
+                await (Task)Call("RateReviewAsync", true)!;
+                check(C<TextBlock>("ReviewWordText").Text == "recall-one" && C<Border>("ReviewAnswer").IsVisible && store.GetAllWords().Single(x => x.Id == before.Id).Stage == before.Stage, "failed rating retains revealed card and unchanged progress");
+            }
+            finally { Sql("DROP TRIGGER recall_fail"); }
+            var first = (Task)Call("RateReviewAsync", true)!;
+            var second = (Task)Call("RateReviewAsync", true)!;
+            await Task.WhenAll(first, second);
+            check(store.GetAllWords().Single(x => x.Id == before.Id).Stage == before.Stage + 1, "double rating commits exactly one stage");
+            check(C<TextBlock>("ReviewWordText").Text == "recall-two" && C<TextBlock>("ReviewMeaningText").Text == "", "next card hides its answer");
+
+            // An undo restores the prior due date and must make the card visible again.
+            check(store.UndoLastReview(before.Id), "review fixture can be undone");
+            Call("RefreshWords"); Click("NavLookup"); Click("NavReview");
+            check(C<TextBlock>("ReviewWordText").Text == "recall-one", "undo then reopen shows the restored due word");
+
+            // Rate it again, then explicitly schedule it for today; reopening must
+            // likewise invalidate the session exclusion.
+            Click("ReviewRevealBtn");
+            await (Task)Call("RateReviewAsync", true)!;
+            store.ExecuteBatch([before.Id], "today");
+            Call("RefreshWords"); Click("NavLookup"); Click("NavReview");
+            check(C<TextBlock>("ReviewWordText").Text == "recall-one", "today reschedule then reopen shows the due word");
+            Click("ReviewRevealBtn");
+            var reviewedStage = store.GetAllWords().Single(x => x.Id == before.Id).Stage;
+            await (Task)Call("RateReviewAsync", true)!;
+            check(store.GetAllWords().Single(x => x.Id == before.Id).Stage == reviewedStage, "same-day rating preserves scheduling idempotence");
+            store.ExecuteBatch([before.Id], "today");
+            Call("RefreshWords"); Click("NavLookup"); Click("NavReview");
+            check(C<TextBlock>("ReviewWordText").Text == "recall-one", "same-date explicit reschedule invalidates handled revision");
+            Click("ReviewRevealBtn");
+            await (Task)Call("RateReviewAsync", false)!;
+
+            Click("ReviewRevealBtn"); Click("NavLookup"); Click("NavReview");
+            check(!C<Border>("ReviewAnswer").IsVisible, "re-entering deck hides current answer");
+            Click("ReviewRevealBtn");
+            C<Grid>("PageReview").RaiseEvent(new KeyEventArgs { RoutedEvent = InputElement.KeyDownEvent, Key = Key.Left });
+            await Task.Delay(250);
+            check(store.GetAllWords().Single(x => x.Word == "recall-two").NextReviewDate == DateTime.Today.AddDays(1).ToString("yyyy-MM-dd"), "left-key unfamiliar schedules tomorrow");
+            check(C<Border>("ReviewEmptyCard").IsVisible && C<TextBlock>("ReviewRemainingText").Text == "还剩 0 个词", "completed deck displays zero remaining");
+            C<CheckBox>("HighContrastBox").IsChecked = true;
+            C<CheckBox>("OpaqueMaterialBox").IsChecked = true;
+            C<CheckBox>("ReduceMotionBox").IsChecked = true;
+            var saved = store.LoadSettings();
+            check(saved.HighContrast && saved.OpaqueMaterial && saved.ReduceMotion && w.TransparencyLevelHint.SequenceEqual(new[] { WindowTransparencyLevel.None }), "accessibility preferences persist and disable transparency");
+            Click("NavSettings"); await Snapshot("settings-high-contrast");
+        }
+        finally
+        {
+            Sql("DROP TRIGGER IF EXISTS recall_fail");
+            var fixtures = store.GetAllWords().Where(x => x.Word.StartsWith("recall-", StringComparison.Ordinal)).Select(x => x.Id).ToArray();
+            if (fixtures.Length > 0) store.ExecuteBatch(fixtures, "delete");
+            foreach (var old in originals)
+            {
+                using var cmd = db.CreateCommand(); cmd.CommandText = "UPDATE words SET next_review_date=$date WHERE id=$id";
+                cmd.Parameters.AddWithValue("$date", (object?)old.NextReviewDate ?? DBNull.Value); cmd.Parameters.AddWithValue("$id", old.Id); cmd.ExecuteNonQuery();
+            }
+            C<CheckBox>("HighContrastBox").IsChecked = settings.HighContrast;
+            C<CheckBox>("OpaqueMaterialBox").IsChecked = settings.OpaqueMaterial;
+            C<CheckBox>("ReduceMotionBox").IsChecked = settings.ReduceMotion;
+            C<TextBox>("VocabSearchInput").Text = "";
+            w.Width = size.Width; w.Height = size.Height;
+            Call("RefreshWords"); Click("NavLookup");
+        }
+    }
+}

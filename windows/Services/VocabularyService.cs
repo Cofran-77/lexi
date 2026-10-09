@@ -8,7 +8,7 @@ using Lexi.Core;
 
 namespace Lexi;
 
-public sealed partial class VocabularyService : IDisposable
+public sealed partial class VocabularyService : IVocabularyArchive, IDisposable
 {
     public static readonly int[] StageOffsets = ReviewSchedule.DefaultStageOffsets;
     public const int MaxStage = ReviewSchedule.DefaultMaxStage;
@@ -1005,7 +1005,8 @@ public sealed partial class VocabularyService : IDisposable
             RememberKey = settings.RememberKey, Clipboard = settings.Clipboard, Theme = settings.Theme,
             Timeout = settings.Timeout, ApiKey = "",
             AiContext = string.IsNullOrWhiteSpace(settings.AiContext) ? "日常表达" : settings.AiContext,
-            IncludeSourceInAi = settings.IncludeSourceInAi
+            IncludeSourceInAi = settings.IncludeSourceInAi,
+            HighContrast = settings.HighContrast, OpaqueMaterial = settings.OpaqueMaterial, ReduceMotion = settings.ReduceMotion
         };
         using var cmd = _connection.CreateCommand();
         cmd.CommandText = @"INSERT INTO app_settings (id, settings_json) VALUES (1, $json)

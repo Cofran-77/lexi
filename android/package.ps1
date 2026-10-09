@@ -1,13 +1,13 @@
-param([string]$Destination = (Join-Path ([Environment]::GetFolderPath('Desktop')) 'Lexi Android 0.1.1 预览版'))
+param([string]$Destination = (Join-Path ([Environment]::GetFolderPath('Desktop')) 'Lexi Android 0.1.2 预览版'))
 $ErrorActionPreference = 'Stop'
 $apk = Join-Path $PSScriptRoot 'app/build/outputs/apk/debug/app-debug.apk'
 if (!(Test-Path -LiteralPath $apk)) { throw '请先执行 gradlew.bat assembleDebug 生成 APK。' }
 New-Item -ItemType Directory -Force $Destination | Out-Null
-Copy-Item -LiteralPath $apk -Destination (Join-Path $Destination 'Lexi-Android-0.1.1-alpha.apk') -Force
+Copy-Item -LiteralPath $apk -Destination (Join-Path $Destination 'Lexi-Android-0.1.2-alpha.apk') -Force
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'README.md') -Destination (Join-Path $Destination '安装与使用说明.md') -Force
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'DELIVERY.md') -Destination (Join-Path $Destination '交付范围与注意事项.md') -Force
 Add-Type -AssemblyName System.IO.Compression
-$output = [IO.File]::Create((Join-Path $Destination 'Lexi-Android-0.1.1-源码.zip'))
+$output = [IO.File]::Create((Join-Path $Destination 'Lexi-Android-0.1.2-源码.zip'))
 $zip = [IO.Compression.ZipArchive]::new($output,[IO.Compression.ZipArchiveMode]::Create)
 try {
     Get-ChildItem -LiteralPath $PSScriptRoot -Recurse -File | ForEach-Object {

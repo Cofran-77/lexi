@@ -225,6 +225,10 @@ fun LexiApp(vm: LexiViewModel, onExport: (String, Set<Long>?) -> Unit, onImport:
                                 Text(entry.translation.ifBlank { "待补充释义" }, maxLines = 2, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 Text(if (entry.status == "mastered") "已掌握" else "阶段 ${entry.stage + 1} · ${entry.nextReviewDate ?: "未安排"}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
                             }
+                            TextButton(onClick = { activeId = entry.id }, enabled = !vm.busy) {
+                                Icon(Icons.Outlined.Edit, null, Modifier.size(16.dp))
+                                Spacer(Modifier.width(4.dp)); Text("编辑")
+                            }
                         }
                     }
                 }
@@ -238,6 +242,7 @@ fun LexiApp(vm: LexiViewModel, onExport: (String, Set<Long>?) -> Unit, onImport:
 }
 
 @Composable private fun EntryEditor(entry: Entry, vm: LexiViewModel, onBack: () -> Unit, onDelete: () -> Unit, onExport: () -> Unit) {
+    var word by rememberSaveable(entry.id, entry.archive.revision) { mutableStateOf(entry.word) }
     var translation by rememberSaveable(entry.id, entry.archive.revision) { mutableStateOf(entry.translation) }
     var definition by rememberSaveable(entry.id, entry.archive.revision) { mutableStateOf(entry.definition) }
     var phonetic by rememberSaveable(entry.id, entry.archive.revision) { mutableStateOf(entry.phonetic) }
@@ -248,7 +253,7 @@ fun LexiApp(vm: LexiViewModel, onExport: (String, Set<Long>?) -> Unit, onImport:
     var tags by rememberSaveable(entry.id, entry.archive.revision) { mutableStateOf(entry.archive.tags.joinToString(", ")) }
     var aiJson by rememberSaveable(entry.id, entry.archive.revision) { mutableStateOf(entry.aiResult?.let { ArchiveJson.encodeAI(it) }.orEmpty()) }
     var error by remember { mutableStateOf<String?>(null) }
-    val dirty = translation != entry.translation || definition != entry.definition || phonetic != entry.phonetic || notes != entry.notes || sourceType != entry.archive.sourceType || source != entry.archive.sourceTitle || excerpt != entry.archive.sourceExcerpt || tags != entry.archive.tags.joinToString(", ") || aiJson != entry.aiResult?.let { ArchiveJson.encodeAI(it) }.orEmpty()
+    val dirty = word != entry.word || translation != entry.translation || definition != entry.definition || phonetic != entry.phonetic || notes != entry.notes || sourceType != entry.archive.sourceType || source != entry.archive.sourceTitle || excerpt != entry.archive.sourceExcerpt || tags != entry.archive.tags.joinToString(", ") || aiJson != entry.aiResult?.let { ArchiveJson.encodeAI(it) }.orEmpty()
     Column(Modifier.fillMaxSize()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onBack) { Icon(Icons.Outlined.ArrowBack, "返回档案列表") }
@@ -258,6 +263,7 @@ fun LexiApp(vm: LexiViewModel, onExport: (String, Set<Long>?) -> Unit, onImport:
         }
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Section("词条信息", "收藏于 ${entry.createdAt} · 遇见 ${entry.archive.encounterCount} 次") {
+                Field(word, "单词", { word = it })
                 Field(phonetic, "音标", { phonetic = it })
                 Field(translation, "中文释义", { translation = it }, 2)
                 Field(definition, "英文释义", { definition = it }, 2)
@@ -286,10 +292,12 @@ fun LexiApp(vm: LexiViewModel, onExport: (String, Set<Long>?) -> Unit, onImport:
         }
         Button(onClick = {
             try {
+                require(word.trim().isNotEmpty() && word.trim().length <= 512) { "单词须为 1–512 个字符" }
+                require(vm.entries.none { it.id != entry.id && it.word.equals(word.trim(), true) }) { "档案中已存在这个单词，请使用已有词条" }
                 val parsed = if (aiJson.isBlank()) null else ArchiveJson.decodeAI(aiJson)
                 error = null
-                vm.save(entry.copy(phonetic = phonetic, translation = translation, definition = definition, notes = notes, archive = entry.archive.copy(sourceType = sourceType, sourceTitle = source, sourceExcerpt = excerpt, tags = tags.split(',', '，').map { it.trim() }.filter { it.isNotEmpty() }.distinct()), aiResult = parsed))
-            } catch (e: Exception) { error = "AI JSON 格式有误：${e.message ?: "请检查字段和标点"}"; vm.report(error!!) }
+                vm.save(entry.copy(word = word.trim(), phonetic = phonetic, translation = translation, definition = definition, notes = notes, archive = entry.archive.copy(sourceType = sourceType, sourceTitle = source, sourceExcerpt = excerpt, tags = tags.split(',', '，').map { it.trim() }.filter { it.isNotEmpty() }.distinct()), aiResult = parsed))
+            } catch (e: Exception) { error = "暂未保存：${e.message ?: "请检查填写内容"}"; vm.report(error!!) }
         }, modifier = Modifier.fillMaxWidth().padding(top = 10.dp).heightIn(min = 50.dp), enabled = !vm.busy && !vm.aiBusy) { Text("保存档案") }
     }
 }
@@ -368,7 +376,7 @@ fun LexiApp(vm: LexiViewModel, onExport: (String, Set<Long>?) -> Unit, onImport:
                 OutlinedTextField(vm.apiKey, { vm.apiKey = it }, Modifier.fillMaxWidth(), label = { Text("API Key") }, singleLine = true, visualTransformation = PasswordVisualTransformation(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password), shape = RoundedCornerShape(14.dp))
                 Toggle("在此设备加密记住 Key", vm.rememberKey) { vm.rememberKey = it }
                 Text("关闭记住后，Key 仅用于本次打开。点击下方保存设置生效；导出文件不包含 Key。", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Field(vm.config.context, "例句语境", { vm.config = vm.config.copy(context = it) })
+                ContextPicker(vm)
                 Toggle("生成时附带来源摘录", vm.config.includeSource) { vm.config = vm.config.copy(includeSource = it) }
                 Text("开启后，当前词条的来源摘录会发给所选 AI 服务。", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text("请求超时：${vm.config.timeoutSeconds} 秒", style = MaterialTheme.typography.labelLarge)
@@ -384,7 +392,7 @@ fun LexiApp(vm: LexiViewModel, onExport: (String, Set<Long>?) -> Unit, onImport:
                 Text("私人档案位置", style = MaterialTheme.typography.labelLarge)
                 Text(vm.dataLocation, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            Section("Lexi for Android", "0.1.0 · Alpha") {
+            Section("Lexi for Android", "0.1.2 · Alpha") {
                 Text("为日常阅读留下一本私人词汇档案。\n本地保存 · 无需账户 · 无自动同步", style = MaterialTheme.typography.bodyMedium)
                 Text("离线词典：ECDICT（MIT License）。手机与平板根据窗口宽度自动适配。", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }

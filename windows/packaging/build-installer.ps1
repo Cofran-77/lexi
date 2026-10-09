@@ -2,7 +2,7 @@
 param(
   [string]$Nsis = 'C:\Program Files (x86)\NSIS\makensis.exe',
   [string]$Dotnet = '',
-  [string]$Version = '1.2.3',
+  [string]$Version = '1.2.4',
   [string]$OutputDir = '',
   [switch]$SkipPublish
 )
@@ -23,7 +23,7 @@ if ([string]::IsNullOrWhiteSpace($Dotnet)) {
   }
 }
 
-# Resolve release directory (default: workspace output dir under Lexi 1.2.3 Windows)
+# Resolve release directory (default: workspace output dir under Lexi 1.2.4 Windows)
 if ([string]::IsNullOrWhiteSpace($OutputDir)) {
   $release = Join-Path $versionRoot "Lexi-$Version-Windows-x64"
 } else {

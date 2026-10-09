@@ -3,11 +3,11 @@
     <ResourceDictionary>
       <ResourceDictionary.ThemeDictionaries>
         <ResourceDictionary x:Key="Light">
-          <SolidColorBrush x:Key="GlassSurfaceBrush">#F3F6F9FD</SolidColorBrush>
+          <SolidColorBrush x:Key="GlassSurfaceBrush">#C8F6F9FD</SolidColorBrush>
           <SolidColorBrush x:Key="GlassEdgeBrush">#B8FFFFFF</SolidColorBrush>
         </ResourceDictionary>
         <ResourceDictionary x:Key="Dark">
-          <SolidColorBrush x:Key="GlassSurfaceBrush">#F3202C3D</SolidColorBrush>
+          <SolidColorBrush x:Key="GlassSurfaceBrush">#D0202C3D</SolidColorBrush>
           <SolidColorBrush x:Key="GlassEdgeBrush">#554F6480</SolidColorBrush>
         </ResourceDictionary>
       </ResourceDictionary.ThemeDictionaries>

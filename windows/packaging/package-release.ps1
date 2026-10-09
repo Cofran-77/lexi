@@ -1,5 +1,5 @@
 param(
-  [string]$Version = '1.2.3',
+  [string]$Version = '1.2.4',
   [string]$OutputDir = '',
   [switch]$CopyToDesktop
 )
@@ -43,7 +43,7 @@ try {
   Get-ChildItem -LiteralPath $project -Recurse -File | ForEach-Object {
     $relative = [IO.Path]::GetRelativePath($project, $_.FullName)
     $bundledHelper = $relative.Replace('\','/') -eq 'native/fsrs-optimizer/target/release/fsrs-optimizer.exe'
-    if (!$bundledHelper -and $relative -match '(^|[\\/])(bin|obj|publish|work|target|\.git|\.avalonia-build-tasks)([\\/])') { return }
+    if (!$bundledHelper -and $relative -match '(^|[\\/])(bin|obj|publish|work|\.work|target|\.git|\.avalonia-build-tasks)([\\/])') { return }
     if ($relative -match '(vocab\.sqlite3|\.dpapi|\.env$|appsettings\.local\.json)') { throw "Unexpected private file: $relative" }
     $entry = $zip.CreateEntry('lexi_avalonia/' + $relative.Replace('\','/'), [IO.Compression.CompressionLevel]::Optimal)
     $entryStream = $entry.Open()

@@ -229,7 +229,9 @@ class LexiRepository(context: Context) {
         database.rawQuery("PRAGMA journal_mode", null).use { require(it.moveToFirst() && it.getString(0).equals("delete", true)) { "备份必须是完整的 Android 原生备份（DELETE 日志模式）" } }
         val schemas = mutableMapOf<String, String>()
         database.rawQuery("SELECT name,sql FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'", null).use { while (it.moveToNext()) schemas[it.getString(0)] = it.getString(1) }
-        require(schemas.keys == setOf("entries", "undo")) { "词库表结构不匹配" }
+        // Android's SQLite connection creates android_metadata for its locale.
+        // It is platform-owned, optional in transferred backups, and not an app table.
+        require(schemas.keys - "android_metadata" == setOf("entries", "undo")) { "词库表结构不匹配" }
         require(schemas["entries"] == "CREATE TABLE entries(id INTEGER PRIMARY KEY AUTOINCREMENT, word_key TEXT NOT NULL UNIQUE, uuid TEXT NOT NULL UNIQUE, payload TEXT NOT NULL)" &&
             schemas["undo"] == "CREATE TABLE undo(word_id INTEGER PRIMARY KEY REFERENCES entries(id) ON DELETE CASCADE, payload TEXT NOT NULL)") { "词库约束不匹配" }
         require(scalar("SELECT count(*) FROM sqlite_master WHERE type IN ('trigger','view')") == 0L) { "词库包含不受支持的结构" }

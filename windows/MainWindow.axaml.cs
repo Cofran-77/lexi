@@ -741,11 +741,8 @@ public partial class MainWindow : Window
         }).ToList();
         ApplyVocabFilters();
 
-        var today = DateTime.Today.ToString("yyyy-MM-dd");
-        var dueCount = _allWords.Count(w => w.Status == "learning" && w.NextReviewDate != null && string.Compare(w.NextReviewDate, today) <= 0);
-
         NavVocabBadge.Text = _allWords.Count.ToString();
-        NavReviewBadge.Text = dueCount.ToString();
+        UpdateReviewBadge();
     }
 
     private void ResetVocabScroll()

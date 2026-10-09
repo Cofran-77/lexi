@@ -35,17 +35,25 @@ public partial class MainWindow
     private void OpenReviewDeck()
     {
         ++_reviewEpoch;
-        if (_reviewDay != DateTime.Today) { _reviewHandled.Clear(); _reviewDay = DateTime.Today; }
         RenderReviewCard();
     }
 
-    private void RenderReviewCard(bool resetPose = true)
+    private List<WordItem> GetPendingReviewWords()
     {
+        if (_reviewDay != DateTime.Today) { _reviewHandled.Clear(); _reviewDay = DateTime.Today; }
         var today = DateTime.Today.ToString("yyyy-MM-dd");
-        var due = _allWords.Where(w => w.Status == "learning" && w.NextReviewDate != null
+        return _allWords.Where(w => w.Status == "learning" && w.NextReviewDate != null
             && string.CompareOrdinal(w.NextReviewDate, today) <= 0
             && (!_reviewHandled.TryGetValue(w.Id, out var handledRevision) || handledRevision != w.Archive.Revision))
             .OrderBy(w => w.NextReviewDate).ThenBy(w => w.Id).ToList();
+    }
+
+    private void UpdateReviewBadge() => NavReviewBadge.Text = GetPendingReviewWords().Count.ToString();
+
+    private void RenderReviewCard(bool resetPose = true)
+    {
+        var due = GetPendingReviewWords();
+        NavReviewBadge.Text = due.Count.ToString();
         _reviewSession.Reset(due);
         _reviewWord = _reviewSession.Current;
         _reviewRevealed = false;
@@ -117,6 +125,7 @@ public partial class MainWindow
             RefreshWords();
             var updated = _allWords.FirstOrDefault(w => w.Id == word.Id);
             if (updated != null) _reviewHandled[word.Id] = updated.Archive.Revision;
+            UpdateReviewBadge();
             if (!ReduceMotionBox.IsChecked.GetValueOrDefault() && _currentPage == "review" && epoch == _reviewEpoch)
             {
                 var direction = remembered ? 1 : -1;

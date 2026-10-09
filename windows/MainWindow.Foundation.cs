@@ -43,7 +43,7 @@ public partial class MainWindow
         var item = FindCurrentArchive();
         ArchiveStateText.Text = item == null ? "未入库 · 收藏后可补充来源、原句与备注" : $"已入库 · 遇见 {item.Archive.EncounterCount} 次";
         AddWordBtn.IsEnabled = item == null;
-        AddWordBtn.Content = item == null ? "＋ 加入生词本" : "✓ 已加入档案";
+        AddWordBtn.Content = item == null ? "＋ 加入生词本 · Alt+Space" : "✓ 已加入档案";
         EditCurrentArchiveBtn.IsVisible = RecordEncounterBtn.IsVisible = item != null;
     }
 

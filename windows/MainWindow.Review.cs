@@ -2,9 +2,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Media;
-using Avalonia.Animation;
-using Avalonia.Animation.Easings;
-using Avalonia.Styling;
+using System.Diagnostics;
 
 namespace Lexi;
 
@@ -41,7 +39,7 @@ public partial class MainWindow
         RenderReviewCard();
     }
 
-    private void RenderReviewCard()
+    private void RenderReviewCard(bool resetPose = true)
     {
         var today = DateTime.Today.ToString("yyyy-MM-dd");
         var due = _allWords.Where(w => w.Status == "learning" && w.NextReviewDate != null
@@ -62,9 +60,32 @@ public partial class MainWindow
         ReviewWordText.Text = _reviewWord?.Word ?? "";
         ReviewPhoneticText.Text = _reviewWord?.Phonetic ?? "";
         ReviewHintText.Text = "先在心里想一想它的意思，再查看释义。";
-        ReviewCard.Opacity = 1;
-        ReviewCard.RenderTransform = new TranslateTransform();
+        if (resetPose) SetReviewPose(0, 1);
         if (_reviewWord != null && _currentPage == "review") ReviewRevealBtn.Focus();
+    }
+
+    private void SetReviewPose(double x, double opacity)
+    {
+        if (ReviewCard.RenderTransform is not TranslateTransform) ReviewCard.RenderTransform = new TranslateTransform();
+        ((TranslateTransform)ReviewCard.RenderTransform).X = x;
+        ReviewCard.Opacity = opacity;
+    }
+
+    // Keep final property values rather than letting an animation clock revert to the
+    // old visible card. Content is replaced only at opacity zero, then eased in.
+    private async Task<bool> MoveReviewCardAsync(int epoch, double fromX, double toX, bool entering)
+    {
+        var duration = entering ? 190d : 150d;
+        var clock = Stopwatch.StartNew();
+        while (true)
+        {
+            if (epoch != _reviewEpoch || _currentPage != "review") return false;
+            var t = Math.Min(1, clock.Elapsed.TotalMilliseconds / duration);
+            var ease = entering ? 1 - Math.Pow(1 - t, 3) : t * t;
+            SetReviewPose(fromX + (toX - fromX) * ease, entering ? ease : 1 - ease);
+            if (t >= 1) return true;
+            await Task.Delay(16);
+        }
     }
 
     private void RevealReview()
@@ -98,19 +119,15 @@ public partial class MainWindow
             if (updated != null) _reviewHandled[word.Id] = updated.Archive.Revision;
             if (!ReduceMotionBox.IsChecked.GetValueOrDefault() && _currentPage == "review" && epoch == _reviewEpoch)
             {
-                var slide = new Animation
-                {
-                    Duration = TimeSpan.FromMilliseconds(180), Easing = new CubicEaseOut(),
-                    Children =
-                    {
-                        new KeyFrame { Cue = new Cue(0), Setters = { new Setter(TranslateTransform.XProperty, 0d), new Setter(OpacityProperty, 1d) } },
-                        new KeyFrame { Cue = new Cue(1), Setters = { new Setter(TranslateTransform.XProperty, remembered ? 80d : -80d), new Setter(OpacityProperty, 0d) } }
-                    }
-                };
-                await slide.RunAsync(ReviewCard);
+                var direction = remembered ? 1 : -1;
+                if (!await MoveReviewCardAsync(epoch, 0, direction * 48, false)) return;
+                RenderReviewCard(resetPose: false);
+                SetReviewPose(-direction * 32, 0);
+                if (_reviewWord != null && !await MoveReviewCardAsync(epoch, -direction * 32, 0, true)) return;
+                SetReviewPose(0, 1);
             }
+            else if (epoch == _reviewEpoch) RenderReviewCard();
             SetStatus(remembered ? "已记下这次重逢。" : "已安排明日再见。" );
-            if (epoch == _reviewEpoch) RenderReviewCard();
         }
         catch (Exception ex) { SetStatus("本次复习未完成，请重试：" + ex.Message); }
         finally { _reviewBusy = false; ReviewRatingBar.IsEnabled = true; }

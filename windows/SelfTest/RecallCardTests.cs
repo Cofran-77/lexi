@@ -31,6 +31,7 @@ public static class RecallCardTests
         }
         try
         {
+            C<CheckBox>("ReduceMotionBox").IsChecked = false;
             Sql("UPDATE words SET next_review_date='2999-01-01' WHERE status='learning'");
             store.AddWord("recall-one", "/wʌn/", "第一张的隐藏释义", string.Join(" ", Enumerable.Repeat("A long definition for scrolling.", 100)));
             store.AddWord("recall-two", "/tuː/", "第二张的隐藏释义", "Second definition");
@@ -61,7 +62,26 @@ public static class RecallCardTests
             finally { Sql("DROP TRIGGER recall_fail"); }
             var first = (Task)Call("RateReviewAsync", true)!;
             var second = (Task)Call("RateReviewAsync", true)!;
+            // At the handoff the new card must start invisible rather than pop in.
+            var partialEntry = false;
+            var lastExitOpacity = 1d;
+            var lastEntryOpacity = 0d;
+            var monotonic = true;
+            while (!first.IsCompleted)
+            {
+                var opacity = C<Border>("ReviewCard").Opacity;
+                if (C<TextBlock>("ReviewWordText").Text == "recall-two")
+                {
+                    partialEntry |= opacity < .95;
+                    monotonic &= opacity >= lastEntryOpacity;
+                    lastEntryOpacity = opacity;
+                }
+                else { monotonic &= opacity <= lastExitOpacity; lastExitOpacity = opacity; }
+                await Task.Delay(8);
+            }
             await Task.WhenAll(first, second);
+            check(partialEntry, "next recall card enters progressively instead of flashing fully visible");
+            check(monotonic && C<Border>("ReviewCard").Opacity == 1, "card opacity is monotonic across exit and entry with no snap-back");
             check(store.GetAllWords().Single(x => x.Id == before.Id).Stage == before.Stage + 1, "double rating commits exactly one stage");
             check(C<TextBlock>("ReviewWordText").Text == "recall-two" && C<TextBlock>("ReviewMeaningText").Text == "", "next card hides its answer");
 
@@ -91,12 +111,20 @@ public static class RecallCardTests
             check(!C<Border>("ReviewAnswer").IsVisible, "re-entering deck hides current answer");
             Click("ReviewRevealBtn");
             C<Grid>("PageReview").RaiseEvent(new KeyEventArgs { RoutedEvent = InputElement.KeyDownEvent, Key = Key.Left });
-            await Task.Delay(250);
+            await Task.Delay(35);
+            Click("NavLookup"); Click("NavReview");
+            await Task.Delay(500);
+            check(C<Border>("ReviewCard").Opacity == 1, "page navigation cancels old animation without fading the reopened deck");
             check(store.GetAllWords().Single(x => x.Word == "recall-two").NextReviewDate == DateTime.Today.AddDays(1).ToString("yyyy-MM-dd"), "left-key unfamiliar schedules tomorrow");
             check(C<Border>("ReviewEmptyCard").IsVisible && C<TextBlock>("ReviewRemainingText").Text == "还剩 0 个词", "completed deck displays zero remaining");
             C<CheckBox>("HighContrastBox").IsChecked = true;
             C<CheckBox>("OpaqueMaterialBox").IsChecked = true;
             C<CheckBox>("ReduceMotionBox").IsChecked = true;
+            store.ExecuteBatch([before.Id], "today");
+            Call("RefreshWords"); Click("NavReview"); Click("ReviewRevealBtn");
+            var instant = (Task)Call("RateReviewAsync", false)!;
+            check(instant.IsCompleted && C<Border>("ReviewCard").Opacity == 1, "reduced motion changes cards immediately without transient opacity");
+            await instant;
             var saved = store.LoadSettings();
             check(saved.HighContrast && saved.OpaqueMaterial && saved.ReduceMotion && w.TransparencyLevelHint.SequenceEqual(new[] { WindowTransparencyLevel.None }), "accessibility preferences persist and disable transparency");
             Click("NavSettings"); await Snapshot("settings-high-contrast");

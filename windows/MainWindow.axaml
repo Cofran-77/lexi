@@ -526,6 +526,7 @@
 
               <Border Classes="card"><StackPanel Spacing="10">
                 <TextBlock Text="查词与快捷方式" FontSize="16" FontWeight="SemiBold"/>
+                <TextBlock Text="Alt+Space 将当前查询结果加入生词本（仅在 Lexi 查词页生效，已收藏的词不会重复入库）。" Classes="muted" TextWrapping="Wrap"/>
                 <TextBlock Text="选中英文后按 Alt+D 即查；未选中时仅唤醒输入框。查询使用本地离线词典，不调用 AI。" Classes="muted" TextWrapping="Wrap"/>
                 <TextBlock Text="× 隐藏到托盘 · 横线最小化 · 标题栏双击最大化 · 拖动边缘调整大小。完全退出请用托盘菜单。" Classes="muted" TextWrapping="Wrap"/>
               </StackPanel></Border>

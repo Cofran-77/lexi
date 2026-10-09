@@ -57,6 +57,7 @@ public partial class MainWindow : Window
 
         BindEvents();
         ConfigureWindowChrome();
+        ConfigureLookupShortcut();
         BindFoundationEvents();
         BindReviewEvents();
         BindAppearanceEvents();
@@ -245,6 +246,7 @@ public partial class MainWindow : Window
     private void ShowPage(string page)
     {
         if (!_databaseAvailable) return;
+        ++_reviewEpoch; // Invalidate any in-flight card transition before page navigation.
         _currentPage = page;
         _isReviewMode = false; // Review deck owns its queue; archive filters never change it.
 

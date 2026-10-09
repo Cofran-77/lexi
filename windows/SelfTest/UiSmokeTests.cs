@@ -9,6 +9,8 @@ namespace Lexi;
 // Runs real Avalonia controls/event handlers on the UI thread using isolated data.
 public static class UiSmokeTests
 {
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern IntPtr SendMessage(IntPtr hwnd, uint message, IntPtr wParam, IntPtr lParam);
     public static async Task RunAsync(MainWindow window)
     {
         var folder = Environment.GetEnvironmentVariable("LEXI_DATA_DIR");
@@ -39,7 +41,8 @@ public static class UiSmokeTests
             input.Text = "serendipity";
             await (Task)Call("PerformLookupAsync")!;
             Check(C<TextBlock>("ResultWordText").Text == "serendipity", "offline query renders word");
-            Click("AddWordBtn");
+            input.RaiseEvent(new Avalonia.Input.KeyEventArgs { RoutedEvent = Avalonia.Input.InputElement.KeyDownEvent, Key = Avalonia.Input.Key.Space, KeyModifiers = Avalonia.Input.KeyModifiers.Alt });
+            Check(!C<Button>("AddWordBtn").IsEnabled, "Alt+Space adds the current lookup while input has focus");
 
             // Visual Test 2: AI Option CheckBox capsules retain semantics
             var optExamples = C<CheckBox>("AiOptExamples");
@@ -67,8 +70,17 @@ public static class UiSmokeTests
 
             input.Text = "resilient";
             await (Task)Call("PerformLookupAsync")!;
-            Click("AddWordBtn");
+            SendMessage(window.TryGetPlatformHandle()!.Handle, 0x0104, new IntPtr(0x20), new IntPtr(1L << 29));
+            Check(!C<Button>("AddWordBtn").IsEnabled, "native Windows Alt+Space adds without opening the system menu");
+            var shortcutStore = (IVocabularyArchive)typeof(MainWindow).GetField("_vocabService", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(window)!;
+            var savedRevision = shortcutStore.GetAllWords().Single(x => x.Word == "resilient").Archive.Revision;
+            SendMessage(window.TryGetPlatformHandle()!.Handle, 0x0104, new IntPtr(0x20), new IntPtr((1L << 29) | (1L << 30)));
+            input.RaiseEvent(new Avalonia.Input.KeyEventArgs { RoutedEvent = Avalonia.Input.InputElement.KeyDownEvent, Key = Avalonia.Input.Key.Space, KeyModifiers = Avalonia.Input.KeyModifiers.Alt });
+            Check(shortcutStore.GetAllWords().Single(x => x.Word == "resilient").Archive.Revision == savedRevision, "held or repeated add shortcut leaves archived content unchanged");
             Click("NavVocab");
+            var offPageKey = new Avalonia.Input.KeyEventArgs { RoutedEvent = Avalonia.Input.InputElement.KeyDownEvent, Key = Avalonia.Input.Key.Space, KeyModifiers = Avalonia.Input.KeyModifiers.Alt };
+            window.RaiseEvent(offPageKey);
+            Check(!offPageKey.Handled, "add shortcut does not consume Alt+Space on other pages");
             var list = C<ListBox>("VocabListBox");
             Check(list.ItemCount >= 2, "two queried words appear in vocabulary");
 

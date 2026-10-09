@@ -38,7 +38,11 @@ class LexiViewModel(app: Application) : AndroidViewModel(app) {
 
     init {
         viewModelScope.launch {
-            try { entries = repo.all(); initialized = true; status = "离线词典 · 按需 AI · 私人档案" }
+            try {
+                entries = repo.all()
+                lookup?.let { result -> if (!aiBusy && ai == null) ai = entries.firstOrNull { it.word.equals(result.word, true) }?.aiResult }
+                initialized = true; status = "离线词典 · 按需 AI · 私人档案"
+            }
             catch (e: Exception) { status = "词库无法打开，已保留原文件：${e.message}" }
             try {
                 withContext(Dispatchers.IO) {
@@ -161,6 +165,13 @@ class LexiViewModel(app: Application) : AndroidViewModel(app) {
     }
     fun writeFile(uri: Uri, kind: String, ids: Set<Long>? = null) {
         mutate("文件已导出") {
+            if (kind == "pdf") {
+                val selected = entries.filter { ids == null || it.id in ids }.toList()
+                withContext(Dispatchers.IO) {
+                    getApplication<Application>().contentResolver.openOutputStream(uri, "wt")?.use { PdfExporter.write(selected, it) } ?: error("无法写入所选位置")
+                }
+                return@mutate
+            }
             val data = when (kind) { "backup" -> repo.backup(); "html" -> printHtml(ids).toByteArray(Charsets.UTF_8); else -> repo.exportJSON(ids) }
             withContext(Dispatchers.IO) { getApplication<Application>().contentResolver.openOutputStream(uri, "wt")?.use { it.write(data) } ?: error("无法写入所选位置") }
         }

@@ -11,6 +11,9 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.compose.runtime.SideEffect
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.core.view.WindowCompat
 import org.lexi.archive.ui.LexiApp
 
 class MainActivity : ComponentActivity() {
@@ -31,7 +34,16 @@ class MainActivity : ComponentActivity() {
         exportIds = savedInstanceState?.getLongArray("exportIds")?.toSet()
         restoring = savedInstanceState?.getBoolean("restoring") ?: false
         enableEdgeToEdge()
-        setContent { LexiApp(vm, ::export, ::openDocument, ::print) }
+        setContent {
+            val dark = when (vm.theme) { "dark" -> true; "light" -> false; else -> isSystemInDarkTheme() }
+            SideEffect {
+                WindowCompat.getInsetsController(window, window.decorView).apply {
+                    isAppearanceLightStatusBars = !dark
+                    isAppearanceLightNavigationBars = !dark
+                }
+            }
+            LexiApp(vm, ::export, ::openDocument, ::print)
+        }
         if (savedInstanceState == null) consumeIntent(intent)
     }
     override fun onSaveInstanceState(outState: Bundle) {
@@ -54,10 +66,10 @@ class MainActivity : ComponentActivity() {
     }
     private fun export(kind: String, ids: Set<Long>?) {
         exportKind = kind; exportIds = ids?.toSet()
-        val ext = when (kind) { "html" -> "html"; "backup" -> "sqlite3"; else -> "json" }
+        val ext = when (kind) { "pdf" -> "pdf"; "html" -> "html"; "backup" -> "sqlite3"; else -> "json" }
         createFile.launch(Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
             addCategory(Intent.CATEGORY_OPENABLE)
-            type = when (kind) { "html" -> "text/html"; "backup" -> "application/octet-stream"; else -> "application/json" }
+            type = when (kind) { "pdf" -> "application/pdf"; "html" -> "text/html"; "backup" -> "application/octet-stream"; else -> "application/json" }
             putExtra(Intent.EXTRA_TITLE, "Lexi-${java.time.LocalDate.now()}.$ext")
         })
     }

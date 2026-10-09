@@ -10,8 +10,9 @@ android {
         applicationId = "org.lexi.archive"
         minSdk = 26
         targetSdk = 35
-        versionCode = 3
-        versionName = "0.1.2-alpha"
+        versionCode = 4
+        versionName = "0.2.0-alpha"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     buildFeatures { compose = true }
     compileOptions {
@@ -21,6 +22,9 @@ android {
     kotlinOptions { jvmTarget = "17" }
 }
 dependencies {
+    androidTestImplementation("androidx.test:runner:1.6.2")
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
+    androidTestImplementation("androidx.test.uiautomator:uiautomator:2.3.0")
     implementation(platform("androidx.compose:compose-bom:2024.12.01"))
     implementation("androidx.activity:activity-compose:1.9.3")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")

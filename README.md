@@ -34,7 +34,7 @@ Lexi 面向希望持续积累英语词汇的学习者，将离线词典、个人
 
 macOS 下载与应用内更新检查当前继续使用 [原 macOS 3.1.3 发布页](https://github.com/DespairJasper/lexi-macos/releases/tag/v3.1.3)，提供 DMG 与 SHA256；本仓库此次接入源码，尚未创建 `macos-v3.1.3` Release。安装、签名和升级数据保留说明见 [macOS README](macos/README.md)。
 
-**直接下载：[Windows 安装程序](https://github.com/Cofran-77/lexi/releases/download/windows-v1.2.4-nc.1/Lexi-1.2.4-nc.1-x64-setup.exe) · [Android APK](https://github.com/Cofran-77/lexi/releases/download/android-v0.2.2-nc.1/Lexi-Android-0.2.2-alpha.apk)**。无需自行编译。各包适用许可见独立许可说明。
+**直接下载：[Windows 安装程序](https://github.com/Cofran-77/lexi/releases/download/windows-v1.2.4-nc.1/Lexi-1.2.4-nc.1-x64-setup.exe) · [Android APK](https://github.com/Cofran-77/lexi/releases/download/android-v0.2.2-nc.1/Lexi-Android-0.2.2-alpha.apk) · [macOS DMG](https://github.com/DespairJasper/lexi-macos/releases/download/v3.1.3/Lexi-3.1.3-macOS-arm64.dmg)**。无需自行编译。各包适用许可见独立许可说明。
 
 本次许可修订不改变应用版本或学习功能。Windows 安装包包含完整程序、离线词典与当前专题学习资源，安装后即可使用，无需另行下载教材。Android 提供其当前版本完整功能。第三方内容分别遵循来源条款。
 
@@ -50,10 +50,9 @@ macOS 下载与应用内更新检查当前继续使用 [原 macOS 3.1.3 发布�
 ### 复习与学习
 
 - **今日重逢**：先回忆，再揭晓释义并记录熟悉程度。
-- **Windows**：FSRS-6 自适应排期，根据学习历史、难度、记忆稳定性与目标保持率安排复习；个人参数训练由 Rust 助手完成，数据不足时使用默认参数。
-- **macOS**：FSRS-6 长期排期、本机个人参数训练与 Context 校准；保留三按钮、三格轮内进度、改判撤销、每日计划与淡写/默写。
+- **Windows / macOS**：FSRS-6 自适应长期排期，根据学习历史、难度、记忆稳定性与目标保持率安排复习；个人参数由本机 Rust 助手训练，数据不足时使用默认参数，并结合 Context 校准。
 - **Android**：当前采用第 1、2、4、7、15 天的固定日期排期。
-- Windows 还提供每日计划、辅助拼写、全局专注学习、可配置快捷键与朗读。
+- Windows 与 macOS 均保留三按钮、三格轮内进度和改判撤销，提供每日计划、淡写/默写、辅助拼写、全局专注学习、可配置快捷键与朗读。
 
 ### 语境与句子积累
 

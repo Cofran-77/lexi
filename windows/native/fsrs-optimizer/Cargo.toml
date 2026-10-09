@@ -2,7 +2,7 @@
 name = "fsrs-optimizer"
 version = "0.2.0"
 edition = "2021"
-authors = ["Lexi Team"]
+authors = ["Cofran-77", "DespairJasper"]
 license = "MIT OR Apache-2.0"
 description = "Standalone FSRS-6 personal parameter training helper for Lexi"
 

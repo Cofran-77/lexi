@@ -1,0 +1,13 @@
+name: 功能建议 / Feature request
+description: 描述实际学习场景和期望行为
+body:
+  - type: textarea
+    id: scenario
+    attributes:
+      label: 使用场景与平台
+    validations:
+      required: true
+  - type: textarea
+    id: proposed
+    attributes:
+      label: 建议行为与现有替代办法

@@ -1,0 +1,21 @@
+name: 缺陷反馈 / Bug report
+description: 提供可复现步骤与平台版本
+body:
+  - type: input
+    id: version
+    attributes:
+      label: 平台 / 版本 / 系统
+      placeholder: Windows 1.2.4 / Windows 11，或 Android 0.2.2-alpha / Android 15
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤、预期与实际行为
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: 脱敏截图或日志
+      description: 不上传个人词库、API Key、签名材料或教材录音。

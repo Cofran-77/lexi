@@ -4,6 +4,6 @@
     <ProjectReference Include="../Domain/Lexi.Domain.csproj" />
     <Compile Include="../Core/ISecureSecretStore.cs" Link="Contracts/ISecureSecretStore.cs" />
     <Compile Include="../Models/Models.cs" Link="Presentation/WordItem.cs" />
-    <Compile Include="../Services/ArchiveTransferService.cs" Link="ArchiveTransferService.cs" />
+    <Compile Include="../Services/ArchiveTransferService*.cs" Link="ArchiveTransferService.cs" />
   </ItemGroup>
 </Project>

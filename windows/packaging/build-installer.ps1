@@ -9,7 +9,7 @@ if (!$SkipPublish) {
 }
 if (!(Test-Path (Join-Path $publish 'Lexi.exe'))) { throw 'Publish the application first.' }
 if (!(Test-Path $Nsis)) { throw 'Specify the NSIS compiler with -Nsis.' }
-$release = Join-Path (Split-Path $project -Parent) 'Lexi-1.1.2-Windows-x64'
+$release = Join-Path (Split-Path $project -Parent) 'Lexi-1.1.3-Windows-x64'
 New-Item -ItemType Directory -Force $release | Out-Null
 $lines = [Collections.Generic.List[string]]::new()
 Get-ChildItem $publish -Recurse -File | Where-Object Extension -ne '.pdb' | ForEach-Object {

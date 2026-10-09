@@ -22,6 +22,7 @@ public interface IVocabularyArchive : IDisposable
     string? LastBackupPath { get; }
     string MigrationMessage { get; }
     List<WordItem> GetAllWords();
+    (int Added, int Skipped) ImportArchive(IReadOnlyList<WordItem> entries);
     void AddWord(string word, string phonetic, string translation, string definition);
     void SaveArchive(long id, string translation, string notes, ArchiveMetadata metadata, LlmResult? ai);
     void SaveExpansion(long id, LlmResult result);

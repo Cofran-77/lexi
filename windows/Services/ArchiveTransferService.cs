@@ -8,7 +8,7 @@ using Lexi.Core;
 namespace Lexi;
 
 /// <summary>Explicit portable archive schema: never serializes settings or the UI model directly.</summary>
-public static class ArchiveTransferService
+public static partial class ArchiveTransferService
 {
     public const int MaximumJsonBytes = 50 * 1024 * 1024;
     public const int MaximumEntries = 100_000;
@@ -19,36 +19,12 @@ public static class ArchiveTransferService
         Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
     };
 
-    /// <summary>Caller writes this text with new UTF8Encoding(true) for Excel's UTF-8 BOM detection.</summary>
-    public static string GenerateCsv(IEnumerable<WordItem> words)
-    {
-        ArgumentNullException.ThrowIfNull(words);
-        var output = new StringBuilder();
-        AddRow(["单词", "音标", "中文释义", "英文释义", "备注", "学习阶段", "状态", "创建时间", "学习开始日期", "下次重逢日期",
-            "上次复习时间", "复习次数", "档案标识", "来源类型", "来源标题", "来源原句", "标签", "遇见次数", "首次收藏UTC", "更新时间UTC", "最近遇见UTC", "修订版本", "AI例句", "AI同义词", "AI反义词", "AI词组"]);
-        foreach (var word in words)
-        {
-            ArgumentNullException.ThrowIfNull(word);
-            var a = word.Archive ?? throw Invalid("缺少档案元数据。");
-            AddRow([word.Word, word.Phonetic, word.Translation, word.Definition, word.Notes, Number(word.Stage),
-                word.Status == "mastered" ? "已掌握" : "学习中", word.CreatedAt, word.LearningStartDate, word.NextReviewDate,
-                word.LastReviewedAt, Number(word.ReviewCount), a.Uuid, a.SourceType, a.SourceTitle, a.SourceExcerpt,
-                string.Join("; ", a.Tags), Number(a.EncounterCount), a.CreatedAtUtc, a.UpdatedAtUtc, a.LastEncounteredAtUtc, Number(a.Revision),
-                string.Join("\n", word.AiResult?.Examples.Select(e => e.English + " / " + e.Chinese) ?? []),
-                string.Join("; ", word.AiResult?.Synonyms ?? []), string.Join("; ", word.AiResult?.Antonyms ?? []),
-                string.Join("\n", word.AiResult?.Phrases.Select(p => p.English + " / " + p.Chinese) ?? [])]);
-        }
-        return output.ToString();
-
-        void AddRow(IEnumerable<string?> fields) => output.Append(string.Join(",", fields.Select(Quote))).Append("\r\n");
-    }
-
     private static string Number(int number) => number.ToString(CultureInfo.InvariantCulture);
     private static string Quote(string? text)
     {
         text ??= "";
         var significant = text.AsSpan().TrimStart();
-        if ((!significant.IsEmpty && "=+-@".Contains(significant[0])) || (text.Length > 0 && text[0] is '\t' or '\r' or '\n')) text = "'" + text;
+        if (text.StartsWith("'") || (!significant.IsEmpty && "=+-@".Contains(significant[0])) || (text.Length > 0 && text[0] is '\t' or '\r' or '\n')) text = "'" + text;
         return "\"" + text.Replace("\"", "\"\"") + "\"";
     }
 

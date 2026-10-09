@@ -599,6 +599,7 @@
                     <Button Name="OpenDataFolderBtn" Classes="ghost" Content="打开数据目录" Margin="0,0,8,8"/>
                   </WrapPanel>
                   <WrapPanel>
+                    <Button Name="ImportCsvBtn" Classes="secondary" Content="导入 CSV / JSON" Margin="0,0,8,8"/>
                     <Button Name="ExportCsvBtn" Classes="secondary" Content="导出 CSV" Margin="0,0,8,8"/>
                     <Button Name="ExportJsonBtn" Classes="secondary" Content="导出完整档案 JSON" Margin="0,0,8,8"/>
                   </WrapPanel>

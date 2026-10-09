@@ -27,6 +27,7 @@ public partial class MainWindow
         RestoreBackupBtn.Click += async (_, _) => await ChooseRestoreAsync();
         RestoreCancelBtn.Click += (_, _) => { RestoreOverlay.IsVisible = false; _pendingRestore = null; };
         RestoreConfirmBtn.Click += async (_, _) => await RestoreChosenBackupAsync();
+        ImportCsvBtn.Click += async (_, _) => await ImportArchiveAsync();
         ExportCsvBtn.Click += async (_, _) => await ExportArchiveAsync(false);
         ExportJsonBtn.Click += async (_, _) => await ExportArchiveAsync(true);
         OpenDataFolderBtn.Click += (_, _) =>
@@ -169,6 +170,23 @@ public partial class MainWindow
         }
         catch (Exception ex) { SetStatus("备份未完成：" + ex.Message); }
         finally { BackupNowBtn.IsEnabled = true; }
+    }
+
+    private async Task ImportArchiveAsync()
+    {
+        try {
+            var files=await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions { Title="导入词汇档案",AllowMultiple=false,FileTypeFilter=[new FilePickerFileType("Lexi CSV / JSON") {Patterns=["*.csv","*.json"]}] });
+            if(files.Count==0)return;
+            await using var input=await files[0].OpenReadAsync();
+            using var buffer=new MemoryStream();var chunk=new byte[8192];int count;
+            while((count=await input.ReadAsync(chunk))>0){if(buffer.Length+count>ArchiveTransferService.MaximumJsonBytes)throw new FormatException("档案超过 50 MB。");buffer.Write(chunk,0,count);}
+            var text=new UTF8Encoding(false,true).GetString(buffer.ToArray()).TrimStart('\uFEFF');
+            var csv=files[0].Name.EndsWith(".csv",StringComparison.OrdinalIgnoreCase);
+            var entries=await Task.Run(()=>csv?ArchiveTransferService.ParseCsv(text):ArchiveTransferService.ParseJson(text));
+            var report=_vocabService.ImportArchive(entries);
+            RefreshWords();UpdateDataInfo();UpdateLookupArchiveState();
+            SetStatus($"已导入 {report.Added} 个词，跳过 {report.Skipped} 个重复词；已有词条未覆盖。导入前已备份。");
+        } catch(Exception ex){SetStatus("导入未完成："+ex.Message);}
     }
 
     private async Task ExportArchiveAsync(bool json)

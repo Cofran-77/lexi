@@ -1,8 +1,8 @@
 Unicode true
 !include "MUI2.nsh"
 !include "LogicLib.nsh"
-Name "Lexi 1.1.2"
-OutFile "..\..\Lexi-1.1.2-Windows-x64\Lexi-1.1.2-x64-setup.exe"
+Name "Lexi 1.1.3"
+OutFile "..\..\Lexi-1.1.3-Windows-x64\Lexi-1.1.3-x64-setup.exe"
 InstallDir "$LOCALAPPDATA\Programs\LexiNative"
 InstallDirRegKey HKCU "Software\LexiNative" "InstallDir"
 RequestExecutionLevel user
@@ -90,8 +90,8 @@ Section "Lexi" SEC01
   CreateShortcut "$SMPROGRAMS\Lexi\Lexi.lnk" "$INSTDIR\Lexi.exe"
   CreateShortcut "$SMPROGRAMS\Lexi\卸载.lnk" "$INSTDIR\Uninstall.exe"
   WriteRegStr HKCU "Software\LexiNative" "InstallDir" "$INSTDIR"
-  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\LexiNative" "DisplayName" "Lexi 1.1.2"
-  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\LexiNative" "DisplayVersion" "1.1.2"
+  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\LexiNative" "DisplayName" "Lexi 1.1.3"
+  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\LexiNative" "DisplayVersion" "1.1.3"
   WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\LexiNative" "UninstallString" '"$INSTDIR\Uninstall.exe"'
   WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\LexiNative" "DisplayIcon" "$INSTDIR\Lexi.exe"
   WriteRegDWORD HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\LexiNative" "NoModify" 1

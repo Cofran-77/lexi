@@ -11,6 +11,30 @@ namespace Lexi;
 
 public sealed partial class VocabularyService
 {
+    public (int Added, int Skipped) ImportArchive(IReadOnlyList<WordItem> entries)
+    {
+        ArchiveTransferService.GenerateJson(entries);
+        foreach (var entry in entries) { ValidateArchiveTags(entry.Archive.Tags); ValidateArchiveAi(entry.AiResult); }
+        CreateManualBackup();
+        int added=0, skipped=0;
+        using var tx=_connection.BeginTransaction();
+        foreach(var w in entries) {
+            using var exists=_connection.CreateCommand();exists.Transaction=tx;
+            exists.CommandText="SELECT 1 FROM words w JOIN word_archives a ON a.word_id=w.id WHERE lower(w.word)=lower($word) OR a.uuid=$uuid LIMIT 1";
+            exists.Parameters.AddWithValue("$word",w.Word);exists.Parameters.AddWithValue("$uuid",w.Archive.Uuid);
+            if(exists.ExecuteScalar()!=null){skipped++;continue;}
+            using var cmd=_connection.CreateCommand();cmd.Transaction=tx;
+            cmd.CommandText="INSERT INTO words (word,phonetic,translation,definition,notes,stage,status,created_at,learning_start_date,next_review_date,last_reviewed_at,review_count) VALUES ($word,$phon,$trans,$def,$notes,$stage,$status,$created,$start,$next,$last,$reviews); SELECT last_insert_rowid();";
+            void P(string key,object? value)=>cmd.Parameters.AddWithValue(key,value??DBNull.Value);
+            P("$word",w.Word);P("$phon",w.Phonetic);P("$trans",w.Translation);P("$def",w.Definition);P("$notes",w.Notes);P("$stage",w.Stage);P("$status",w.Status);P("$created",w.CreatedAt);P("$start",w.LearningStartDate);P("$next",w.NextReviewDate);P("$last",w.LastReviewedAt);P("$reviews",w.ReviewCount);
+            var id=(long)cmd.ExecuteScalar()!;cmd.Parameters.Clear();
+            cmd.CommandText="INSERT INTO word_archives (word_id,uuid,source_type,source_title,source_excerpt,tags_json,encounter_count,revision,created_at_utc,updated_at_utc,last_encountered_at_utc,ai_json) VALUES ($id,$uuid,$type,$title,$excerpt,$tags,$count,$revision,$created,$updated,$encounter,$ai)";
+            var a=w.Archive;P("$id",id);P("$uuid",a.Uuid);P("$type",a.SourceType);P("$title",a.SourceTitle);P("$excerpt",a.SourceExcerpt);P("$tags",JsonSerializer.Serialize(a.Tags));P("$count",a.EncounterCount);P("$revision",a.Revision);P("$created",a.CreatedAtUtc);P("$updated",a.UpdatedAtUtc);P("$encounter",a.LastEncounteredAtUtc);P("$ai",w.AiResult==null?null:JsonSerializer.Serialize(w.AiResult));
+            cmd.ExecuteNonQuery();added++;
+        }
+        tx.Commit();BackupCommittedState();return(added,skipped);
+    }
+
     public static string GenerateStableUuid(string word)
     {
         var clean = (word ?? "").Trim().ToLowerInvariant();

@@ -9,6 +9,14 @@ public static class FoundationTransferTests
 {
     public static void Run()
     {
+        var fixtureFolder = Environment.GetEnvironmentVariable("LEXI_CSV_FIXTURES");
+        if (!string.IsNullOrWhiteSpace(fixtureFolder)) {
+            Directory.CreateDirectory(fixtureFolder);
+            File.WriteAllText(Path.Combine(fixtureFolder,"windows-legacy.csv"),GenerateLegacyCsv([Fixture()]),new UTF8Encoding(true));
+            File.WriteAllText(Path.Combine(fixtureFolder,"windows-current.csv"),ArchiveTransferService.GenerateCsv([Fixture()]),new UTF8Encoding(true));
+        }
+        CsvRoundTrip();
+        ImportTransaction();
         RoundTrip();
         RejectInvalidArchives();
         CsvSafety();
@@ -97,6 +105,75 @@ public static class FoundationTransferTests
             word.Notes = dangerous;
             Check(ArchiveTransferService.GenerateCsv([word]).Contains("\"'" + dangerous + "\"", StringComparison.Ordinal), "formula prefix was not neutralized");
         }
+    }
+
+    private static void CsvRoundTrip()
+    {
+        var fixture = Fixture();
+        fixture.Id = 0;
+        Check(!PrintDocumentFormatter.GenerateHtml([fixture]).Contains("a summary"), "print table contains English definition");
+        foreach (var csv in new[]{ArchiveTransferService.GenerateCsv([fixture]),GenerateLegacyCsv([fixture])}) {
+            var copy=ArchiveTransferService.ParseCsv("\uFEFF"+csv).Single();
+            Check(copy.Archive.Uuid==fixture.Archive.Uuid && copy.Archive.Tags.SequenceEqual(fixture.Archive.Tags) && copy.AiResult!.Phrases[0].Chinese=="提交简历" && copy.ReviewCount==7 && copy.Notes==fixture.Notes,"cross-platform CSV content lost");
+        }
+        fixture.Notes="'=literal";
+        fixture.Archive.Tags=["a\nb", "slash\\literal"];
+        fixture.AiResult!.Examples=[new("", "中文\n行")];
+        var round=ArchiveTransferService.ParseCsv(ArchiveTransferService.GenerateCsv([fixture])).Single();
+        Check(round.Notes==fixture.Notes && round.Archive.Tags.SequenceEqual(fixture.Archive.Tags) && round.AiResult!.Examples[0].Chinese=="中文\n行", "CSV escape roundtrip");
+        Throws<FormatException>(()=>ArchiveTransferService.ParseCsv("单词,单词\na,b"),"duplicate headers accepted");
+        Throws<FormatException>(()=>ArchiveTransferService.ParseCsv("单词\n\"unfinished"),"broken CSV accepted");
+        var android=Environment.GetEnvironmentVariable("LEXI_ANDROID_CSV");
+        if (!string.IsNullOrEmpty(android)) {
+            var imported=ArchiveTransferService.ParseCsv(File.ReadAllText(android)).Single();
+            Check(imported.Word=="reason" && imported.Notes=="=HYPERLINK(\"https://example.com\")" && imported.Archive.Tags.SequenceEqual(new[]{"阅读","literal\\n","multi\nline"}) && imported.AiResult!.Synonyms.Single()=="'cause" && imported.AiResult.Examples[0].Chinese=="", "Android CSV field mismatch");
+            var returned=Path.Combine(Path.GetDirectoryName(android)!,"windows-via-android.csv");
+            if(File.Exists(returned)) {
+                var returnedWord=ArchiveTransferService.ParseCsv(File.ReadAllText(returned)).Single();
+                Check(returnedWord.Archive.Uuid==fixture.Archive.Uuid && returnedWord.ReviewCount==7 && returnedWord.AiResult!.Phrases[0].Chinese=="提交简历", "Windows Android Windows roundtrip mismatch");
+            }
+        }
+    }
+
+    private static void ImportTransaction()
+    {
+        var root=Path.Combine(Path.GetTempPath(),"Lexi_CsvImport_"+Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try {
+            using var db=new VocabularyService(Path.Combine(root,"vocab.sqlite3"));
+            var words=ArchiveTransferService.ParseCsv(ArchiveTransferService.GenerateCsv([Fixture()]));
+            Check(db.ImportArchive(words)==(1,0),"CSV import failed");
+            Check(db.ImportArchive(words)==(0,1),"duplicate CSV overwritten");
+            var loaded=db.GetAllWords().Single();
+            Check(loaded.Archive.Uuid==words[0].Archive.Uuid && loaded.Archive.Revision==2 && loaded.AiResult!.Examples[0].Chinese=="发送简历。" && loaded.ReviewCount==7,"database import lost metadata/AI/progress");
+            words[0].Stage=8;
+            Throws<FormatException>(()=>db.ImportArchive(words),"invalid import accepted");
+            Check(db.GetAllWords().Count==1,"failed import changed data");
+        } finally {Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();Directory.Delete(root,true);}
+    }
+
+    /// <summary>Caller writes this text with new UTF8Encoding(true) for Excel's UTF-8 BOM detection.</summary>
+    public static string GenerateLegacyCsv(IEnumerable<WordItem> words)
+    {
+        ArgumentNullException.ThrowIfNull(words);
+        var output = new StringBuilder();
+        AddRow(["单词", "音标", "中文释义", "英文释义", "备注", "学习阶段", "状态", "创建时间", "学习开始日期", "下次重逢日期",
+            "上次复习时间", "复习次数", "档案标识", "来源类型", "来源标题", "来源原句", "标签", "遇见次数", "首次收藏UTC", "更新时间UTC", "最近遇见UTC", "修订版本", "AI例句", "AI同义词", "AI反义词", "AI词组"]);
+        foreach (var word in words)
+        {
+            ArgumentNullException.ThrowIfNull(word);
+            var a = word.Archive ?? throw new FormatException("缺少档案元数据。");
+            AddRow([word.Word, word.Phonetic, word.Translation, word.Definition, word.Notes, Convert.ToString(word.Stage),
+                word.Status == "mastered" ? "已掌握" : "学习中", word.CreatedAt, word.LearningStartDate, word.NextReviewDate,
+                word.LastReviewedAt, Convert.ToString(word.ReviewCount), a.Uuid, a.SourceType, a.SourceTitle, a.SourceExcerpt,
+                string.Join("; ", a.Tags), Convert.ToString(a.EncounterCount), a.CreatedAtUtc, a.UpdatedAtUtc, a.LastEncounteredAtUtc, Convert.ToString(a.Revision),
+                string.Join("\n", word.AiResult?.Examples.Select(e => e.English + " / " + e.Chinese) ?? []),
+                string.Join("; ", word.AiResult?.Synonyms ?? []), string.Join("; ", word.AiResult?.Antonyms ?? []),
+                string.Join("\n", word.AiResult?.Phrases.Select(p => p.English + " / " + p.Chinese) ?? [])]);
+        }
+        return output.ToString();
+
+        void AddRow(IEnumerable<string?> fields) => output.Append(string.Join(",", fields.Select(value => "\"" + (value ?? "").Replace("\"", "\"\"") + "\""))).Append("\r\n");
     }
 
     private static void SecretStorage()

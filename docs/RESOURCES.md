@@ -21,3 +21,11 @@ dictionary.sqlite3 来自 ECDICT 常用词子集，共 59,026 条，采用原项
 [STUDY-RESOURCES-MANIFEST.json](STUDY-RESOURCES-MANIFEST.json) 记录适配基线与文件 SHA256。下载附件另附 SHA256SUMS.txt，安装包和资源 ZIP 分别校验。固定适配目录在程序输出的 Assets/IELTS，应用不自动更新教材。
 
 自备资料可按 catalog.example.json 格式接入。路径相对于资料目录，解析器限制越界访问。接入与分发第三方内容应遵循其权利和使用条件。
+
+## macOS 3.1.3 源码资源
+
+`macos/lexi_avalonia/Assets/dictionary.sqlite3` 保留 59,026 条离线词典；词典 MIT 声明、字体与运行库通知在 `macos/lexi_avalonia/Notices/`，FSRS vendor 在 `macos/native/fsrs-optimizer/vendor/fsrs/`。
+
+按现有 Git 资源约定，不导入约 502 MB、3,881 个第三方 IELTS 教材与音频文件。原文件路径、大小和 SHA256 保留在 [macOS 来源清单](MACOS-SOURCE-MANIFEST.json)。`macos/lexi_avalonia/Assets/IELTS/` 仅保留说明与 `catalog.example.json`；示例不是完整教材，不提供原始资源的下载授权。
+
+有权使用原资源的开发者应在本机恢复到上述 IELTS 目录，再运行完整专题功能与回归。原应用 DMG 和此 Git 源码树的资源范围不同；已核实的安装入口见 [macOS README](../macos/README.md)。

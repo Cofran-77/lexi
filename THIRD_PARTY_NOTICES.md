@@ -1,6 +1,6 @@
 # 第三方代码与资源说明
 
-根目录 PolyForm Noncommercial LICENSE 只覆盖 Cofran-77 与 DespairJasper 的项目原创代码和文档，不覆盖以下第三方内容。构建后实际分发的依赖也须保留对应通知。
+根目录 PolyForm Noncommercial LICENSE 覆盖其适用范围内的项目原创代码和文档；`macos/` 导入原有内容保留该目录 LICENSE。两者均不覆盖以下第三方内容。构建后实际分发的依赖也须保留对应通知。
 
 | 内容 | 来源 / 许可 | 仓库中的保留位置 |
 | --- | --- | --- |
@@ -21,4 +21,4 @@ Windows 配套专题资料来自 [hefengxian/my-ielts](https://github.com/hefeng
 
 ## 平台合作与许可
 
-macOS 参考项目 [DespairJasper/lexi-macos](https://github.com/DespairJasper/lexi-macos) 由合作作者维护，本仓库尚未导入该端源码。原创内容当前按 PolyForm Noncommercial 分发；许可适用范围与沿革见 LICENSE-POLICY.md，不自动修改外部仓库或第三方许可。
+macOS 参考项目 [DespairJasper/lexi-macos](https://github.com/DespairJasper/lexi-macos) 由合作作者维护，本仓库已将其 3.1.3 源码导入 `macos/`，保留 `macos/LICENSE` 的 Lexi 非商业许可。macOS 的 ECDICT、Avalonia、Inter、SkiaSharp、.NET 和 FSRS 及 Rust 依赖声明分别保存在 `macos/lexi_avalonia/Notices/` 与 `macos/native/fsrs-optimizer/vendor/fsrs/LICENSE`；索引见 [macOS NOTICES](macos/NOTICES.md)。此次不导入 IELTS 教材与音频。许可适用范围见 LICENSE-POLICY.md，不自动修改外部仓库或第三方许可。

@@ -1,0 +1,53 @@
+# 本机 SDK、构建与发布产物
+.tools
+dist/
+**/bin/
+**/obj/
+**/publish/
+verification/
+
+# macOS 与 IDE 生成文件
+.DS_Store
+**/.DS_Store
+*.user
+
+# 本机资料与密钥
+USER-STEERING.md
+README_macOS.md
+IELTS-升级说明.md
+macOS版本历史.md
+*.pdb
+*.log
+*.dmg
+*.p12
+*.pfx
+*.key
+*.pem
+signing.json
+vocab.sqlite3
+
+# 个人练习、记忆状态与本机备份；升级沿用应用包外的数据目录
+vocab.sqlite3-*
+vocab.sqlite3.*
+ielts-learning.json
+ielts-learning.json.*
+daily-study-plans.json
+daily-study-plans.json.*
+backups/
+upgrade-backups/
+private-practice-reset-backups/
+private-update-backup*/
+
+# Python 与临时审查缓存
+**/__pycache__/
+*.pyc
+.superpowers/
+
+# 与 monorepo 一致：第三方教材与音频不进入 Git
+lexi_avalonia/Assets/IELTS/**
+!lexi_avalonia/Assets/IELTS/README.md
+!lexi_avalonia/Assets/IELTS/catalog.example.json
+**/target/
+**/.avalonia-build-tasks/
+*.env
+.env.*

@@ -151,5 +151,16 @@
     "Files": 38,
     "Excluded": 2,
     "Commit": "5f58b6c60c539f2fa4581d0f5dadab6f396b556a"
+  },
+  {
+    "Platform": "macos",
+    "Version": "3.1.3",
+    "SourceRepository": "https://github.com/DespairJasper/lexi-macos",
+    "SourceCommit": "85871a482479601aba8946665696df8d71fb3e70",
+    "Files": 646,
+    "Excluded": 3881,
+    "ImportedOn": "2026-10-09",
+    "Manifest": "MACOS-SOURCE-MANIFEST.json",
+    "Note": "Current Git source snapshot; not a reconstructed archive or a new macOS Release."
   }
 ]

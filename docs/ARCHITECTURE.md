@@ -1,6 +1,6 @@
 # 架构与平台边界
 
-Windows 与 Android 是独立工程；此仓库采用 monorepo 便于共同维护文档与版本，不意味着共享所有运行时代码。
+Windows、Android 与 macOS 是独立工程；此仓库采用 monorepo 便于共同维护文档与版本，不意味着共享所有运行时代码。
 
 ## Windows
 
@@ -20,7 +20,15 @@ Kotlin / Compose 主界面；`app/src/main/java/org/lexi/archive` 包含 ViewMod
 
 ## macOS
 
-由合作作者后续提供本端实现。外部 `DespairJasper/lexi-macos` 可作为参考，但本仓库没有复制该端源码，也不承诺其现有许可证自动变化。
+已接入 `macos/` 下的 3.1.3 源码，原有内部目录保持不变：
+
+- `lexi_avalonia/`：Avalonia UI；`Core/`、`Domain/`、`Application/`、`Infrastructure/`、`Services/`、`Platform/` 分担记忆契约、存储、会话与 macOS 集成。
+- `lexi_avalonia/tests/`、`SelfTest/`：领域和真实 UI 回归、隔离数据截图入口。
+- `native/fsrs-optimizer/`：个人 FSRS-6 Rust 训练助手和固定版本 fsrs vendor 源码。
+- `scripts/`、`packaging/`：SDK 定位、回归、数据备份、签名、DMG、发布证明与隐私检查。
+- 跨应用查词、翻译、金句卡片；FSRS-6、个人参数与 Context 校准在本机运行。钥匙串保护 AI Key。
+
+应用版本与 Dock 唤醒行为保留原 3.1.3 实现；更新检查仍读取 `DespairJasper/lexi-macos` 正式 Release。导入原许可保留于 `macos/LICENSE`。
 
 ## 资源与数据
 

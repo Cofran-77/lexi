@@ -35,3 +35,14 @@ dotnet run --project Lexi.csproj
 ## 许可与资源
 
 当前分发采用根目录 PolyForm Noncommercial 1.0.0；此前 MIT 版本的既有授权保留，见 [许可政策](../LICENSE-POLICY.md)。第三方许可独立保留在 Notices/ 和 FSRS vendor 目录。教材接入见 [资源指南](../docs/RESOURCES.md)。
+
+## 源码目录
+
+- UI/MainWindow：主窗口各功能的界面交互代码。
+- Features、Controls、Shell、Styles：功能组件、控件、窗口外壳与样式。
+- Domain、Application、Infrastructure、Services、Platform：数据模型、业务逻辑、存储与平台服务。
+- Assets、Notices：资源及第三方声明。
+- tests、SelfTest：领域测试与界面自检。
+- native、packaging：FSRS 助手及安装包工具。
+
+根目录保留启动入口、App/MainWindow 界面文件和 Lexi.csproj。

@@ -4,7 +4,7 @@
 
 下载 Lexi-1.2.4-nc.1-x64-setup.exe 安装即可使用，包含 .NET 运行环境、ECDICT 离线词典、本地 FSRS 助手及当前专题资料，不需要再单独补齐教材。资料在安装包内本地加载，不从第三方站点自动抓取。
 
-Lexi-1.2.4-study-resources.zip 提供相同的专题资源，供源码构建使用；普通用户无需重复下载。原书素材、音频及讲义权利归原权利人，来源和限制保留于包内及 THIRD_PARTY_NOTICES.md，不由项目许可重新授权。
+源码构建需要配套资料时，可从已安装程序的 Assets/IELTS 目录复制；普通用户只需下载安装程序。原书素材、音频及讲义权利归原权利人，来源和限制保留于包内及 THIRD_PARTY_NOTICES.md，不由项目许可重新授权。
 
 项目当前采用 PolyForm Noncommercial 1.0.0，面向非商业使用；商业用途需另获书面授权。作者 Cofran-77、DespairJasper。适用范围与授权沿革见 [独立许可说明](https://github.com/Cofran-77/lexi/blob/main/LICENSE-POLICY.md)。
 

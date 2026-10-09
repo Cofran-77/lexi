@@ -4,7 +4,7 @@
 
 Windows 1.2.4 当前安装包包含离线词典及配套专题学习资料，安装后本地加载，无需另行下载。Android 按其已实现的功能集提供，不包含 Windows 专题工作区。
 
-开发者可在 [Windows 发布页](https://github.com/Cofran-77/lexi/releases/tag/windows-v1.2.4-nc.1) 下载 Lexi-1.2.4-study-resources.zip。将 Assets/IELTS 下的内容解压到 windows/Assets/IELTS 后构建。Git 中保留格式示例和资源哈希清单，避免在提交历史中重复存放约 500 MB 音频和资料。
+开发者可安装当前 Windows 版，将安装目录中的 Assets/IELTS 复制到 windows/Assets/IELTS 后构建。Git 中保留格式示例和资源哈希清单，避免在提交历史中重复存放约 500 MB 音频和资料。
 
 ## 离线词典
 

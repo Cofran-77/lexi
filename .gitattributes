@@ -1,0 +1,15 @@
+* text=auto
+*.cs text eol=lf
+*.kt text eol=lf
+*.kts text eol=lf
+*.rs text eol=lf
+*.md text eol=lf
+*.json text eol=lf
+*.ps1 text eol=lf
+*.sh text eol=lf
+gradlew text eol=lf
+*.bat text eol=crlf
+*.sqlite3 binary
+*.png binary
+*.ico binary
+*.jar binary

@@ -43,11 +43,13 @@ private-update-backup*/
 *.pyc
 .superpowers/
 
-# 与 monorepo 一致：第三方教材与音频不进入 Git
-lexi_avalonia/Assets/IELTS/**
-!lexi_avalonia/Assets/IELTS/README.md
-!lexi_avalonia/Assets/IELTS/catalog.example.json
-**/target/
-**/.avalonia-build-tasks/
-*.env
-.env.*
+# 统计侧车与本机工作记录
+study-activity.json
+study-activity.json.*
+.planning/
+
+# 本机好友连接与私有服务端部署；公开源码只提供客户端示例
+lexi_avalonia/Assets/social-public.json
+supabase/
+private-config/
+.local/

@@ -94,7 +94,16 @@ public sealed class StudyShortcutEngine
             return StudyShortcutDispatchResult.Ignored;
         }
 
-        // 2. 检查被明确剔除的裸键 (Q/W/E/A/S/C/Delete 及 Alt+Space)
+        // 2. 回忆揭晓后的 Q/W/E 评分必须先于裸键剔除判断。
+        if (context.StudyPhase == StudyPhase.RecallRevealedUnrated &&
+            input.Modifiers == ShortcutModifiers.None)
+        {
+            if (keyName == "Q") return StudyShortcutDispatchResult.RateKnown;
+            if (keyName == "W") return StudyShortcutDispatchResult.RateUnsure;
+            if (keyName == "E") return StudyShortcutDispatchResult.RateForgot;
+        }
+
+        // 3. 检查被明确剔除的裸键 (Q/W/E/A/S/C/Delete 及 Alt+Space)
         if (input.Modifiers == ShortcutModifiers.None && RemovedBareKeys.Contains(keyName))
         {
             return StudyShortcutDispatchResult.ProhibitedKeyIgnored;
@@ -104,7 +113,7 @@ public sealed class StudyShortcutEngine
             return StudyShortcutDispatchResult.Ignored;
         }
 
-        // 3. Esc 单路由分层优先级：
+        // 4. Esc 单路由分层优先级：
         // 顶层菜单弹窗抽屉/chooser -> global focus -> 学习任务
         if (MatchesAction(input, ShortcutAction.Escape, keyName))
         {
@@ -123,31 +132,31 @@ public sealed class StudyShortcutEngine
         if (context.IsRestoringOrUnavailable)
             return StudyShortcutDispatchResult.Ignored;
 
-        // 4. F11 切换全局专注
+        // 5. F11 切换全局专注
         if (MatchesAction(input, ShortcutAction.ToggleGlobalFocus, keyName))
         {
             return StudyShortcutDispatchResult.ToggleGlobalFocus;
         }
 
-        // 5. 撤销 (默认 Ctrl+Z)
+        // 6. 撤销 (默认 Ctrl+Z)
         if (MatchesAction(input, ShortcutAction.Undo, keyName))
         {
             return context.CanUndo ? StudyShortcutDispatchResult.Undo : StudyShortcutDispatchResult.Ignored;
         }
 
-        // 6. 收藏 (默认 Ctrl+D)
+        // 7. 收藏 (默认 Ctrl+D)
         if (MatchesAction(input, ShortcutAction.Favorite, keyName))
         {
             return context.HasCurrentWord ? StudyShortcutDispatchResult.Favorite : StudyShortcutDispatchResult.Ignored;
         }
 
-        // 7. 发音朗读 (默认 ↑)
+        // 8. 发音朗读 (默认 ↑)
         if (MatchesAction(input, ShortcutAction.Speak, keyName))
         {
             return context.HasCurrentWord ? StudyShortcutDispatchResult.Speak : StudyShortcutDispatchResult.Ignored;
         }
 
-        // 8. 评分快捷键：← Forgot, ↓ Unsure, → Known，以及可选的 1/2/3 备用
+        // 9. 评分快捷键：← Forgot, ↓ Unsure, → Known，以及可选的 1/2/3 备用
         if (MatchesRatingAction(input, ShortcutAction.Forgot, keyName, ["D1", "NumPad1"]))
         {
             if (context.StudyPhase == StudyPhase.RecallRevealedUnrated)
@@ -164,7 +173,7 @@ public sealed class StudyShortcutEngine
                 return StudyShortcutDispatchResult.RateKnown;
         }
 
-        // 9. Space / Enter 主推进快捷键：
+        // 10. Space / Enter 主推进快捷键：
         // Learn 推进 / 隐藏揭晓 / 已评分下一词；
         // 关键：不隐式 Known，不退出！
         if (MatchesAction(input, ShortcutAction.Primary, keyName))

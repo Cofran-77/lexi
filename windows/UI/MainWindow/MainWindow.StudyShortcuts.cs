@@ -205,12 +205,14 @@ public partial class MainWindow
         if (_currentPage == "review")
         {
             if (_reviewWord == null) return StudyPhase.None;
+            if (_reviewRatedPending) return StudyPhase.RecallRated;
             if (!_reviewRevealed) return StudyPhase.RecallHidden;
             return StudyPhase.RecallRevealedUnrated;
         }
 
         if (_currentPage == "learning" && _studyWorkspaceHost.IsVisible && _dailyLearningSession != null)
         {
+            if (_planRatedPending) return StudyPhase.RecallRated;
             if (_dailyLearningSession.Round.CurrentStep == StudyStep.Learn) return StudyPhase.Learn;
             if (!_planAnswerVisible) return StudyPhase.RecallHidden;
             return StudyPhase.RecallRevealedUnrated;
@@ -231,7 +233,8 @@ public partial class MainWindow
     {
         if (_focusActive) return (_focusRound?.HasCurrent == true) || _focusRated;
         if (_currentPage == "review") return _reviewWord != null;
-        if (_currentPage == "learning" && _dailyLearningSession != null) return _dailyLearningSession.Round.HasCurrent;
+        if (_currentPage == "learning" && _dailyLearningSession != null)
+            return _planRatedPending || _dailyLearningSession.Round.HasCurrent;
         if (_currentPage == "lookup") return LookupResultCard.IsVisible;
         return false;
     }
@@ -337,6 +340,14 @@ public partial class MainWindow
             _focusRated = false;
             _focusAnswerVisible = false;
             RenderFocus();
+        }
+        else if (_currentPage == "review")
+        {
+            _ = AdvanceReviewAsync();
+        }
+        else if (_currentPage == "learning")
+        {
+            AdvanceDailyLearningAfterRating();
         }
     }
 

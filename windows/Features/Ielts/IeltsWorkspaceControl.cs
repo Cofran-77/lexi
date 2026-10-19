@@ -686,9 +686,13 @@ public sealed class IeltsWorkspaceControl : Grid, IDisposable
             {
                 CornerRadius = new CornerRadius(8),
                 Padding = new Thickness(10, 8),
-                Margin = new Thickness(2, 1)
+                Margin = new Thickness(2, 1),
+                // Chapter rows used to be pointer-only; keyboard users need focus and Enter/Space.
+                Focusable = true
             };
             try { row.Cursor = new Cursor(StandardCursorType.Hand); } catch { }
+            Avalonia.Automation.AutomationProperties.SetName(row,
+                section.Title + " · " + IeltsI18n.WordCountFormat(section.Entries.Count));
 
             // 克制选中状态（不整块高饱和长蓝条，采用 SelectionBrush 及细辅色指示）
             if (isCurrent)
@@ -746,6 +750,25 @@ public sealed class IeltsWorkspaceControl : Grid, IDisposable
                 {
                     SelectSection(section);
                 }
+            };
+            row.KeyDown += (_, e) =>
+            {
+                if (e.Key is not (Key.Enter or Key.Space)) return;
+                e.Handled = true;
+                if (_selectedSection?.Id != section.Id) SelectSection(section);
+            };
+            // A focusable row needs a visible focus cue of its own; the selected state keeps its
+            // accent edge, an unselected row borrows the accent border while focused.
+            row.GotFocus += (_, _) =>
+            {
+                if (isCurrent) return;
+                row.BorderThickness = new Thickness(1);
+                row.Bind(Border.BorderBrushProperty, this.GetResourceObservable("AccentBrush"));
+            };
+            row.LostFocus += (_, _) =>
+            {
+                if (isCurrent) return;
+                row.BorderThickness = new Thickness(0);
             };
 
             _chapterListPanel.Children.Add(row);

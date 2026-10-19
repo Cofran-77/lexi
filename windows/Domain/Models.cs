@@ -37,6 +37,12 @@ public sealed class AppSettings
     public bool HighContrast { get; set; }
     public bool OpaqueMaterial { get; set; }
     public bool ReduceMotion { get; set; }
+    /// <summary>上次停留的顶层页面，仅用于冷启动恢复；白名单见 <see cref="Lexi.NavigationState"/>。</summary>
+    public string LastPage { get; set; } = "lookup";
+    public string ExamTopicId { get; set; } = "ielts";
+    public string? ExamBookId { get; set; }
+    public string? ExamSectionId { get; set; }
+    public List<string> ExamSelectedWordIds { get; set; } = [];
 }
 
 public sealed class LookupResult
@@ -65,4 +71,3 @@ public sealed class LlmResult
 
     public bool HasContent => Examples.Count > 0 || Synonyms.Count > 0 || Antonyms.Count > 0 || Phrases.Count > 0;
 }
-

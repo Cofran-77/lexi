@@ -33,6 +33,9 @@ vocab.sqlite3*
 learning-progress.json
 daily-study-plans.json
 wolfpack.config.json
+windows/social-public.json
+**/social-public.json
+!**/social-public.example.json
 **/Notices/verification/
 # IELTS book data and media are NOT licensed by this project
 windows/Assets/IELTS/**

@@ -1,13 +1,26 @@
 name: 功能建议 / Feature request
-description: 描述实际学习场景和期望行为
+description: 描述实际学习场景、影响平台和期望行为
 body:
+  - type: dropdown
+    id: platform
+    attributes:
+      label: 主要平台
+      options:
+        - Windows
+        - macOS
+        - Android
+        - 跨平台
+        - 文档或发布流程
+    validations:
+      required: true
   - type: textarea
     id: scenario
     attributes:
-      label: 使用场景与平台
+      label: 使用场景与当前困难
     validations:
       required: true
   - type: textarea
     id: proposed
     attributes:
       label: 建议行为与现有替代办法
+      description: 说明是否涉及本地数据、登录同步、第三方资源或平台兼容性。

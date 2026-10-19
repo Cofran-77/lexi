@@ -62,7 +62,7 @@ public static class Improvement122Tests
             store.AddWord("adaptive","/əˈdæptɪv/","能够适应变化的；自适应的","Able to adjust to new conditions."); Call("RefreshWords");
             var word = store.GetAllWords().Single(w=>w.Word=="adaptive");
             var plan = DailyStudyPlanRules.Create("让词汇慢慢生长", DailyStudyPlanSource.Archive,"词汇档案",[new DailyStudyPlanWord{Id=word.Id.ToString(),Word=word.Word,Meaning=word.Translation}],1,false,1);
-            Call("OpenPlanCreator",DailyStudyPlanSource.Archive,null!); await Shot("plan-creator");
+            Call("OpenPlanCreator",DailyStudyPlanSource.Archive,null!,null!,null!); await Shot("plan-creator");
             Check(Field<Border>("_planCreatorOverlay").IsVisible && Field<ContentControl>("_planCreatorContent").Bounds.Width>500,"plan creation uses an in-app workspace");
             Call("ClosePlanCreator");
             Call("ShowPage","learning"); Call("StartDailyLearning",plan);
@@ -161,7 +161,7 @@ public static class Improvement122Tests
             var ieltsWord=Field<IeltsCatalog>("_ieltsCatalog").AllWords.First();Call("EnterIeltsFocus",new List<LearningWord>{ieltsWord});await Shot("ielts-focus");
             Check(sharedSurface.IsVisible && ReferenceEquals(sharedSurface,Field<Border>("_globalStudySurface")),"IELTS uses the exact same focus surface");Call("ExitFocus");
             var hintWord=new LearningWord { Id="122-hint-fixture",Words=["adaptive"],Meaning="自适应的" };
-            Call("StartLearningTyping",new List<LearningWord>{hintWord},true);await Task.Delay(60);
+            Call("StartLearningTyping",new List<LearningWord>{hintWord},true,"learning");await Task.Delay(60);
             var typing=Field<TypingSession>("_learningTypingSession");
             var hint=Field<SelectableTextBlock>("_learningTypingHint");
             Check(hint.Text=="8 个字母" && !hint.Text.Any(c=>c is >= 'a' and <= 'z' or >= 'A' and <= 'Z'),"assisted spelling initially shows length without answer letters");

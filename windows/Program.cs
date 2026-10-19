@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using System.Threading.Tasks;
 using Avalonia;
+using Lexi.Social;
 
 namespace Lexi;
 
@@ -19,6 +20,7 @@ public static class Program
         {
             var text = "Lexi 未能启动。已保留原有数据。\n\n" + ex.Message + "\n\n自动备份目录：" + Path.Combine(Path.GetDirectoryName(VocabularyService.GetDefaultDatabasePath())!, "backups");
             Console.Error.WriteLine(text);
+            Console.Error.WriteLine(ex);
             if (OperatingSystem.IsWindows() && !args.Any(a => a is "--database-check" or "--backup-database" or "--restore-backup")) MessageBox(IntPtr.Zero, text, "Lexi · 启动失败", 0x10);
             return 1;
         }
@@ -43,7 +45,8 @@ public static class Program
         // 2. Single instance enforcement using Mutex + Named Pipe
         using var singleInstance = new SingleInstanceService();
         var maintenance = args.Any(a => a is "--database-check" or "--backup-database" or "--restore-backup");
-        if (!singleInstance.CheckAndAcquire(!maintenance))
+        var activationArgument = args.FirstOrDefault(WindowsProtocolRegistration.IsCallbackUri);
+        if (!singleInstance.CheckAndAcquire(!maintenance, activationArgument))
         {
             // Another instance is already running; wake signal sent, exit gracefully.
             if (maintenance) { Console.Error.WriteLine("请先退出正在运行的 Lexi，再检查或恢复词库。"); return 3; }
@@ -70,6 +73,7 @@ public static class Program
                 if (args.Contains("--backup-database")) Console.WriteLine(DatabaseSafety.CreateBackup(database, path));
                 else Console.WriteLine("词库完整性和关联检查通过。");
             }
+            if (DatabaseSafety.TakeRecoveryNotice() is { Length: > 0 } recovery) Console.WriteLine("中断恢复收尾：" + recovery);
             return 0;
         }
 

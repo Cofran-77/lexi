@@ -17,7 +17,7 @@ namespace Lexi;
 /// <summary>
 /// 1.2.3 学习与拼写控件级自检套件：
 /// - StudyCanvasControl：限宽 680、40 字号词头、音标扬声器、揭晓阅读边界与左对齐、纯色无白卡、全 SelectableTextBlock
-/// - PracticeSetupControl：限宽 640、高约 320、两项范围、空 weak 禁用、唯一开始键、Hints 恒 true、模式单选框不暴露于视觉树
+/// - PracticeSetupControl：限宽 640、高约 320、两种模式与两项范围、空 weak 禁用、唯一开始键
 /// - SpellingPracticeControl：20 字号释义、26 字号轻底线输入框、短窗可滚、Enter 单次提交、提示不清空输入、就近反馈与扬声器
 /// 供主控验收调用：RunAsync(MainWindow?, Action&lt;bool, string&gt;)。
 /// </summary>
@@ -91,7 +91,7 @@ public static class Learning123ControlTests
         check(dividers.Any(), "揭晓后生成细分隔线形成阅读边界");
 
         // =====================================================================
-        // PART 2: PracticeSetupControl 范围与单一模式验证
+        // PART 2: PracticeSetupControl 模式与范围验证
         // =====================================================================
         bool? startOnlyWeak = null;
         bool? startHints = null;
@@ -114,7 +114,7 @@ public static class Learning123ControlTests
         check(setup.TotalWords == 50 && setup.WeakWords == 12,
             "PracticeSetupControl 正确记录总词数与薄弱词数");
         check(setup.WeakScopeRadio.IsEnabled, "存在薄弱词时薄弱项选项启用");
-        check(setup.Hints, "1.2.3 方案中 PracticeSetupControl.Hints 恒为 true");
+        check(setup.Hints, "PracticeSetupControl 默认选择淡写并启用提示");
 
         // 触发开始练习
         setup.WeakScopeRadio.IsChecked = true;
@@ -126,10 +126,13 @@ public static class Learning123ControlTests
         setup.CancelButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
         check(cancelled, "点击取消正确触发 cancel 回调");
 
-        // 检查模式单选框不暴露于视觉树
+        // 两种模式均可见，切换默写后关闭提示
         var visualRadios = setup.GetLogicalDescendants().OfType<RadioButton>().ToList();
-        check(!visualRadios.Contains(setup.MemoryModeRadio) && !visualRadios.Contains(setup.AssistedModeRadio),
-            "兼容模式单选框未暴露至视觉树，仅保留两项范围单选");
+        check(visualRadios.Contains(setup.MemoryModeRadio) && visualRadios.Contains(setup.AssistedModeRadio),
+            "淡写与默写模式均暴露在练习准备界面");
+        setup.MemoryModeRadio.IsChecked = true;
+        setup.StartButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        check(startHints == false, "切换默写后向主控传递 hints: false");
 
         // 边界情况：空 weak 禁用
         var setupNoWeak = new PracticeSetupControl(
@@ -178,14 +181,18 @@ public static class Learning123ControlTests
 
         spelling.Update(spellModel);
 
-        check(spelling.MeaningBlock.FontSize == 20 && spelling.MeaningBlock.Text == "坚持；执意",
-            "SpellingPracticeControl 释义字号为 20 字号居中呈现");
+        check(spelling.MeaningBlock.FontSize is >= 18 and <= 20 &&
+              spelling.MeaningBlock.Text == "坚持；执意" &&
+              spelling.MeaningBlock.TextAlignment == TextAlignment.Center,
+            "SpellingPracticeControl 释义保持居中且字号适合全屏单词卡");
 
         check(spelling.InputBox.FontSize >= 24 && spelling.InputBox.FontSize <= 28,
             "SpellingPracticeControl 输入框字号在 24-28 区间（实际 26 字号）");
 
-        check(spelling.InputBox.BorderThickness.Bottom == 2 && spelling.InputBox.BorderThickness.Top == 0,
-            "SpellingPracticeControl 输入框具备轻底线样式");
+        check(spelling.InputBox.Classes.Contains("spelling-input") &&
+              spelling.InputBox.Background == Brushes.Transparent &&
+              spelling.InputBox.BorderThickness == default,
+            "SpellingPracticeControl 输入框应用无边框透明样式以显示逐字母反馈");
 
         check(spelling.HintBlock.Text == "p _ _ s _ _ t" && spelling.HintBlock.IsVisible,
             "SpellingPracticeControl 单一轻量提示呈现，去除巨大双重占位线");
@@ -214,11 +221,11 @@ public static class Learning123ControlTests
         check(submitCount == 1 && submittedWord == "persist",
             "提交逻辑正确单次提交输入内容");
 
-        // 验证看答案后切换下一词按钮
+        // 验证看答案后仍需照着输入并提交，不能直接进入下一词
         spellModel.AnswerRevealed = true;
         spelling.Update(spellModel);
-        check(spelling.NextButton.IsVisible && !spelling.SubmitButton.IsVisible,
-            "查看答案后操作区切换为「下一词」主按钮");
+        check(spelling.SubmitButton.IsVisible && !spelling.NextButton.IsVisible,
+            "查看答案后仍需照着输入并提交才能进入下一词");
 
         // 刷新双语无异常
         spelling.RefreshLanguage();

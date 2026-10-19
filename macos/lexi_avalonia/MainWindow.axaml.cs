@@ -53,7 +53,7 @@ public partial class MainWindow : Window
         InitializeComponent();
 
         _dictService = ServiceFactory.OpenDictionary();
-        _vocabService = ServiceFactory.OpenArchive();
+        _vocabService = ServiceFactory.OpenArchive(secrets: App.IsAutomatedTestRun() ? new AutomatedRunSecrets() : null);
         _aiService = ServiceFactory.CreateAi();
         _settings = _vocabService.LoadSettings();
 
@@ -75,6 +75,8 @@ public partial class MainWindow : Window
         ConfigureLearningMemory();
         RefreshWords();
         ConfigureLearningPages();
+        ConfigureStatistics();
+        ConfigureSocial();
         ConfigureUpdateCheck();
 
         ShowPage("lookup");
@@ -228,6 +230,8 @@ public partial class MainWindow : Window
     internal void PrepareForApplicationShutdown()
     {
         if (_isForceClose) return;
+        StatisticsStopTracking();
+        GlacierCancelPageMotion();
         MemoryCancelParameters();
         MemoryCancelContextTraining();
         StopLearningSpeech();
@@ -317,6 +321,7 @@ public partial class MainWindow : Window
         UpdateLearningNavigation(page);
 
         var incoming = PageControl(page);
+        GlacierCancelPageMotion();
         ApplyPageVisibility(page);
         if (previousPage != page) StartPageTransition(incoming);
 
@@ -339,10 +344,11 @@ public partial class MainWindow : Window
         if (page == "quotes") RenderQuotes();
         if (page == "ielts") RenderIeltsPage();
         if (page == "plans") RenderStudyPlanLists();
+        if (page == "dailyplan") RenderDailyPlanDetail();
+        if (page == "statistics") StatisticsEnterPage();
+        if (page == "social") SocialEnterPage();
         if (page == "typing") ShowTypingPractice();
     }
-
-    private CancellationTokenSource? _pageTransitionCts;
 
     private Control? PageControl(string? page) => page switch
     {
@@ -352,6 +358,9 @@ public partial class MainWindow : Window
         "settings" => PageSettings,
         "ielts" => _ieltsPage,
         "plans" => _studyPlanPage,
+        "dailyplan" => _dailyPlanPage,
+        "statistics" => _statisticsPage,
+        "social" => _socialPage,
         "typing" => _typingPage,
         "quotes" => _quotesPage,
         _ => null,
@@ -360,10 +369,16 @@ public partial class MainWindow : Window
     // 任一时刻只有一个页面可见（沿用原契约）；新页面随后淡入，避免两页半透明内容重影。
     private void ApplyPageVisibility(string page)
     {
+        if (_socialPage != null) _socialPage.IsVisible = page == "social";
+        _socialNav?.Classes.Set("active", page == "social");
         if (_quotesPage != null) _quotesPage.IsVisible = page == "quotes";
         _quotesNav?.Classes.Set("active",page == "quotes");
         if (_ieltsPage != null) _ieltsPage.IsVisible = page == "ielts";
         if (_studyPlanPage != null) _studyPlanPage.IsVisible = page == "plans";
+        if (_dailyPlanPage != null) _dailyPlanPage.IsVisible = page == "dailyplan";
+        if (_statisticsPage != null) _statisticsPage.IsVisible = page == "statistics";
+        this.FindControl<Button>("NavStatistics")?.Classes.Set("active", page == "statistics");
+        NavPlans.Classes.Set("active", page is "plans" or "dailyplan");
         if (_typingPage != null) _typingPage.IsVisible = page == "typing";
         PageLookup.IsVisible = true; // 宿主的显隐已经足够，淡出过程中内容不应提前消失
         foreach (var (key, control) in new (string, Control)[]
@@ -378,20 +393,16 @@ public partial class MainWindow : Window
     // macOS 风格：旧页即时退场，新页淡入并轻微上浮（fade-through），不做硬切。
     private void StartPageTransition(Control? incoming)
     {
-        _pageTransitionCts?.Cancel();
-        if (incoming == null) return;
-        var cts = new CancellationTokenSource();
-        _pageTransitionCts = cts;
-
-        Motion.SetPose(incoming, Motion.Pose(0, 12, 1), 0);
-        _ = Motion.ToPoseAsync(incoming, Motion.Rest, 1, Motion.Standard, Motion.Enter, cts.Token);
+        if (incoming != null) GlacierAnimatePage(incoming);
     }
 
     #endregion
 
     #region Lookup & Offline Dictionary
 
-    private async Task PerformLookupAsync()
+    private Task PerformLookupAsync() => PerformLookupCoreAsync(null);
+
+    private async Task PerformLookupCoreAsync(LearningWord? topicWord)
     {
         if (_restoring || !_databaseAvailable) return;
         var requestVersion = ++_lookupVersion;
@@ -426,7 +437,7 @@ public partial class MainWindow : Window
                 Word = personal.Word, Phonetic = personal.Phonetic, Translation = personal.Translation,
                 Definition = personal.Definition, Found = true
             };
-            var ielts = _ieltsCatalog?.Find(query);
+            var ielts = topicWord ?? FindLearningWord(query);
             if (!res.Found && ielts != null) res = new LookupResult
             { Word = query, Translation = ielts.Pos + " " + ielts.Meaning, Phonetic = ielts.Phonetic, Definition = ielts.Extra, Found = true };
             if (requestVersion != _lookupVersion || _isForceClose) return;

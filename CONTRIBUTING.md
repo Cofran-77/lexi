@@ -1,26 +1,49 @@
 # 参与 Lexi
 
-项目作者：Cofran-77、DespairJasper。欢迎改进源码、文档、可访问性与平台体验。
+Lexi 由 Cofran-77 与 DespairJasper 共同署名。欢迎提交缺陷修复、文档、可访问性和平台适配改进。
 
-## 开始
+## 提交前
 
-1. 先查已有 Issues。较大的功能先开 Issue 说明场景、平台和预期行为。
-2. Fork 仓库，从 main 新建短名称分支；在对应 `windows/`、`android/` 或 `macos/` 修改。macOS 已接入 3.1.3，具体构建与验证见该目录 README。
-3. 保持一个 PR 聚焦一个问题；说明用户行为变化、验证方式与已知边界。
-4. 根据改动运行相关测试或构建。轻量文档改动不要求全软件回归；UI 缺陷附隔离数据截图或复现步骤。
+1. 先搜索已有 Issue，较大功能先说明使用场景、平台和预期行为。
+2. 从 `main` 创建短名称分支，一个 PR 聚焦一个问题。
+3. 只在相关平台目录修改：`windows/`、`macos/` 或 `android/`。
+4. 写清实际运行的构建或测试。编译成功不能替代 UI、安装包和设备验收。
+5. UI 缺陷尽量附隔离演示数据截图或最小复现步骤。
 
-## 约束
+## 隐私与资源
 
-- 不随意改变既有主题、快捷键与存储行为；涉及数据迁移需解释备份、失败和回滚路径。
-- 不提交个人词库、API Key、本机配置、签名材料、第三方教材/录音、构建缓存或内部代理日志。
-- 使用第三方代码须保留许可和来源。未取得可分发权利的资源不进入 Git 或 Release。
-- 贡献者应有权提交内容，并同意贡献按对应目录许可分发（默认 PolyForm Noncommercial；macOS 原有内容采用 `macos/LICENSE`）；第三方内容保留独立授权，不要求转让作者版权。
-- 测试声明只写实际执行过的内容，不把编译、模拟器测试或旧版本报告当成所有设备认证。
+- 不提交个人词库、学习记录、计划、账号资料、Cookie、Session、Token、API Key、签名材料、日志或本机配置。
+- UI 截图必须使用 `LEXI_DATA_DIR` 等隔离目录，并检查通知、好友资料、路径和密钥。
+- Windows 公开 Git 源码不包含未获分发许可的 IELTS 书籍与音频。
+- macOS 源码只保留上游公开跟踪的资源；新增第三方内容必须有可核对来源和分发依据。
+- 真实 `social-public.json` 不提交，只提交 `social-public.example.json`。
 
-## 版本约定
+## 许可
 
-各端独立版本，标签为 `windows-vX.Y.Z` / `android-vX.Y.Z` / `macos-vX.Y.Z`。Android alpha 发布设置 prerelease。维护者更新 CHANGELOG、平台说明及下载资源校验后再发布，历史里程碑不推荐覆盖安装。
+- 根目录原创贡献按适用的 [PolyForm Noncommercial 1.0.0](LICENSE) 分发。
+- `macos/` 原有内容继续按 [Lexi 非商业许可](macos/LICENSE) 分发。
+- 贡献者保留自己的版权；提交商业版本所需的额外授权需另行协商。
+- 第三方代码和资料保留各自许可，不能因进入本仓库而重新授权。
 
-## macOS 合作
+## 验证
 
-macOS 3.1.3 已接入，后续通过分支与 PR 维护 `macos/`。保留源码原许可、第三方通知与发布 pin，运行相关检查。安装包与应用内更新源目前仍为原 macOS 发布仓库；新建本仓库 Release 时再同步维护发布入口。
+Windows 最小检查：
+
+```powershell
+cargo build --manifest-path windows/native/fsrs-optimizer/Cargo.toml --release --locked
+dotnet build windows/Lexi.csproj -c Release
+```
+
+macOS 最小检查：
+
+```sh
+cd macos
+python3 scripts/verify_source_integrity.py
+dotnet build lexi_avalonia/Lexi.csproj -c Release
+```
+
+涉及安装包、数据迁移、签名、登录或好友同步时，在 PR 中明确列出未验证环境和残余风险。
+
+## 版本与发布
+
+桌面端当前使用统一 Release 标签 `vX.Y.Z-cross-platform`。历史平台标签继续保留。维护者更新 README、更新日志、验证记录和 Release 校验文件后再发布。

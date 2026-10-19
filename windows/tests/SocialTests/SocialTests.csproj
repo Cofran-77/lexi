@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../Application/Lexi.Application.csproj" />
+    <ProjectReference Include="../../Infrastructure/Lexi.Infrastructure.csproj" />
+    <Compile Include="../../Platform/WindowsProtocolRegistration.cs" Link="Platform/WindowsProtocolRegistration.cs" />
+    <Compile Include="../../Services/SingleInstanceService.cs" Link="Services/SingleInstanceService.cs" />
+  </ItemGroup>
+</Project>

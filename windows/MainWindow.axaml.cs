@@ -62,17 +62,24 @@ public partial class MainWindow : Window
         BindFoundationEvents();
         BindReviewEvents();
         InitializeLearningHub();
+        InitializeStatistics();
         InitializeFocus();
         InitializeIelts();
+        InitializeExamTopics();
+        InitializeSocial();
+        InitializeStudyActivityTracking();
         BindAppearanceEvents();
         ConfigureQuickActions();
         ConfigureInteractionWorkspace();
+        ReorderLearningNavigation();
         ConfigureVisual123();
         BindLanguageEvents();
         LoadSettingsToUi();
         RefreshWords();
 
-        ShowPage("lookup");
+        ShowPage(NavigationState.Normalize(_settings.LastPage));
+        if (DatabaseSafety.TakeRecoveryNotice() is { Length: > 0 } recoveryNotice)
+            SetStatus(LocalizeRecoveryNotice(recoveryNotice));
     }
 
     private void BindEvents()
@@ -91,7 +98,7 @@ public partial class MainWindow : Window
         DragBar.PointerPressed += OnTitleBarPressed;
         Opened += (_, _) =>
         {
-            LookupInput.Focus();
+            FocusVisiblePageEntry();
             if (App.Hotkey?.IsRegistered == false) SetStatus("Alt+D 被其他程序占用；可用托盘或桌面快捷方式呼出。请退出旧版后重开新版。");
         };
 
@@ -165,7 +172,9 @@ public partial class MainWindow : Window
         {
             var theme = SettingsThemeCombo.SelectedIndex == 1 ? "Dark" : "Light";
             RequestedThemeVariant = theme == "Dark" ? Avalonia.Styling.ThemeVariant.Dark : Avalonia.Styling.ThemeVariant.Light;
-            ThemeToggleBtn.Content = theme == "Dark" ? "切换浅色" : "切换深色";
+            ThemeToggleBtn.Content = theme == "Dark"
+                ? UiText.Bilingual("切换浅色", "Light mode")
+                : UiText.Bilingual("切换深色", "Dark mode");
             if (_settings.Theme == theme) return;
             var oldTheme = _settings.Theme;
             _settings.Theme = theme;
@@ -187,7 +196,51 @@ public partial class MainWindow : Window
 
     private void SetStatus(string message)
     {
-        GlobalStatusText.Text = string.IsNullOrEmpty(_vocabService.BackupWarning) ? message : message + " " + _vocabService.BackupWarning;
+        message = UiText.RuntimeText(message);
+        GlobalStatusText.Text = string.IsNullOrEmpty(_vocabService.BackupWarning)
+            ? message
+            : message + " " + LocalizeBackupWarning(_vocabService.BackupWarning);
+    }
+
+    private static string LocalizeBackupWarning(string warning) => warning switch
+    {
+        "数据已保存，但存储整理未完成；下次启动将重试。请检查磁盘空间与权限。" =>
+            UiText.Bilingual(
+                "数据已保存，但存储整理未完成；下次启动将重试。请检查磁盘空间与权限。",
+                "Data was saved, but storage maintenance did not finish. It will retry on the next launch. Check disk space and permissions."),
+        "数据已保存，但自动备份未完成。请检查磁盘空间与权限。" =>
+            UiText.Bilingual(
+                "数据已保存，但自动备份未完成。请检查磁盘空间与权限。",
+                "Data was saved, but automatic backup failed. Check disk space and permissions."),
+        _ => UiText.RuntimeText(warning)
+    };
+
+    private static string LocalizeRecoveryNotice(string notice)
+    {
+        const string rollbackPrefix = "上次的恢复在替换词库时中断，已回滚到恢复前状态；原始文件保留在 ";
+        if (notice.StartsWith(rollbackPrefix, StringComparison.Ordinal))
+            return UiText.Bilingual(notice,
+                "The previous restore was interrupted while replacing the database and was rolled back; the original file remains at "
+                + notice[rollbackPrefix.Length..]);
+
+        const string installPrefix = "上次的恢复在安装阶段中断，已完成收尾；恢复前词库保留在 ";
+        if (notice.StartsWith(installPrefix, StringComparison.Ordinal))
+            return UiText.Bilingual(notice,
+                "The previous restore was interrupted during installation and has been finalized; the pre-restore database remains at "
+                + notice[installPrefix.Length..]);
+
+        return notice switch
+        {
+            "上次的恢复在写入词库前中断，已丢弃未生效的候选文件，原词库保持不变。" =>
+                UiText.Bilingual(
+                    "上次的恢复在写入词库前中断，已丢弃未生效的候选文件，原词库保持不变。",
+                    "The previous restore stopped before writing to the database. The unapplied candidate was discarded and the original database is unchanged."),
+            "上次的恢复已完成但未清理现场记录，已自动收尾。" =>
+                UiText.Bilingual(
+                    "上次的恢复已完成但未清理现场记录，已自动收尾。",
+                    "The previous restore completed without clearing its recovery record; cleanup has finished automatically."),
+            _ => UiText.RuntimeText(notice)
+        };
     }
 
     #region Window Lifecycle & Tray
@@ -213,7 +266,7 @@ public partial class MainWindow : Window
     {
         if (_restoring) return;
         if (!TryFlushWritingDraft()) return;
-        if (_databaseAvailable) PersistPausedSurfaces();
+        if (_databaseAvailable) { PersistPausedSurfaces(); PersistNavigationState(); }
         _memoryLifetime.Cancel();
         _aiCts?.Cancel();
         CancelLookupFallback();
@@ -227,8 +280,19 @@ public partial class MainWindow : Window
 
     public void HideToTray()
     {
+        PersistNavigationState();
         Hide();
         SetStatus("已最小化至系统托盘，按 Alt+D 随时唤醒。");
+    }
+
+    private void PersistNavigationState()
+    {
+        if (!_databaseAvailable) return;
+        try { _vocabService.SaveNavigationState(_settings.LastPage); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException
+            or Microsoft.Data.Sqlite.SqliteException or InvalidOperationException
+            or ObjectDisposedException or ArgumentException)
+        { SetStatus(UiText.Bilingual("导航状态未能保存：", "Could not save navigation state: ") + ex.Message); }
     }
 
     public void ShowAndActivate()
@@ -237,7 +301,7 @@ public partial class MainWindow : Window
         Show();
         if (WindowState == WindowState.Minimized) WindowState = _restoreWindowState;
         Activate();
-        if (_currentPage == "lookup" && !_focusActive) LookupInput.Focus();
+        FocusVisiblePageEntry();
     }
 
     public void ToggleVisibility()
@@ -270,6 +334,7 @@ public partial class MainWindow : Window
         StopWindowsLearningAudio();
         ++_reviewEpoch; // Invalidate any in-flight card transition before page navigation.
         _currentPage = page;
+        _settings.LastPage = NavigationState.Normalize(page);
         _isReviewMode = false; // Review deck owns its queue; archive filters never change it.
 
         NavLookup.Classes.Set("active", page == "lookup");
@@ -283,8 +348,13 @@ public partial class MainWindow : Window
         PageReview.IsVisible = page == "review";
         PageSettings.IsVisible = page == "settings";
         ShowLearningHub(page == "learning");
-        if (_ieltsPage != null) { _ieltsPage.IsVisible = page == "ielts"; _ieltsNav?.Classes.Set("active", page == "ielts"); }
+        if (_ieltsPage != null) _ieltsPage.IsVisible = page == "ielts";
         if (_quotesPage != null) { _quotesPage.IsVisible = page == "quotes"; _quotesNav?.Classes.Set("active", page == "quotes"); if (page == "quotes") RenderQuotes(); }
+        SetExamTopicsPageVisible(page == "exams");
+        SetStatisticsPageVisible(page == "statistics");
+        _statisticsNav?.Classes.Set("active", page == "statistics");
+        if (page == "statistics") RefreshStatisticsPage();
+        SetSocialPageVisible(page == "social");
 
         if (page == "lookup")
         {
@@ -296,8 +366,14 @@ public partial class MainWindow : Window
         }
         else if (page == "vocab")
         {
-            VocabPageTitle.Text = _isReviewMode ? "今日重逢" : "词汇档案";
-            VocabPageSubtitle.Text = _isReviewMode ? "记得，就走向下个节点；还不熟，明日再见。" : "保存真正遇见的词，也留下当时的语境。";
+            VocabPageTitle.Text = _isReviewMode
+                ? UiText.Bilingual("今日重逢", "Review today")
+                : UiText.Bilingual("词汇档案", "Vocabulary");
+            VocabPageSubtitle.Text = _isReviewMode
+                ? UiText.Bilingual("记得，就走向下个节点；还不熟，明日再见。",
+                    "Move on when you remember; see it again tomorrow if it is still unfamiliar.")
+                : UiText.Bilingual("保存真正遇见的词，也留下当时的语境。",
+                    "Keep the words you actually encounter, together with their context.");
             VocabStatusFilter.IsEnabled = !_isReviewMode;
             ApplyVocabFilters();
         }
@@ -328,12 +404,12 @@ public partial class MainWindow : Window
         LookupNotFoundCard.IsVisible = false;
         AiDrawerToggleBtn.IsVisible = false;
         AiGenerateBtn.IsEnabled = true;
-        AiGenerateBtn.Content = "✦ 生成";
+        AiGenerateBtn.Content = UiText.Bilingual("✦ 生成", "✦ Generate");
         AiCancelBtn.IsVisible = false;
         _ = CloseDrawerAsync(immediate: true);
 
         LookupBtn.IsEnabled = false;
-        LookupBtn.Content = "查询中…";
+        LookupBtn.Content = UiText.Bilingual("查询中…", "Looking up…");
 
         try
         {
@@ -359,7 +435,9 @@ public partial class MainWindow : Window
             if (res.Found)
             {
                 ResultWordText.Text = res.Word;
-                ResultPhoneticText.Text = string.IsNullOrEmpty(res.Phonetic) ? "暂无音标" : res.Phonetic;
+                ResultPhoneticText.Text = string.IsNullOrEmpty(res.Phonetic)
+                    ? UiText.Bilingual("暂无音标", "No phonetic")
+                    : res.Phonetic;
                 ResultTranslationText.Text = res.Translation;
                 ResultDefinitionText.Text = res.Definition;
                 RenderPartOfSpeech(res.Pos, res.Translation);
@@ -372,7 +450,14 @@ public partial class MainWindow : Window
                     _currentExpansion = savedExpansion;
                     RenderExpansion(savedExpansion);
                 }
-                SetStatus($"查词成功: {res.Word} ({(aiCompleted ? "AI 补全" : personal == null ? "离线词库" : "私人词汇档案")})");
+                var source = aiCompleted
+                    ? UiText.Bilingual("AI 补全", "AI completed")
+                    : personal == null
+                        ? UiText.Bilingual("离线词库", "Offline dictionary")
+                        : UiText.Bilingual("私人词汇档案", "Personal vocabulary");
+                SetStatus(string.Format(
+                    UiText.Bilingual("查词成功: {0} ({1})", "Found: {0} ({1})"),
+                    res.Word, source));
             }
             else
             {
@@ -381,7 +466,13 @@ public partial class MainWindow : Window
                 ManualTranslationInput.Text = "";
                 ManualDefinitionInput.Text = "";
                 LookupNotFoundCard.IsVisible = true;
-                SetStatus(aiError == null ? $"离线词库未收录 '{query}'，可手动补充录入。" : $"离线词库未收录 '{query}'，AI 补全失败：{aiError}；可手动补充录入。");
+                SetStatus(aiError == null
+                    ? $"离线词库未收录 '{query}'，可手动补充录入。"
+                    : string.Format(
+                        UiText.Bilingual(
+                            "离线词库未收录 '{0}'，AI 补全失败：{1}；可手动补充录入。",
+                            "'{0}' is not in the offline dictionary. AI completion failed: {1}. You can add it manually."),
+                        query, aiError));
             }
         }
         catch (Exception ex)
@@ -390,7 +481,11 @@ public partial class MainWindow : Window
         }
         finally
         {
-            if (requestVersion == _lookupVersion) { LookupBtn.IsEnabled = true; LookupBtn.Content = "查询 ↵"; }
+            if (requestVersion == _lookupVersion)
+            {
+                LookupBtn.IsEnabled = true;
+                LookupBtn.Content = UiText.Bilingual("查询 ↵", "Look up ↵");
+            }
         }
 
         await Task.CompletedTask;
@@ -416,7 +511,9 @@ public partial class MainWindow : Window
         var word = ResultWordText.Text?.Trim();
         if (string.IsNullOrEmpty(word)) return;
 
-        var phon = ResultPhoneticText.Text?.Trim() == "暂无音标" ? "" : ResultPhoneticText.Text?.Trim() ?? "";
+        var phon = ResultPhoneticText.Text?.Trim() is "暂无音标" or "No phonetic"
+            ? ""
+            : ResultPhoneticText.Text?.Trim() ?? "";
         var trans = ResultTranslationText.Text?.Trim() ?? "";
         var def = ResultDefinitionText.Text?.Trim() ?? "";
 
@@ -473,7 +570,7 @@ public partial class MainWindow : Window
     {
         var version = ++_drawerAnimVersion;
         _drawerOpen = true;
-        AiDrawerToggleBtn.Content = "收起扩展 ↑";
+        AiDrawerToggleBtn.Content = UiText.Bilingual("收起扩展 ↑", "Collapse extras ↑");
         var startHeight = AiDrawerSlot.IsVisible ? (double.IsNaN(AiDrawerSlot.Height) ? AiDrawerSlot.Bounds.Height : AiDrawerSlot.Height) : 0;
         AiDrawerSlot.IsVisible = true;
         AiResultBox.IsVisible = true;
@@ -512,7 +609,7 @@ public partial class MainWindow : Window
     private async Task CloseDrawerAsync(bool immediate = false)
     {
         _drawerOpen = false;
-        AiDrawerToggleBtn.Content = "展开扩展 ↓";
+        AiDrawerToggleBtn.Content = UiText.Bilingual("展开扩展 ↓", "Show extras ↓");
         var version = ++_drawerAnimVersion;
         if (!AiDrawerSlot.IsVisible)
         {
@@ -710,7 +807,7 @@ public partial class MainWindow : Window
         _generatingWord = word;
 
         AiGenerateBtn.IsEnabled = false;
-        AiGenerateBtn.Content = "生成中…";
+        AiGenerateBtn.Content = UiText.Bilingual("生成中…", "Generating…");
         AiCancelBtn.IsVisible = true;
         AiDrawerToggleBtn.IsVisible = false;
         _ = CloseDrawerAsync(immediate: true);
@@ -752,7 +849,7 @@ public partial class MainWindow : Window
             if (ReferenceEquals(_aiCts, request))
             {
                 AiGenerateBtn.IsEnabled = true;
-                AiGenerateBtn.Content = "✦ 生成";
+                AiGenerateBtn.Content = UiText.Bilingual("✦ 生成", "✦ Generate");
                 AiCancelBtn.IsVisible = false;
                 _aiCts = null;
             }
@@ -828,7 +925,7 @@ public partial class MainWindow : Window
         _filteredWords = filtered;
         var pageCount = Math.Max(1, (filtered.Count + VocabPageSize - 1) / VocabPageSize);
         _vocabPage = Math.Clamp(_vocabPage, 0, pageCount - 1);
-        VocabPageText.Text = $"{_vocabPage + 1} / {pageCount} 页 · 共 {filtered.Count} 词";
+        VocabPageText.Text = UiText.Format($"{_vocabPage + 1} / {pageCount} 页 · 共 {filtered.Count} 词");
         VocabPager.IsVisible = pageCount > 1;
         VocabPreviousBtn.IsEnabled = _vocabPage > 0;
         VocabNextBtn.IsEnabled = _vocabPage + 1 < pageCount;
@@ -855,7 +952,7 @@ public partial class MainWindow : Window
     private void UpdateSelectedCount()
     {
         var selectedCount = _filteredWords.Count(w => w.Selected);
-        SelectedCountText.Text = $"已选 {selectedCount} 项";
+        SelectedCountText.Text = UiText.Format($"已选 {selectedCount} 项");
         _archiveActions?.UpdateSelection(selectedCount);
         SelectAllCheckBox.IsChecked = _displayedWords.Count > 0 && _displayedWords.All(w => w.Selected);
     }
@@ -925,7 +1022,7 @@ public partial class MainWindow : Window
                 break;
             case 6:
                 _pendingDeleteIds = selectedIds;
-                DialogDeleteTitle.Text = $"确认删除选中的 {selectedIds.Count} 个单词？";
+                DialogDeleteTitle.Text = UiText.Format($"确认删除选中的 {selectedIds.Count} 个单词？");
                 DialogDeleteOverlay.IsVisible = true;
                 break;
         }
@@ -994,7 +1091,7 @@ public partial class MainWindow : Window
             if (word != null)
             {
                 _pendingDeleteIds = new List<long> { id };
-                DialogDeleteTitle.Text = $"确认删除 '{word.Word}'？";
+                DialogDeleteTitle.Text = UiText.Format($"确认删除 '{word.Word}'？");
                 DialogDeleteOverlay.IsVisible = true;
             }
         }
@@ -1151,7 +1248,9 @@ public partial class MainWindow : Window
         try
         {
             _vocabService.SaveSettings(_settings);
-            SetStatus("设置已保存。查词优先离线，缺词时按配置进行 AI 补全。");
+            SetStatus(UiText.Bilingual(
+                "设置已保存。查词优先离线，缺词时按配置进行 AI 补全。",
+                "Settings saved. Lookup uses the offline dictionary first and AI only when configured."));
         }
         catch (Exception ex) { SetStatus($"设置未能保存：{ex.Message}"); }
     }

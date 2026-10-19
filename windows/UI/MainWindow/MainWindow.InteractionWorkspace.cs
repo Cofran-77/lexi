@@ -22,7 +22,11 @@ public partial class MainWindow
     {
         flyout.Opened+=(_,_)=>_openStudyFlyouts.Add(flyout);
         flyout.Closed+=(_,_)=>_openStudyFlyouts.Remove(flyout);
-        flyout.Opened+=(_,_)=>{ if(_glassHost!=null)_glassHost.TrackOnce(flyout); };
+        flyout.Opened+=(_,_)=>
+        {
+            if(_glassHost!=null)_glassHost.TrackOnce(flyout);
+            RefreshUiLanguageForFlyout(flyout);
+        };
     }
 
     private void ConfigureInteractionWorkspace()
@@ -92,12 +96,14 @@ public partial class MainWindow
         _settingsPreviousFocusChrome = _globalFocusActive;
         _settingsPageVisibility.Clear();
         foreach (var control in new Control?[] { PageLookup, LookupPageHost, PageVocab, PageReview,
-            _learningHubPage, _ieltsPage, _quotesPage, _focusHost, _typingHost })
+            _learningHubPage, _ieltsPage, _examTopicsPage, _statisticsPage, _socialPage,
+            _quotesPage, _focusHost, _typingHost })
             if (control != null) { _settingsPageVisibility[control] = control.IsVisible; control.IsVisible = false; }
         SetGlobalFocusChrome(false);
         _currentPage = "settings";
         NavLookup.Classes.Set("active", false); NavVocab.Classes.Set("active", false); NavReview.Classes.Set("active", false);
-        _navLearningHub?.Classes.Set("active", false); _ieltsNav?.Classes.Set("active", false); _quotesNav?.Classes.Set("active", false);
+        _navLearningHub?.Classes.Set("active", false); _quotesNav?.Classes.Set("active", false);
+        _examTopicsNav?.Classes.Set("active", false); _statisticsNav?.Classes.Set("active", false); _socialNav?.Classes.Set("active", false);
         UpdateDataInfo();
         _settingsDrawerOpen = true;
         PageSettings.IsVisible = true;
@@ -117,7 +123,10 @@ public partial class MainWindow
         NavSettings.Classes.Set("active", false);
         NavLookup.Classes.Set("active", _currentPage == "lookup"); NavVocab.Classes.Set("active", _currentPage == "vocab");
         NavReview.Classes.Set("active", _currentPage == "review"); _navLearningHub?.Classes.Set("active", _currentPage == "learning");
-        _ieltsNav?.Classes.Set("active", _currentPage == "ielts"); _quotesNav?.Classes.Set("active", _currentPage == "quotes");
+        _quotesNav?.Classes.Set("active", _currentPage == "quotes");
+        SetExamTopicsPageVisible(_currentPage == "exams");
+        SetStatisticsPageVisible(_currentPage == "statistics");
+        SetSocialPageVisible(_currentPage == "social");
         SetGlobalFocusChrome(_settingsPreviousFocusChrome);
     }
 

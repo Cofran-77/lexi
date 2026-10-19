@@ -2,163 +2,217 @@
 
 # Lexi
 
-**本地优先的英语词汇管理与学习工具**
+**本地优先的英语词汇、记忆与阅读工具**
 
-从查词、积累到复习，在自己的词汇档案中建立持续学习的路径。
+Windows x64 · macOS Apple Silicon · 离线词典 · FSRS-6 · 考试专题 · 学习计划
 
-[![Build](https://github.com/Cofran-77/lexi/actions/workflows/build.yml/badge.svg)](https://github.com/Cofran-77/lexi/actions/workflows/build.yml)
-[![License](https://img.shields.io/badge/license-PolyForm_Noncommercial_1.0.0-blue)](LICENSE)
-[![Windows](https://img.shields.io/badge/Windows-1.2.4-0078D4)](windows/README.md)
+[![Windows](https://img.shields.io/badge/Windows-3.3.1-0078D4)](windows/README.md)
+[![macOS](https://img.shields.io/badge/macOS-3.3.1-555555)](macos/README.md)
 [![Android](https://img.shields.io/badge/Android-0.2.2_alpha-3DDC84)](android/README.md)
-[![macOS](https://img.shields.io/badge/macOS-3.1.3-555555)](macos/README.md)
+[![License](https://img.shields.io/badge/license-source--available-blue)](LICENSE)
 
-[下载](https://github.com/Cofran-77/lexi/releases) · [构建指南](docs/BUILDING.md) · [更新日志](CHANGELOG.md) · [问题反馈](https://github.com/Cofran-77/lexi/issues)
-
-**Cofran-77 · DespairJasper**
+[下载 3.3.1](https://github.com/Cofran-77/lexi/releases/tag/v3.3.1-cross-platform) ·
+[构建说明](docs/BUILDING.md) ·
+[更新日志](CHANGELOG.md) ·
+[隐私边界](docs/PRIVACY.md) ·
+[问题反馈](https://github.com/Cofran-77/lexi/issues)
 
 </div>
 
-Lexi 面向希望持续积累英语词汇的学习者，将离线词典、个人词汇档案与复习流程整合在一起。词条不仅记录释义，也能保存遇见它的原句、来源和备注，让复习回到实际语境。AI 是可选的扩展能力：用户自行配置服务，在需要时生成内容，基础查词和本地档案无需 API 密钥。
+Lexi 把查词、词汇档案、每日计划与长期复习放在同一个桌面应用里。核心功能在本机运行：离线词典不需要账号，个人词库、学习记录、金句和记忆状态默认不离开设备。可选登录只用于「一起学习」好友摘要同步。
 
-本仓库提供 Windows、Android 与 macOS 的应用源码；macOS 3.1.3 已接入 `macos/`。各平台独立实现、独立发布；当前不提供账号系统或跨端自动云同步。
+本次跨平台 Release 同时提供 Windows 3.3.1 和 macOS 3.3.1。安装包作为 GitHub Release 资产分发，源码位于 `windows/` 与 `macos/`。
 
-## 平台与安装
+## 下载
 
-| 平台 | 当前应用版本 | 运行要求 | 发布状态 |
+| 平台 | 系统要求 | 安装包 | 校验 |
 | --- | --- | --- | --- |
-| Windows | 1.2.4 | Windows 10 / 11，x64 | 桌面版；提供自包含安装程序 |
-| Android | 0.2.2-alpha | Android 8.0 及以上 | 原生预览版；提供可直接安装的 APK |
-| macOS | 3.1.3 | Apple Silicon，macOS 12+ | 源码已接入；DMG 由原 macOS 发布仓库提供 |
+| Windows | Windows 10 / 11，x64 | [Lexi-3.3.1-x64-setup.exe](https://github.com/Cofran-77/lexi/releases/download/v3.3.1-cross-platform/Lexi-3.3.1-x64-setup.exe) | [SHA256](https://github.com/Cofran-77/lexi/releases/download/v3.3.1-cross-platform/Lexi-3.3.1-x64-setup.exe.sha256) |
+| macOS | Apple Silicon，macOS 12+ | [Lexi-3.3.1-macOS-arm64.dmg](https://github.com/Cofran-77/lexi/releases/download/v3.3.1-cross-platform/Lexi-3.3.1-macOS-arm64.dmg) | [SHA256](https://github.com/Cofran-77/lexi/releases/download/v3.3.1-cross-platform/Lexi-3.3.1-macOS-arm64.dmg.sha256) |
 
-在 [Releases](https://github.com/Cofran-77/lexi/releases) 选择当前发布。Windows 安装包包含 .NET 运行环境，无需额外安装；更新前请完全退出托盘并备份档案。Android 提供沿用原开发签名的 APK；安装前请备份，卸载会删除应用私有数据。构建与签名说明见平台文档。
+Windows SHA256：
 
-macOS 下载与应用内更新检查当前继续使用 [原 macOS 3.1.3 发布页](https://github.com/DespairJasper/lexi-macos/releases/tag/v3.1.3)，提供 DMG 与 SHA256；本仓库此次接入源码，尚未创建 `macos-v3.1.3` Release。安装、签名和升级数据保留说明见 [macOS README](macos/README.md)。
+```text
+30be541a845f3f42418886a15e9016e3685cdaf250b31f5392fd7607863590d6
+```
 
-**直接下载：[Windows 安装程序](https://github.com/Cofran-77/lexi/releases/download/windows-v1.2.4-nc.1/Lexi-1.2.4-nc.1-x64-setup.exe) · [Android APK](https://github.com/Cofran-77/lexi/releases/download/android-v0.2.2-nc.1/Lexi-Android-0.2.2-alpha.apk) · [macOS DMG](https://github.com/DespairJasper/lexi-macos/releases/download/v3.1.3/Lexi-3.1.3-macOS-arm64.dmg)**。无需自行编译。各包适用许可见独立许可说明。
+macOS SHA256：
 
-本次许可修订不改变应用版本或学习功能。Windows 安装包包含完整程序、离线词典与当前专题学习资源，安装后即可使用，无需另行下载教材。Android 提供其当前版本完整功能。第三方内容分别遵循来源条款。
+```text
+72df2d153e31e6c6a2cc4abd61f9420db04ad1c84d7bdefafd9d86f55642a354
+```
 
-## 主要功能
+Windows 安装包未使用商业代码签名证书，系统可能显示“未知发布者”。macOS DMG 使用项目自有签名，未使用 Apple Developer ID，也未经过 Apple 公证。首次打开前请核对来源与 SHA256，并按系统提示完成安全确认。
+
+## 3.3.1 更新内容
+
+- 扩展考试专题到 IELTS、CET-4、CET-6、考研、GMAT、TOEFL、GRE，并加入 20 本考试词书。
+- 支持按词书、单元或选中词条建立每日计划；同一单词出现在不同词书时分别保存学习轮次。
+- 新考试词条接入今日重逢、拼写、错词、学习统计与 FSRS-6 长期排期。
+- 学习统计展示初学、复习、拼写时长、学习词数、连续天数、峰值和易忘词，并区分预测与已观察数据。
+- 新增可选的「一起学习」：双人邀请、逐好友分享控制、共同学习日与预测曲线对照。
+- 统一 Glacier Blue 视觉、双语界面、计划汇总、备份轮换与数据库加法迁移。
+- 修复复习卡内部 ID 泄漏、评分后“下一词”或空格无响应，以及“忘记”后主操作不突出等问题。
+
+完整说明见 [3.3.1 发布记录](docs/releases/v3.3.1-cross-platform.md) 与 [版本历史](docs/VERSION_HISTORY.md)。
+
+## 核心能力
 
 ### 查词与词汇档案
 
-- 内置 ECDICT 常用词子集，共 59,026 条，支持离线查询。
-- 保存音标、释义、来源原句、备注、标签及已保存的 AI 内容。
-- 支持词条编辑、筛选、批量管理和数据导出。
-- Windows 与 macOS 提供全局快捷查词；macOS 另有 `⌥D` 查词、`⌥A` 翻译和 `⌥S` 收藏金句卡片。Android 可通过系统选中文字菜单或分享入口接收词句。
+- Windows 与 macOS 均内置 59,026 条 ECDICT 离线词典记录。
+- 保存音标、释义、来源原句、备注、标签和可选 AI 内容。
+- 支持词条编辑、筛选、批量管理、CSV / JSON 迁移与本地备份。
+- Windows 支持全局快捷查词、文字选择、朗读、打印与导出；macOS 支持 `⌥D` 查词、`⌥A` 翻译与 `⌥S` 收藏金句。
 
-### 复习与学习
+### 学习与记忆
 
-- **今日重逢**：先回忆，再揭晓释义并记录熟悉程度。
-- **Windows / macOS**：FSRS-6 自适应长期排期，根据学习历史、难度、记忆稳定性与目标保持率安排复习；个人参数由本机 Rust 助手训练，数据不足时使用默认参数，并结合 Context 校准。
-- **Android**：当前采用第 1、2、4、7、15 天的固定日期排期。
-- Windows 与 macOS 均保留三按钮、三格轮内进度和改判撤销，提供每日计划、淡写/默写、辅助拼写、全局专注学习、可配置快捷键与朗读。
+- 今日重逢、先回忆后揭晓、三按钮评分、轮内强化、改判与撤销。
+- FSRS-6 根据每个词的历史计算长期复习间隔；数据不足时使用默认参数。
+- 个人 FSRS 参数由本机 Rust 助手训练，Context 校正在本机运行并经过影子验证。
+- 每日计划、淡写、默写、逐字反馈、自动发音、全局专注与可配置快捷键。
+- 考试专题支持整本、单元或选中词条进入学习，词书身份彼此隔离。
 
-### 语境与句子积累
+### 本地优先与可选同步
 
-Windows 与 macOS 提供句子翻译与金句本，可将例句、译文和语境纳入个人积累。可选 AI 功能支持例句、近反义词与常用词组等内容生成，兼容用户自行配置的 OpenAI 风格接口。请求由用户主动发起，服务费用由用户所配置的账户承担。
+- 离线查词、词库、计划、学习记录、金句、统计与 FSRS 不需要登录。
+- Windows 默认数据目录为 `%LOCALAPPDATA%\Lexi`。
+- macOS 默认数据目录为 `~/Library/Application Support/Lexi/`。
+- AI 是可选能力，由用户配置自己的 OpenAI 风格接口；密钥分别保存在 Windows 受保护存储或 macOS 钥匙串。
+- 「一起学习」需要 GitHub 登录，只同步账号资料、好友关系、当日达标及用户授权的统计摘要。完整词库、逐词历史、计划内容与个人记忆模型不上传。
 
-### 数据管理
-
-支持 CSV 词条迁移、旧版 JSON 导入及各端本地备份。Windows 提供打印与导出工具；Android 支持 A4 PDF 导出和系统打印。
-
-CSV 用于词条交换，不保证迁移全部计划、会话或复习历史。各端 SQLite 数据库不能直接互相覆盖；macOS 的完整记忆状态和计划也不能通过词条 CSV 保证迁移。迁移前请阅读 [数据与迁移说明](docs/DATA_AND_MIGRATION.md)。
+公开源码和安装包不包含作者的个人词库、学习记录、登录 Cookie、Session、Token、API Key、签名私钥或本机代理配置。详见 [隐私说明](docs/PRIVACY.md) 和 [数据迁移](docs/DATA_AND_MIGRATION.md)。
 
 ## 界面预览
 
-![Windows 主界面](docs/images/windows-main.png)
+以下截图使用隔离演示数据，不读取个人词库、账号状态或通知。Windows 截图为 3.3.1 实际桌面界面。
 
-![Windows 计划编辑](docs/images/windows-plan-editor.png)
+| 查词与词汇档案 | IELTS 专题 |
+| --- | --- |
+| <img src="docs/images/windows/ielts.png" alt="Windows IELTS 专题与词汇档案" width="520"> | <img src="docs/images/windows/exam-topics.png" alt="Windows 七大考试专题" width="520"> |
 
-以上 Windows 截图使用隔离演示数据。
+| 设置与学习选项 | 全局专注学习 |
+| --- | --- |
+| <img src="docs/images/windows/settings.png" alt="Windows 设置页" width="520"> | <img src="docs/images/windows/focus.png" alt="Windows 全局专注学习" width="520"> |
 
-### macOS 3.1.3
+<div align="center">
+<img src="docs/images/windows/quotes.png" alt="Windows 金句本" width="720">
+</div>
 
-背单词卡片：先学后测，用“认识 / 模糊 / 忘记了”记录回忆结果，并可揭晓释义和语境。
+macOS 截图来自 3.3.1 arm64 实际应用与隔离示例档案。
 
-![macOS 背词卡片](docs/images/macos-word-card.png)
+| 首页与离线查词 | 七大考试专题 |
+| --- | --- |
+| <img src="docs/images/macos/home.png" alt="macOS 首页与离线查词" width="520"> | <img src="docs/images/macos/exams.png" alt="macOS 考试专题" width="520"> |
 
-打字拼写：淡写提供浅色字母提示，默写用于检验拼写，错误时逐字反馈。
+| 学习计划 | 每日计划 |
+| --- | --- |
+| <img src="docs/images/macos/study-plans.png" alt="macOS 学习计划总览" width="520"> | <img src="docs/images/macos/daily-plan.png" alt="macOS 每日计划" width="520"> |
 
-![macOS 打字拼写](docs/images/macos-typing.png)
+| 单词回忆 | 忘记后的再次学习 |
+| --- | --- |
+| <img src="docs/images/macos/study-answer.png" alt="macOS 单词回忆卡" width="520"> | <img src="docs/images/macos/study-forgot.png" alt="macOS 忘记后的再次学习" width="520"> |
 
-学习计划：按所选词汇设置每日数量，管理学习进度；创建浮层用于选择词汇与学习顺序。
+| 学习统计 | 一起学习 |
+| --- | --- |
+| <img src="docs/images/macos/statistics.png" alt="macOS 学习统计" width="520"> | <img src="docs/images/macos/study-together.png" alt="macOS 一起学习入口，未登录" width="520"> |
 
-![macOS 学习计划](docs/images/macos-plans.png)
+<div align="center">
+<img src="docs/images/macos/quotes.png" alt="macOS 金句本" width="720">
+</div>
 
-![macOS 创建学习计划](docs/images/macos-plan-editor.png)
+截图来源、分辨率与隔离数据说明见 [截图索引](docs/images/README.md)。
 
-macOS 预览由实际 3.1.3 应用在隔离演示数据目录中生成，不包含个人词库；[截图来源与复现方式](docs/images/README.md)。
+## 安装与升级
 
-## 开始使用
+### Windows
 
-1. 安装对应平台版本，直接离线查词。
-2. 将需要学习的词保存到词汇档案，补充原句、来源或标签。
-3. 在今日重逢中复习；Windows 可进一步建立每日计划或使用专注模式。
-4. 如需生成语境内容，在设置中配置自己的 AI 接口与模型。
-5. 定期导出或备份，尤其是在升级、恢复数据库与更换签名前。
+1. 下载 EXE 和对应 `.sha256` 文件。
+2. 在 PowerShell 中运行 `Get-FileHash .\Lexi-3.3.1-x64-setup.exe -Algorithm SHA256`，核对哈希。
+3. 完全退出正在运行的 Lexi，再执行安装程序。
+4. 如果需要保留旧版本，先备份 `%LOCALAPPDATA%\Lexi`；更新和卸载不会主动删除该目录，但用户仍应保有自己的备份。
 
-## 开发与构建
+安装包包含 .NET 运行环境、离线词典、FSRS 助手和当前专题资料，不需要额外安装 SDK。
 
-| 平台 | 技术栈 | 开发工具 |
-| --- | --- | --- |
-| Windows | C#、Avalonia、SQLite、Rust FSRS 助手 | .NET SDK 8、Rust 1.85+；安装程序使用 NSIS 3 |
-| Android | Kotlin、Jetpack Compose、SQLite | JDK 17、Android SDK 35、Gradle Wrapper 8.9 |
-| macOS | C#、Avalonia、SQLite、Rust FSRS 助手 | macOS、.NET SDK 8；构建助手另需 Rust |
+### macOS
+
+1. 下载 DMG 和对应 `.sha256` 文件。
+2. 在终端运行 `shasum -a 256 -c Lexi-3.3.1-macOS-arm64.dmg.sha256`，确认输出为 `OK`。
+3. 打开 DMG，将 `Lexi.app` 拖入“应用程序”，推出磁盘映像后启动。
+4. 覆盖安装前先用 `⌘Q` 正常退出 Lexi。用户数据位于应用包外，升级不会替换词库、计划、学习轨迹和记忆状态。
+
+DMG 中的卸载脚本默认只移除应用并保留用户数据；只有用户明确选择删除并再次确认时，才会清理 Lexi 自己的数据目录与钥匙串项目。
+
+## 从源码构建
+
+### Windows
+
+需要 Windows 10 / 11 x64、.NET SDK 8、Rust 1.85+ 和 NSIS 3 Unicode。NuGet 与 Cargo 首次还原需要联网。
 
 ```powershell
 git clone https://github.com/Cofran-77/lexi.git
 cd lexi
 cargo build --manifest-path windows/native/fsrs-optimizer/Cargo.toml --release --locked
-dotnet run --project windows/Lexi.csproj
+dotnet build windows/Lexi.csproj -c Release
 ```
 
-```sh
-cd android
-chmod +x gradlew
-./gradlew assembleDebug
+生成自包含安装包：
+
+```powershell
+pwsh -File windows/packaging/build-installer.ps1 `
+  -Version 3.3.1 `
+  -Dotnet <dotnet-path> `
+  -Nsis <makensis-path>
 ```
+
+Windows Git 源码依据 `.gitignore` 排除第三方 IELTS 书籍与音频；公开安装包包含发布方有权随包提供的资料。只有版权和使用条件允许时才应把完整资料加入本地构建。
+
+### macOS
+
+需要在 macOS 上使用 .NET SDK 8；完整打包还需要 Python 3.10+、Rust 和 macOS 磁盘映像工具。
 
 ```sh
 cd macos
+python3 scripts/verify_source_integrity.py
 dotnet build lexi_avalonia/Lexi.csproj -c Release
-# 或使用源码入口，自动查找 .NET SDK
-bash 启动Lexi源码.command
+bash scripts/run_tests.sh
 ```
 
-完整环境、安装包构建和签名说明见 [构建指南](docs/BUILDING.md)。工程编译工作流用于检查可构建性，不替代真机适配或功能验收。
+macOS 源码保留上游仓库跟踪的离线词典、考试词书和 IELTS 资源。自行构建时，将 `lexi_avalonia/Assets/social-public.example.json` 复制为 `social-public.json` 并填入自己的公开客户端配置；该真实配置已被忽略，不应提交。发布身份 pin、签名与 DMG 门禁说明见 [macOS README](macos/README.md)。
 
-## 项目结构与文档
+更多环境、测试和发布细节见 [构建指南](docs/BUILDING.md)。
+
+## 仓库结构
 
 ```text
-windows/     Windows 应用、学习算法、测试与打包工具
-android/     Android 应用、Gradle Wrapper 与测试
-macos/       macOS 3.1.3 应用、离线词典、测试与签名打包工具
-docs/        架构、数据、隐私、资源与版本文档
-.github/     编译工作流与 Issue / PR 模板
+windows/       Windows 3.3.1 应用、测试、Rust 助手与 NSIS 打包
+macos/         macOS 3.3.1 应用、测试、Rust 助手与签名/DMG 打包
+android/       Android 0.2.2-alpha 预览源码
+docs/          架构、构建、数据、隐私、资源、验证与版本文档
+.github/       编译工作流和 Issue / PR 模板
 ```
 
 - [系统架构](docs/ARCHITECTURE.md)
-- [数据格式与迁移](docs/DATA_AND_MIGRATION.md)
-- [隐私说明](docs/PRIVACY.md)
-- [资源接入](docs/RESOURCES.md)
-- [版本历史与源码来源](docs/VERSION_HISTORY.md)
+- [构建与发布](docs/BUILDING.md)
+- [数据、备份与迁移](docs/DATA_AND_MIGRATION.md)
+- [隐私与数据处理](docs/PRIVACY.md)
+- [学习资源与第三方内容](docs/RESOURCES.md)
+- [验证记录](docs/VERIFICATION.md)
+- [源码版本史](docs/VERSION_HISTORY.md)
 - [贡献指南](CONTRIBUTING.md)
 
-历史归档包含 11 个 Windows、6 个 Android 源码快照，并接入 macOS 3.1.3 当前源码；重要节点通过平台前缀标签保留。归档来源和重建方式见版本历史文档。
+## Android 预览
 
-## 专题学习与资料
-
-Windows 提供专题词汇、辅助拼写、听力与语法资料、写作练习工作区，当前配套资料随安装包提供。第三方组件、词典与学习资料分别遵循各自条款，不由项目许可重新授权。来源与说明见 [第三方声明](THIRD_PARTY_NOTICES.md)。
+仓库保留 Android 0.2.2-alpha 源码。该平台采用固定第 1、2、4、7、15 天复习规则，尚未迁移桌面端 FSRS-6；本次跨平台 Release 的重点是 Windows 与 macOS。Android 的历史构建见 [Android README](android/README.md) 和既有 Releases。
 
 ## 许可
 
-除 `macos/` 保留的原有许可范围外，本次修订起，项目原创代码与文档以 **[PolyForm Noncommercial 1.0.0](LICENSE)** 提供，作者为 **Cofran-77 和 DespairJasper**。允许许可条款规定的非商业使用、修改与分发；商业使用需另获相关权利人的书面授权。作者保留未来商业授权与产品发行权利。macOS 导入的原有代码与文档保留 [Lexi 非商业许可](macos/LICENSE)，不在此次上传中改换许可证。第三方代码和资源继续遵循各自许可。
+根目录 [LICENSE](LICENSE) 为 PolyForm Noncommercial 1.0.0，适用于该许可声明覆盖的项目原创代码和文档。`macos/` 中导入的原有代码与文档继续使用 [macOS LICENSE](macos/LICENSE) 的 Lexi 非商业许可，不因本次发布改换许可。历史版本的既有授权不追溯撤销。
 
-本项目属于**源码可用的非商业项目**。当前许可的适用范围、历史授权及第三方权利见 [许可政策与沿革](LICENSE-POLICY.md)。
+ECDICT、FSRS、Avalonia、.NET、SkiaSharp、字体、考试词书与 IELTS 资料分别遵循各自条款。项目许可不重新授权第三方内容，来源与保留位置见 [第三方声明](THIRD_PARTY_NOTICES.md) 和 [许可政策](LICENSE-POLICY.md)。
 
-## 作者与致谢
+## 作者
 
 [Cofran-77](https://github.com/Cofran-77) · [DespairJasper](https://github.com/DespairJasper)
 
-感谢 [ECDICT](https://github.com/skywind3000/ECDICT)、[Open Spaced Repetition / FSRS](https://github.com/open-spaced-repetition)、Avalonia、.NET、AndroidX 与 Jetpack Compose 等项目。macOS 源码导入自 [DespairJasper/lexi-macos](https://github.com/DespairJasper/lexi-macos)，其授权以该仓库自身声明为准。
+macOS 3.3.1 源码同步自 [DespairJasper/lexi-macos](https://github.com/DespairJasper/lexi-macos) 的 `d6cf5758928a937b79f535e6fdcd39038bc6e5f8` 快照。原仓库继续作为 macOS 源码与历史发布来源。

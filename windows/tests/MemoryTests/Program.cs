@@ -29,6 +29,7 @@ public static class Program
             ("journal", JournalTests.Run),
             ("coordinator", CoordinatorTests.Run),
             ("store", StoreTests.Run),
+            ("navigation", NavigationTests.Run),
             // Context 特征/校准尚未实现（P6）。保留登记，让它的缺席在输出里以 SKIP 显式暴露，
             // 而不是悄悄"通过"。
             ("context", ContextTests.Run),

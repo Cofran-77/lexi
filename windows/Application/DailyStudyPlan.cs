@@ -2,6 +2,71 @@ namespace Lexi;
 
 public enum DailyStudyPlanSource { Archive, Ielts }
 public enum DailyStudyPlanStatus { Active, Completed, Stopped }
+public enum DailyStudyPlanHomeGroup { None, TodayIncomplete, TodayCompleted, HistoryCompleted, Stopped }
+
+public sealed record DailyStudyOverviewScope(
+    string PlanId,
+    IReadOnlySet<string> FirstLearnBatchWordKeys,
+    IReadOnlySet<string> FirstLearnRemainingWordKeys,
+    IReadOnlySet<string> DueReviewWordKeys);
+
+public sealed record DailyStudyOverview(
+    int DueReviewWords,
+    int FirstLearnRemainingWords,
+    int FirstLearnCompletedWords,
+    int FirstLearnBatchWords,
+    int TodayPlanCount,
+    int DuePlanCount,
+    int AttentionRemainingWords,
+    double FirstLearnCompletionRatio)
+{
+    public bool FirstLearnComplete =>
+        FirstLearnBatchWords > 0 && FirstLearnRemainingWords == 0;
+}
+
+public static class DailyStudyOverviewRules
+{
+    public static DailyStudyOverview Build(IEnumerable<DailyStudyOverviewScope> scopes)
+    {
+        ArgumentNullException.ThrowIfNull(scopes);
+        var materialized = scopes
+            .Where(scope => scope is not null)
+            .DistinctBy(scope => scope.PlanId, StringComparer.Ordinal)
+            .ToList();
+
+        var firstBatch = Union(materialized.Select(scope => scope.FirstLearnBatchWordKeys));
+        var firstRemaining = Union(materialized.Select(scope => scope.FirstLearnRemainingWordKeys));
+        var due = Union(materialized.Select(scope => scope.DueReviewWordKeys));
+        var attention = firstRemaining
+            .Union(due, StringComparer.Ordinal)
+            .ToHashSet(StringComparer.Ordinal);
+        var firstCompleted = firstBatch
+            .Where(key => !firstRemaining.Contains(key))
+            .ToHashSet(StringComparer.Ordinal);
+
+        return new DailyStudyOverview(
+            DueReviewWords: due.Count,
+            FirstLearnRemainingWords: firstRemaining.Count,
+            FirstLearnCompletedWords: firstCompleted.Count,
+            FirstLearnBatchWords: firstBatch.Count,
+            TodayPlanCount: materialized.Count(scope =>
+                scope.FirstLearnBatchWordKeys.Count > 0 ||
+                scope.DueReviewWordKeys.Count > 0),
+            DuePlanCount: materialized.Count(scope => scope.DueReviewWordKeys.Count > 0),
+            AttentionRemainingWords: attention.Count,
+            FirstLearnCompletionRatio: firstBatch.Count == 0
+                ? 0
+                : (double)firstCompleted.Count / firstBatch.Count);
+    }
+
+    private static HashSet<string> Union(IEnumerable<IReadOnlySet<string>> sets)
+    {
+        var result = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var set in sets)
+            result.UnionWith(set);
+        return result;
+    }
+}
 
 public sealed class DailyStudyPlanWord
 {
@@ -25,6 +90,7 @@ public sealed class DailyStudyPlan
     public int ShuffleSeed { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateOnly? LastBatchCompletedDate { get; set; }
+    public DateOnly? LastReviewCompletedDate { get; set; }
     public DailyStudyPlanStatus Status { get; set; }
     public List<DailyStudyPlanWord> Words { get; set; } = [];
     public HashSet<string> CompletedWordIds { get; set; } = [];
@@ -84,7 +150,8 @@ public static class DailyStudyPlanRules
         {
             Id = plan.Id, Name = name.Trim(), Source = plan.Source, SourceLabel = plan.SourceLabel,
             DailyWordCount = plan.DailyWordCount, RandomOrder = plan.RandomOrder, ShuffleSeed = plan.ShuffleSeed,
-            CreatedAt = plan.CreatedAt, LastBatchCompletedDate = plan.LastBatchCompletedDate, Status = plan.Status,
+            CreatedAt = plan.CreatedAt, LastBatchCompletedDate = plan.LastBatchCompletedDate,
+            LastReviewCompletedDate = plan.LastReviewCompletedDate, Status = plan.Status,
             Words = plan.Words.Select(w => new DailyStudyPlanWord
             {
                 Id = w.Id, Word = w.Word, Phonetic = w.Phonetic, Meaning = w.Meaning,
@@ -140,6 +207,86 @@ public static class DailyStudyPlanRules
         var unfinishedBatch = UnfinishedBatch(plan);
         return unfinishedBatch.Count > 0 ? unfinishedBatch : plan.Words
             .Where(w => !plan.CompletedWordIds.Contains(w.Id)).Take(plan.DailyWordCount).ToList();
+    }
+
+    /// <summary>当日稳定分母：包含今天已经完成的词条（社会层达标判定与首页进度需要它）。</summary>
+    public static IReadOnlyList<DailyStudyPlanWord> GetTodayBatch(DailyStudyPlan plan, DateOnly date)
+    {
+        ArgumentNullException.ThrowIfNull(plan);
+        if (plan.Status == DailyStudyPlanStatus.Stopped ||
+            plan.DailyWordCount <= 0) return [];
+        if (plan.CurrentBatchWordIds.Count > 0 &&
+            (plan.LastBatchCompletedDate == date ||
+             plan.CurrentBatchWordIds.Any(id => !plan.CompletedWordIds.Contains(id))))
+        {
+            var ids = plan.CurrentBatchWordIds.ToHashSet(StringComparer.Ordinal);
+            return plan.Words.Where(w => ids.Contains(w.Id)).ToList();
+        }
+        if (plan.Status != DailyStudyPlanStatus.Active ||
+            plan.LastBatchCompletedDate is { } completed && date <= completed) return [];
+        // Preserve a partly learned legacy batch, without assigning it a fictitious start date.
+        if (plan.CompletedWordIds.Count % plan.DailyWordCount != 0)
+            return plan.Words.Skip(plan.CompletedWordIds.Count / plan.DailyWordCount * plan.DailyWordCount)
+                .Take(plan.DailyWordCount).ToList();
+        return GetTodayWords(plan, date);
+    }
+
+    /// <summary>
+    /// The home page has one mutually exclusive bucket per plan. Due reviews take
+    /// precedence over the historical completed bucket, while stopped plans are
+    /// never part of today's workload.
+    /// </summary>
+    public static DailyStudyPlanHomeGroup ClassifyHomeGroup(
+        DailyStudyPlan plan, DateOnly date, bool hasDueReview)
+    {
+        ArgumentNullException.ThrowIfNull(plan);
+        if (plan.Status == DailyStudyPlanStatus.Stopped)
+            return DailyStudyPlanHomeGroup.Stopped;
+
+        var batch = GetTodayBatch(plan, date);
+        var firstRemaining = batch.Count(word => !plan.CompletedWordIds.Contains(word.Id));
+        if (firstRemaining > 0 || hasDueReview)
+            return DailyStudyPlanHomeGroup.TodayIncomplete;
+        if ((batch.Count > 0 && plan.LastBatchCompletedDate == date) ||
+            plan.LastReviewCompletedDate == date)
+            return DailyStudyPlanHomeGroup.TodayCompleted;
+        if (plan.Status == DailyStudyPlanStatus.Completed)
+            return DailyStudyPlanHomeGroup.HistoryCompleted;
+        return DailyStudyPlanHomeGroup.None;
+    }
+
+    public static int TodayCompleted(DailyStudyPlan plan, DateOnly date) =>
+        GetTodayBatch(plan, date).Count(w => plan.CompletedWordIds.Contains(w.Id));
+
+    public static string CheckpointSurface(DailyStudyPlan plan, DateOnly date, StudyMode mode)
+    {
+        ArgumentNullException.ThrowIfNull(plan);
+        return $"plan:{plan.Id}:{date:yyyy-MM-dd}:{mode}";
+    }
+
+    /// <summary>
+    /// Plan review is retrieval of words already completed in the frozen current batch.
+    /// It must never assign an unlearned word to a review-only session.
+    /// </summary>
+    public static IReadOnlyList<DailyStudyPlanWord> GetReviewWords(DailyStudyPlan plan)
+    {
+        ArgumentNullException.ThrowIfNull(plan);
+        HashSet<string> batchIds;
+        if (plan.CurrentBatchWordIds.Count > 0)
+            batchIds = plan.CurrentBatchWordIds.ToHashSet(StringComparer.Ordinal);
+        else if (plan.CompletedWordIds.Count > 0 && plan.DailyWordCount > 0)
+        {
+            var partial = plan.CompletedWordIds.Count % plan.DailyWordCount != 0 &&
+                plan.Status != DailyStudyPlanStatus.Completed;
+            var start = (partial ? plan.CompletedWordIds.Count : plan.CompletedWordIds.Count - 1)
+                / plan.DailyWordCount * plan.DailyWordCount;
+            batchIds = plan.Words.Skip(start).Take(plan.DailyWordCount)
+                .Select(w => w.Id).ToHashSet(StringComparer.Ordinal);
+        }
+        else batchIds = new(StringComparer.Ordinal);
+        return plan.Words
+            .Where(w => batchIds.Contains(w.Id) && plan.CompletedWordIds.Contains(w.Id))
+            .ToList();
     }
 
     private static IReadOnlyList<DailyStudyPlanWord> UnfinishedBatch(DailyStudyPlan plan)

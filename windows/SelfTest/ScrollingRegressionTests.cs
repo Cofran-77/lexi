@@ -1,6 +1,7 @@
 using System.Reflection;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Media.Imaging;
 using Avalonia.VisualTree;
 
@@ -32,6 +33,9 @@ public static class ScrollingRegressionTests
         foreach (var row in rows.Where(r => r.IsExpanded)) row.AiResult = expansion;
         await Task.Delay(200);
         var scroll = list.GetVisualDescendants().OfType<ScrollViewer>().First();
+        if (scroll.GetVisualDescendants().OfType<ScrollBar>().Any(bar => bar.Opacity != 0))
+            throw new Exception("Scrollbars must remain invisible while keeping scroll interaction enabled");
+        report.Add("PASS scrollbars stay invisible while scroll interaction remains enabled");
         foreach (var y in new double[] { 0, 150, 320, 520, 760, 1050, 1600, 2400, 1000, 300, 0 })
         {
             scroll.Offset = new Vector(0, y);

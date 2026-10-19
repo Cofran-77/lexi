@@ -8,6 +8,20 @@ List<string> Deck(int n) => Enumerable.Range(1, n).Select(i => "w" + i).ToList()
 List<LearningWord> SelectRound(int count, bool all, bool random, int seed) =>
     LearningRound.Select(new List<LearningWord> { W("apple"), new() { Id = "colour", Words = ["colour", "color"] }, W("ice cream") }, count, all, random, seed);
 
+// ---- PlanScopeInitializationTracker：章节首次进入默认全选，清空后切走/切语言不复活 ----
+var scopeTracker = new PlanScopeInitializationTracker();
+Check(scopeTracker.ShouldSelectEntireScope("ielts-book", "unit-1", false),
+    "章节首次进入允许执行一次默认全选");
+scopeTracker.MarkInitialized("ielts-book", "unit-1", false);
+Check(!scopeTracker.ShouldSelectEntireScope("ielts-book", "unit-1", false),
+    "同一章节再次进入不会再补回用户清空的词条");
+Check(scopeTracker.ShouldSelectEntireScope("ielts-book", "unit-2", false),
+    "同一词书的新章节仍可执行一次默认全选");
+Check(scopeTracker.ShouldSelectEntireScope("ielts-book", null, true),
+    "整本词书范围使用独立的初始化状态");
+Check(!scopeTracker.IsInitialized("other-book", "unit-1", false),
+    "不同词书的相同章节 ID 不会串用初始化状态");
+
 // ---- TypingFeedbackModel：淡写逐字母显示、默写不泄露答案 ----
 var hintedPrefix = TypingFeedbackModel.Build("apple", "ap", true, TypingOutcome.Pending);
 Check(new string(hintedPrefix.Select(letter => letter.Character).ToArray()) == "apple" &&
@@ -202,6 +216,7 @@ Check(DailyStudyPlanRules.FindOverlaps([archiveOverlap, ieltsOverlap], ieltsDraf
 DailyStudyPlanRules.Stop(archiveOverlap);
 Check(archiveOverlap.Status == DailyStudyPlanStatus.Stopped &&
     DailyStudyPlanRules.GetTodayWords(archiveOverlap, monday).Count == 0 &&
+    DailyStudyPlanRules.GetTodayBatch(archiveOverlap, monday).Count == 0 &&
     DailyStudyPlanRules.FindOverlaps([archiveOverlap, ieltsOverlap], archiveDraft).Count == 0,
     "停止计划不出词且不占用词条");
 Check(!DailyStudyPlanRules.CompleteWord(archiveOverlap, "shared", monday), "停止计划不能继续完成词条");
@@ -213,6 +228,60 @@ Check(DailyStudyPlanRules.CompleteWord(ieltsOverlap, "shared", monday) &&
 Check(DailyStudyPlanRules.FindOverlaps([ieltsOverlap],
     DailyStudyPlanRules.Create("I draft", DailyStudyPlanSource.Ielts, "I", [PW("shared")], 1, false, 0)).Count == 0,
     "已完成计划不占用词条");
+var homeGroups = DailyStudyPlanRules.Create("Home groups", DailyStudyPlanSource.Archive, "A",
+    [PW("h1"), PW("h2")], 2, false, 0);
+Check(DailyStudyPlanRules.ClassifyHomeGroup(homeGroups, monday, hasDueReview: false) ==
+    DailyStudyPlanHomeGroup.TodayIncomplete, "有首学剩余的计划归入今日未完成");
+Check(DailyStudyPlanRules.ClassifyHomeGroup(homeGroups, monday, hasDueReview: true) ==
+    DailyStudyPlanHomeGroup.TodayIncomplete, "有 FSRS 到期词的计划归入今日未完成");
+new DailyStudyPlanSession(homeGroups, monday);
+Check(DailyStudyPlanRules.CompleteWord(homeGroups, "h1", monday) &&
+    DailyStudyPlanRules.CompleteWord(homeGroups, "h2", monday) &&
+    DailyStudyPlanRules.ClassifyHomeGroup(homeGroups, monday, hasDueReview: false) ==
+    DailyStudyPlanHomeGroup.TodayCompleted, "当日完成且无到期词的计划归入今日完成");
+Check(DailyStudyPlanRules.ClassifyHomeGroup(homeGroups, monday.AddDays(1), hasDueReview: false) ==
+    DailyStudyPlanHomeGroup.HistoryCompleted, "历史完成且今日无到期的计划归入历史完成");
+Check(DailyStudyPlanRules.ClassifyHomeGroup(homeGroups, monday.AddDays(1), hasDueReview: true) ==
+    DailyStudyPlanHomeGroup.TodayIncomplete, "历史完成计划出现今日到期词时只归入今日未完成");
+DailyStudyPlanRules.Stop(archiveOverlap);
+Check(DailyStudyPlanRules.ClassifyHomeGroup(archiveOverlap, monday, hasDueReview: true) ==
+    DailyStudyPlanHomeGroup.Stopped, "停止计划即使存在到期词也只归入停止分组");
+
+var mixedOverview = DailyStudyOverviewRules.Build([
+    new DailyStudyOverviewScope(
+        "first-plan",
+        new HashSet<string>(["a", "b"], StringComparer.Ordinal),
+        new HashSet<string>(["b"], StringComparer.Ordinal),
+        new HashSet<string>(["a"], StringComparer.Ordinal)),
+    new DailyStudyOverviewScope(
+        "finished-plan",
+        new HashSet<string>(["c"], StringComparer.Ordinal),
+        new HashSet<string>(StringComparer.Ordinal),
+        new HashSet<string>(StringComparer.Ordinal))
+]);
+Check(mixedOverview.DueReviewWords == 1 &&
+    mixedOverview.FirstLearnRemainingWords == 1 &&
+    mixedOverview.FirstLearnCompletedWords == 2 &&
+    mixedOverview.FirstLearnBatchWords == 3 &&
+    mixedOverview.TodayPlanCount == 2 &&
+    mixedOverview.DuePlanCount == 1 &&
+    mixedOverview.AttentionRemainingWords == 2 &&
+    Math.Abs(mixedOverview.FirstLearnCompletionRatio - 2d / 3d) < 0.000001,
+    "今日总览分别统计首学与复习，首学分母保持冻结且待处理词去重");
+var completedOverview = DailyStudyOverviewRules.Build([
+    new DailyStudyOverviewScope(
+        "complete",
+        new HashSet<string>(["x"], StringComparer.Ordinal),
+        new HashSet<string>(StringComparer.Ordinal),
+        new HashSet<string>(StringComparer.Ordinal))
+]);
+Check(completedOverview.FirstLearnComplete && completedOverview.AttentionRemainingWords == 0 &&
+    completedOverview.FirstLearnCompletionRatio == 1,
+    "今日首学全部完成时进度为 100%，且不再混入复习词计算");
+var emptyOverview = DailyStudyOverviewRules.Build([]);
+Check(emptyOverview.TodayPlanCount == 0 && emptyOverview.AttentionRemainingWords == 0 &&
+    emptyOverview.FirstLearnCompletionRatio == 0,
+    "没有今日任务时总览安全归零");
 void RejectPlan(Action action, string label)
 {
     try { action(); throw new Exception("FAIL: " + label); }
@@ -267,6 +336,98 @@ new DailyStudyPlanSession(partialPlan, monday);
 DailyStudyPlanRules.CompleteWord(partialPlan, "p1", monday);
 var resumedSession = new DailyStudyPlanSession(partialPlan, monday.AddDays(1));
 Check(partialPlan.CurrentBatchWordIds.SequenceEqual(["p1", "p2"]) && resumedSession.BatchWords.Select(w => w.Id).SequenceEqual(["p1", "p2"]), "中断恢复后拼写范围仍是完整原批次");
+
+var planReview = DailyStudyPlanRules.Create("Review", DailyStudyPlanSource.Archive, "A", [PW("r1"), PW("r2")], 2, false, 0);
+planReview.CurrentBatchWordIds = ["r1", "r2"];
+planReview.CompletedWordIds.UnionWith(["r1", "r2"]);
+planReview.LastBatchCompletedDate = monday;
+var reviewSession = new DailyStudyPlanSession(planReview, monday, StudyMode.Review);
+Check(reviewSession.Mode == StudyMode.Review && reviewSession.Round.Mode == StudyMode.Review &&
+    reviewSession.Round.CurrentStep == StudyStep.Recall && reviewSession.Round.CurrentTarget == 1,
+    "计划复习使用今日批次的独立回忆队列");
+Check(reviewSession.Rate(StudyRating.Known, () => true) is { Completed: true } &&
+    planReview.CompletedWordIds.SetEquals(["r1", "r2"]) && planReview.LastBatchCompletedDate == monday,
+    "计划复习首评认识即完成且不改写首次学习完成集合");
+Check(reviewSession.Rate(StudyRating.Known, () => true) is { Completed: true } && reviewSession.Round.IsFinished &&
+    planReview.Status == DailyStudyPlanStatus.Active && planReview.CompletedWordIds.Count == 2,
+    "计划复习完成不结束计划或新增首学完成数");
+var pureReviewPlan = DailyStudyPlanRules.Create("Pure review", DailyStudyPlanSource.Archive, "A",
+    [PW("q1"), PW("q2")], 2, false, 0);
+pureReviewPlan.CurrentBatchWordIds = ["q1", "q2"];
+pureReviewPlan.CompletedWordIds.UnionWith(["q1", "q2"]);
+pureReviewPlan.LastBatchCompletedDate = monday.AddDays(-1);
+var pureReviewSession = new DailyStudyPlanSession(pureReviewPlan, monday, StudyMode.Review);
+Check(pureReviewSession.Rate(StudyRating.Known, () => true) is { Completed: true } &&
+    pureReviewSession.Rate(StudyRating.Known, () => true) is { Completed: true } &&
+    pureReviewSession.Round.IsFinished &&
+    pureReviewPlan.LastReviewCompletedDate == monday &&
+    DailyStudyPlanRules.ClassifyHomeGroup(pureReviewPlan, monday, hasDueReview: false) ==
+        DailyStudyPlanHomeGroup.TodayCompleted,
+    "纯复习完成最后一个到期词后记录复习完成日并归入今日完成");
+Check(DailyStudyPlanRules.ClassifyHomeGroup(pureReviewPlan, monday.AddDays(1), hasDueReview: false) !=
+    DailyStudyPlanHomeGroup.TodayCompleted,
+    "复习完成状态只在完成当日进入今日完成且今日/历史分组互斥");
+var unlearnedReview = DailyStudyPlanRules.Create("Review boundary", DailyStudyPlanSource.Archive, "A",
+    [PW("learned"), PW("new")], 2, false, 0);
+unlearnedReview.CurrentBatchWordIds = ["learned", "new"];
+unlearnedReview.CompletedWordIds.Add("learned");
+var unlearnedReviewSession = new DailyStudyPlanSession(unlearnedReview, monday, StudyMode.Review);
+Check(DailyStudyPlanRules.GetReviewWords(unlearnedReview).Select(w => w.Id).SequenceEqual(["learned"]) &&
+    unlearnedReviewSession.Round.Total == 1 && unlearnedReviewSession.Round.Current == "learned",
+    "计划复习只包含当前批次已经首学完成的词");
+var snapshotPlan = DailyStudyPlanRules.Create("Review snapshot", DailyStudyPlanSource.Archive, "A",
+    [PW("s1"), PW("s2"), PW("s3")], 3, false, 0);
+snapshotPlan.Status = DailyStudyPlanStatus.Completed;
+snapshotPlan.CurrentBatchWordIds = ["s1", "s2", "s3"];
+snapshotPlan.CompletedWordIds.UnionWith(["s1", "s2"]);
+var snapshotBefore = JsonSerializer.Serialize(snapshotPlan);
+var snapshotSession = new DailyStudyPlanSession(snapshotPlan, monday, StudyMode.Review,
+    reviewWordIds: ["s2", "missing", "", "s1", "s2", "s3"]);
+Check(snapshotSession.ReviewWords.Select(w => w.Id).SequenceEqual(["s2", "s1"]) &&
+    snapshotSession.Round.Total == 2, "注入 FSRS 到期快照时过滤未完成、空白、陈旧与重复词并保持顺序");
+Check(snapshotSession.Rate(StudyRating.Known, () => true) is { Completed: true } &&
+    snapshotSession.Rate(StudyRating.Known, () => true) is { Completed: true } &&
+    snapshotSession.ReviewWords.Select(w => w.Id).SequenceEqual(["s2", "s1"]) &&
+    snapshotPlan.CompletedWordIds.SetEquals(["s1", "s2"]) &&
+    snapshotPlan.LastReviewCompletedDate == monday,
+    "已完成计划可复习，仅记录复习完成日且不新增首学完成集合");
+var legacySnapshotSession = new DailyStudyPlanSession(unlearnedReview, monday, StudyMode.Review);
+Check(legacySnapshotSession.ReviewWords.Select(w => w.Id).SequenceEqual(["learned"]),
+    "未注入到期快照时保留旧版当前批次复习行为");
+
+var lateBjt = LearningDay.TodayBjt(new DateTime(2026, 10, 18, 15, 59, 59, DateTimeKind.Utc));
+var nextBjt = LearningDay.TodayBjt(new DateTime(2026, 10, 18, 16, 0, 0, DateTimeKind.Utc));
+Check(lateBjt == new DateOnly(2026, 10, 18) && nextBjt == new DateOnly(2026, 10, 19),
+    "学习日固定按 UTC+8 在北京时间午夜切换");
+var checkpointA = DailyStudyPlanRules.CheckpointSurface(planReview, monday, StudyMode.Review);
+var checkpointB = DailyStudyPlanRules.CheckpointSurface(planReview, monday.AddDays(1), StudyMode.Review);
+var checkpointC = DailyStudyPlanRules.CheckpointSurface(planReview, monday, StudyMode.FirstLearn);
+Check(checkpointA != checkpointB && checkpointA != checkpointC && checkpointA != "plan",
+    "计划检查点按计划、学习日和模式物理隔离");
+var sidecarRoot = Path.Combine(Path.GetTempPath(), "lexi-sidecar-migration-" + Guid.NewGuid().ToString("N"));
+try
+{
+    var legacyDir = Path.Combine(sidecarRoot, "legacy");
+    var currentDir = Path.Combine(sidecarRoot, "current");
+    Directory.CreateDirectory(legacyDir);
+    Directory.CreateDirectory(currentDir);
+    File.WriteAllText(Path.Combine(legacyDir, "daily-plans.json"), "[{\"id\":\"old\"}]");
+    File.WriteAllText(Path.Combine(currentDir, "daily-plans.json"), "[{\"id\":\"keep\"}]");
+    File.WriteAllText(Path.Combine(legacyDir, "learning-progress.json"), "{\"book\":\"old\"}");
+    Check(LegacySidecarMigration.TryMigrate(legacyDir, currentDir, out _), "旧版计划侧写可复制到新目录");
+    Check(File.ReadAllText(Path.Combine(currentDir, "daily-plans.json")).Contains("\"keep\"", StringComparison.Ordinal) &&
+        File.ReadAllText(Path.Combine(currentDir, "learning-progress.json")).Contains("\"old\"", StringComparison.Ordinal) &&
+        File.Exists(Path.Combine(legacyDir, "daily-plans.json")) &&
+        File.Exists(Path.Combine(legacyDir, "learning-progress.json")),
+        "侧写迁移不覆盖目标且不移动源文件");
+    Check(!LegacySidecarMigration.TryMigrate(legacyDir, currentDir, out _) &&
+        Directory.GetFiles(currentDir, ".lexi-sidecar-*.tmp").Length == 0,
+        "侧写迁移可重复执行且不残留临时文件");
+}
+finally
+{
+    if (Directory.Exists(sidecarRoot)) Directory.Delete(sidecarRoot, recursive: true);
+}
 
 var saveFailurePlan = DailyStudyPlanRules.Create("Failure", DailyStudyPlanSource.Ielts, "I", [PW("f1"), PW("f2")], 2, false, 0);
 var saveFailureSession = new DailyStudyPlanSession(saveFailurePlan, monday);

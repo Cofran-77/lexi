@@ -2,6 +2,8 @@ using System.Reflection;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
+using Avalonia.Interactivity;
+using Avalonia.LogicalTree;
 using Avalonia.Media.Imaging;
 
 namespace Lexi;
@@ -11,7 +13,7 @@ public static class FocusIntegrationTests
     public static Task RunAsync(MainWindow window)
     {
         var lines = new List<string>(); var exit = 1;
-        object? Call(string name, params object[] args) => typeof(MainWindow).GetMethod(name, BindingFlags.NonPublic | BindingFlags.Instance)!.Invoke(window, args);
+        object? Call(string name, params object[] args) => Invoke(window, name, args);
         T Field<T>(string name) => (T)typeof(MainWindow).GetField(name, BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(window)!;
         void Check(bool value, string label) { if (!value) throw new Exception(label); lines.Add("PASS " + label); }
         try
@@ -40,6 +42,47 @@ public static class FocusIntegrationTests
             Call("UndoFocus"); Check(!round.IsFinished, "last-card undo restores finished round");
             Check(memoryStore.GetCard(memoryKey) == null, "focus undo invalidates canonical and restores pre-rating card");
             Call("ExitFocus"); Check(!Field<bool>("_focusActive") && window.FindControl<ScrollViewer>("PageLookup")!.IsVisible, "exit restores lookup visibility");
+
+            var examCatalog = ExamCatalog.Load();
+            var examWord = examCatalog.BooksForTopic("cet4").First().Sections.First().Entries.First();
+            Call("OpenExamTopic", "cet4");
+            Field<HashSet<string>>("_examSelectedWordIds").Clear();
+            Field<HashSet<string>>("_examSelectedWordIds").Add(examWord.Id);
+            Call("RenderExamWords");
+            Call("UpdateExamActions");
+            Button FindExamAction(string name) =>
+                Field<WrapPanel>("_examFooterActionHost").GetLogicalDescendants().OfType<Button>()
+                    .SingleOrDefault(button => button.Name == name)
+                ?? throw new InvalidOperationException("Missing exam action " + name);
+            Check(new[] { "ExamStartCardsBtn", "ExamStartHintsBtn", "ExamStartDictationBtn" }
+                    .All(name => Field<WrapPanel>("_examFooterActionHost").GetLogicalDescendants()
+                        .OfType<Button>().Any(button => button.Name == name)),
+                "exam topic exposes card, hints and dictation actions");
+
+            FindExamAction("ExamStartCardsBtn").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            var examPresentation = Field<object?>("_focusPresentation");
+            var presentationKey = examPresentation?.GetType().GetProperty("Key")?.GetValue(examPresentation);
+            var actualMemoryKey = presentationKey?.GetType().GetProperty("Key")?.GetValue(presentationKey)?.ToString();
+            Check(Field<bool>("_focusActive") && Field<TypingSession?>("_learningTypingSession") == null,
+                "exam card mode opens focus without a typing session");
+            Check(Field<StudyRound<string>>("_focusRound").Current.StartsWith("exam:", StringComparison.Ordinal),
+                "exam card mode keeps exam-scoped word identity");
+            Check(actualMemoryKey == WordKeyResolver.FromIelts(examWord).Key,
+                "exam card mode presents the exam word in FSRS");
+            Check(!Field<Border>("_examTopicsPage").IsVisible, "exam card mode hides the topic page");
+            Call("ExitFocus");
+            Check(Field<Border>("_examTopicsPage").IsVisible && Field<Button>("_examTopicsNav").Classes.Contains("active"),
+                "exam focus exit restores topic page and navigation");
+
+            FindExamAction("ExamStartHintsBtn").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            Check(Field<TypingSession?>("_learningTypingSession")?.Hints == true,
+                "exam hints mode starts a hinted typing session");
+            Call("ExitLearningTyping");
+            FindExamAction("ExamStartDictationBtn").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            Check(Field<TypingSession?>("_learningTypingSession")?.Hints == false,
+                "exam dictation mode starts an unhinted typing session");
+            Call("ExitLearningTyping");
+
             var catalog = IeltsCatalog.Load(); Check(catalog.Sections.Count > 0 && catalog.AllWords.Any(), "IELTS catalog deployed with entries");
             Call("ShowIeltsCatalog"); Call("ShowIeltsResources");
             Check(Field<Grid>("_ieltsSubContent").Children.Count > 0 && Field<Grid>("_ieltsPage").IsVisible,
@@ -50,9 +93,15 @@ public static class FocusIntegrationTests
             Check(workspace.GetType().GetField("_selectedSection", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(workspace) is LearningSection,
                 "IELTS actual chapter selector selects catalog section");
             var entry = catalog.AllWords.First(w => !string.IsNullOrWhiteSpace(w.AudioPath));
-            Call("StartLearningTyping", new List<LearningWord> { entry }, false);
+            Call("StartIeltsTyping", new List<LearningWord> { entry }, false);
             Field<TextBox>("_learningTypingInput").Text = entry.Word; Call("SubmitLearningTyping");
             Check(Field<LearningProgress>("_ieltsProgress").Typed.Contains(entry.Id), "IELTS typing persists typed word progress");
+            Call("ExitLearningTyping");
+            var neutral = new LearningWord { Id = "focus-typing-neutral", Words = ["neutral"], Meaning = "中性测试", Phonetic = "/ˈnjuːtrəl/" };
+            Call("StartLearningTyping", new List<LearningWord> { neutral }, false, "learning");
+            Field<TextBox>("_learningTypingInput").Text = neutral.Word; Call("SubmitLearningTyping");
+            Check(!Field<LearningProgress>("_ieltsProgress").Typed.Contains(neutral.Id), "archive typing does not pollute IELTS progress");
+            Call("ExitLearningTyping");
             var synonym = catalog.AllWords.First(w => w.Synonyms.Count > 0);
             Call("StartIeltsSynonyms", new List<LearningWord> { synonym });
             Field<TextBox>("_synonymWordInput").Text = synonym.Word;
@@ -75,5 +124,28 @@ public static class FocusIntegrationTests
         catch (Exception ex) { lines.Add("FAIL " + ex); }
         finally { File.WriteAllLines(Path.Combine(Environment.GetEnvironmentVariable("LEXI_DATA_DIR")!, "focus-integration.txt"), lines); (Application.Current!.ApplicationLifetime as IClassicDesktopStyleApplicationLifetime)!.Shutdown(exit); }
         return Task.CompletedTask;
+    }
+
+    private static object? Invoke(MainWindow window, string name, params object?[] args)
+    {
+        var flags = BindingFlags.NonPublic | BindingFlags.Instance;
+        var methods = typeof(MainWindow).GetMethods(flags).Where(method =>
+        {
+            if (method.Name != name) return false;
+            var parameters = method.GetParameters();
+            if (args.Length < parameters.Count(p => !p.IsOptional) || args.Length > parameters.Length) return false;
+            return args.Select((arg, index) => arg == null
+                ? !parameters[index].ParameterType.IsValueType
+                : parameters[index].ParameterType.IsInstanceOfType(arg)).All(valid => valid);
+        }).OrderBy(method => method.GetParameters().Length).ToArray();
+        if (methods.Length == 0)
+            throw new MissingMethodException($"{name} has no overload for {args.Length} arguments");
+        var target = methods[0];
+        var targetParameters = target.GetParameters();
+        var invocation = new object?[targetParameters.Length];
+        Array.Copy(args, invocation, args.Length);
+        for (var index = args.Length; index < invocation.Length; index++)
+            invocation[index] = targetParameters[index].DefaultValue;
+        return target.Invoke(window, invocation);
     }
 }

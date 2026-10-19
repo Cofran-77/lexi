@@ -44,6 +44,10 @@ public static class StoreTests
     {
         FreshDatabaseMigrates();
         LegacyV1UpgradesInPlace();
+        V3UpgradeIsIdempotentAndAdditive();
+        FutureSchemaVersionIsRejected();
+        StorageMigrationFailureRollsBack();
+        StorageMaintenanceOnlyPrunesAppliedSnapshots();
         AppendEventIsIdempotent();
         SessionRoundTripAndUpsert();
         CommitWordSessionIsIdempotent();
@@ -73,8 +77,10 @@ public static class StoreTests
             Program.Check(TableExists(box.DbPath, table), $"新库存在表 {table}");
 
         var versions = QueryInts(box.DbPath, "SELECT version FROM schema_migrations ORDER BY version");
-        Program.Check(versions.Count == 2 && versions[0] == 1 && versions[1] == 2,
-            $"schema_migrations 含 1 与 2（实际 {string.Join(",", versions)}）");
+        Program.Check(versions.SequenceEqual([1, 2, 3]),
+            $"schema_migrations 含 1、2 与 3（实际 {string.Join(",", versions)}）");
+        Program.Check(IndexExists(box.DbPath, "idx_mutation_outbox_applied_kind"),
+            "v3 迁移建立了 mutation_outbox 维护索引");
 
         Program.Check(IndexExists(box.DbPath, "ux_canonical_active"), "新库存在索引 ux_canonical_active");
         var indexSql = ScalarText(box.DbPath,
@@ -120,8 +126,8 @@ public static class StoreTests
         Program.Check(archivesBefore.Split('\n', StringSplitOptions.RemoveEmptyEntries).Length == 2,
             "快照含 2 行 word_archives");
 
-        // 手工把库退回 v1：删掉 version=2 的迁移记录，并 DROP 掉 9 张长期记忆表。
-        Exec(box.DbPath, "DELETE FROM schema_migrations WHERE version = 2;");
+        // 手工把库退回 v1：删掉 version=2/3 的迁移记录，并 DROP 掉长期记忆表。
+        Exec(box.DbPath, "DELETE FROM schema_migrations WHERE version IN (2, 3);");
         foreach (var table in MemoryTables) Exec(box.DbPath, $"DROP TABLE IF EXISTS {table};");
 
         Program.Check(QueryInts(box.DbPath, "SELECT version FROM schema_migrations ORDER BY version").SequenceEqual([1]),
@@ -134,15 +140,126 @@ public static class StoreTests
 
         foreach (var table in MemoryTables)
             Program.Check(TableExists(box.DbPath, table), $"重新打开后迁移补齐表 {table}");
-        Program.Check(QueryInts(box.DbPath, "SELECT version FROM schema_migrations ORDER BY version").SequenceEqual([1, 2]),
-            "重新打开后 schema_migrations 补齐到 1 与 2");
+        Program.Check(QueryInts(box.DbPath, "SELECT version FROM schema_migrations ORDER BY version").SequenceEqual([1, 2, 3]),
+            "重新打开后 schema_migrations 一次性补齐到 1、2 与 3");
         Program.Check(IndexExists(box.DbPath, "ux_canonical_active"), "重新打开后 ux_canonical_active 重建");
+        Program.Check(IndexExists(box.DbPath, "idx_mutation_outbox_applied_kind"), "重新打开后 v3 维护索引重建");
 
         Program.Check(Dump(box.DbPath, "words", WordsColumns) == wordsBefore, "升级后 words 逐行不变");
         Program.Check(Dump(box.DbPath, "review_logs", ReviewLogsColumns) == logsBefore, "升级后 review_logs 逐行不变");
         Program.Check(Dump(box.DbPath, "word_archives", WordArchivesColumns) == archivesBefore,
             "升级后 word_archives 逐行不变");
         Program.Check(box.Service.GetAllWords().Count == 2, "升级后仍能读出 2 条词");
+    }
+
+    // =====================================================================
+    // 2b. v3 升级：纯加法、幂等、不重复事件
+    // =====================================================================
+    private static void V3UpgradeIsIdempotentAndAdditive()
+    {
+        using var box = new Sandbox();
+        box.ArchivePort.AddWord("v3-keep", "ve", "三", "note");
+        box.ArchivePort.AddWord("v3-keep-2", "ve2", "三2", "note2");
+        var wordsBefore = Dump(box.DbPath, "words", WordsColumns);
+        var logsBefore = Dump(box.DbPath, "review_logs", ReviewLogsColumns);
+        box.Close();
+
+        // 退回 v2：只删 v3 戳与 v3 索引，业务表全部保留（v3 是纯加法）。
+        Exec(box.DbPath, "DELETE FROM schema_migrations WHERE version = 3;");
+        Exec(box.DbPath, "DROP INDEX IF EXISTS idx_mutation_outbox_applied_kind;");
+        Program.Check(!IndexExists(box.DbPath, "idx_mutation_outbox_applied_kind"), "退回后 v3 索引不存在");
+
+        box.Open();
+        Program.Check(QueryInts(box.DbPath, "SELECT version FROM schema_migrations ORDER BY version").SequenceEqual([1, 2, 3]),
+            "v2 库重新打开后补齐 v3 戳");
+        Program.Check(IndexExists(box.DbPath, "idx_mutation_outbox_applied_kind"), "v2 库重新打开后补建 v3 索引");
+        Program.Check(Dump(box.DbPath, "words", WordsColumns) == wordsBefore, "v3 升级后 words 逐行不变");
+        Program.Check(Dump(box.DbPath, "review_logs", ReviewLogsColumns) == logsBefore, "v3 升级后 review_logs 逐行不变");
+
+        // 二次启动必须幂等：不重复迁移记录、不重复事件。
+        box.Close();
+        box.Open();
+        Program.Check(QueryInts(box.DbPath, "SELECT version FROM schema_migrations ORDER BY version").SequenceEqual([1, 2, 3]),
+            "重复启动不产生重复迁移记录");
+        Program.Check(ScalarInt(box.DbPath, "SELECT COUNT(*) FROM schema_migrations") == 3,
+            "schema_migrations 仍然只有 3 行");
+        Program.Check(Dump(box.DbPath, "words", WordsColumns) == wordsBefore, "重复启动后 words 仍逐行不变");
+    }
+
+    // =====================================================================
+    // 2c. 未来版本拒绝：来自更新版本的库不得写入
+    // =====================================================================
+    private static void FutureSchemaVersionIsRejected()
+    {
+        using var box = new Sandbox();
+        box.Close();
+        Exec(box.DbPath,
+            "INSERT INTO schema_migrations (version, applied_at) VALUES (99, '2026-01-01T00:00:00.0000000Z');");
+
+        var rejected = false;
+        try { box.Open(); }
+        catch (Exception ex) when (ex is InvalidDataException or SqliteException) { rejected = true; }
+        Program.Check(rejected, "来自更新版本（version=99）的词库被拒绝打开");
+        Program.Check(QueryInts(box.DbPath, "SELECT version FROM schema_migrations ORDER BY version").SequenceEqual([1, 2, 3, 99]),
+            "拒绝打开没有改写迁移记录（版本 99 原样保留）");
+    }
+
+    // =====================================================================
+    // 2d. 迁移失败必须整体回滚：不写 v3 戳、不动业务行
+    // =====================================================================
+    private static void StorageMigrationFailureRollsBack()
+    {
+        using var box = new Sandbox();
+        box.ArchivePort.AddWord("rollback-keep", "rb", "回滚", "note");
+        var wordsBefore = Dump(box.DbPath, "words", WordsColumns);
+        box.Close();
+
+        // 用一个同名表占住索引名，让 v3 的 CREATE INDEX 必然失败。
+        Exec(box.DbPath, "DELETE FROM schema_migrations WHERE version = 3;");
+        Exec(box.DbPath, "DROP INDEX IF EXISTS idx_mutation_outbox_applied_kind;");
+        Exec(box.DbPath, "CREATE TABLE idx_mutation_outbox_applied_kind (x INTEGER);");
+
+        var failed = false;
+        try { box.Open(); }
+        catch (Exception ex) when (ex is InvalidDataException or SqliteException) { failed = true; }
+        Program.Check(failed, "v3 迁移失败时打开词库失败并保留原库");
+        Program.Check(QueryInts(box.DbPath, "SELECT version FROM schema_migrations ORDER BY version").SequenceEqual([1, 2]),
+            "迁移失败后回滚，v3 戳没有写入");
+        Program.Check(Dump(box.DbPath, "words", WordsColumns) == wordsBefore, "迁移失败后 words 逐行不变");
+        Program.Check(TableExists(box.DbPath, "words") && TableExists(box.DbPath, "review_logs"),
+            "迁移失败不破坏旧表");
+    }
+
+    // =====================================================================
+    // 2e. 存储治理只清理已应用的跨存储快照，不碰学习历史
+    // =====================================================================
+    private static void StorageMaintenanceOnlyPrunesAppliedSnapshots()
+    {
+        using var box = new Sandbox();
+        box.ArchivePort.AddWord("maintenance-keep", "mk", "维护", "note");
+        var wordsBefore = Dump(box.DbPath, "words", WordsColumns);
+        var logsBefore = Dump(box.DbPath, "review_logs", ReviewLogsColumns);
+        box.Close();
+
+        Exec(box.DbPath, """
+            INSERT INTO mutation_outbox (kind, payload_json, created_at_utc, applied_at_utc, attempts, last_error) VALUES
+              ('json.snapshot.v1', '{"a":1}', '2026-01-01T00:00:00.0000000Z', '2026-01-01T00:00:01.0000000Z', 1, NULL),
+              ('json.snapshot.v1', '{"b":2}', '2026-01-01T00:00:02.0000000Z', NULL, 0, NULL),
+              ('other.kind.v1',    '{"c":3}', '2026-01-01T00:00:03.0000000Z', '2026-01-01T00:00:04.0000000Z', 1, NULL);
+            """);
+
+        box.Open();
+
+        Program.Check(ScalarInt(box.DbPath,
+                "SELECT COUNT(*) FROM mutation_outbox WHERE kind='json.snapshot.v1' AND applied_at_utc IS NOT NULL") == 0,
+            "启动维护删除已应用的 json.snapshot.v1 快照");
+        Program.Check(ScalarInt(box.DbPath,
+                "SELECT COUNT(*) FROM mutation_outbox WHERE kind='json.snapshot.v1' AND applied_at_utc IS NULL") == 1,
+            "待应用的快照必须保留");
+        Program.Check(ScalarInt(box.DbPath, "SELECT COUNT(*) FROM mutation_outbox WHERE kind='other.kind.v1'") == 1,
+            "其他 kind 的 outbox 行不受维护影响");
+        Program.Check(Dump(box.DbPath, "words", WordsColumns) == wordsBefore, "存储维护不改动 words");
+        Program.Check(Dump(box.DbPath, "review_logs", ReviewLogsColumns) == logsBefore, "存储维护不改动 review_logs");
     }
 
     // =====================================================================

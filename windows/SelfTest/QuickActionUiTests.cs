@@ -55,13 +55,19 @@ public static class QuickActionUiTests
             Check(card.TranslationInput.Text=="手动保存"&&quotes.GetQuotes("Saved while",50,0).Single().Translation=="手动保存","saving during generation cancels stale translation");
             var duplicateBefore=quotes.GetQuotes("",50,0).Count;card.Prepare(QuickAction.SaveQuote,"Evidence matters.");card.Save();
             Check(quotes.GetQuotes("",50,0).Count==duplicateBefore && card.TranslationInput.Text=="我编辑的译文","duplicate card opens existing translation without overwrite");
-            settings.AiProtocol="responses";settings.LookupShortcut="F";settings.TranslateShortcut="G";settings.QuoteShortcut="H";store.SaveSettings(settings);var loaded=store.LoadSettings();
-            Check(loaded.AiProtocol=="responses"&&loaded.LookupShortcut=="F"&&loaded.TranslateShortcut=="G"&&loaded.QuoteShortcut=="H","protocol and shortcuts persist");
+            string? shortcutProbeError=null,shortcutKeys=null;
+            foreach(var candidate in new[]{"FGH","FHJ","QWE","RTY","UIO","JKL","ZXC","VBN","MNB"})
+            {
+                if(App.Hotkey!.TryConfigure(candidate[0].ToString(),candidate[1].ToString(),candidate[2].ToString(),out shortcutProbeError)){shortcutKeys=candidate;break;}
+            }
+            Check(shortcutKeys!=null,"test can acquire three isolated global shortcuts"+(string.IsNullOrWhiteSpace(shortcutProbeError)?"":": "+shortcutProbeError));
+            settings.AiProtocol="responses";settings.LookupShortcut=shortcutKeys![0].ToString();settings.TranslateShortcut=shortcutKeys[1].ToString();settings.QuoteShortcut=shortcutKeys[2].ToString();store.SaveSettings(settings);var loaded=store.LoadSettings();
+            Check(loaded.AiProtocol=="responses"&&loaded.LookupShortcut==settings.LookupShortcut&&loaded.TranslateShortcut==settings.TranslateShortcut&&loaded.QuoteShortcut==settings.QuoteShortcut,"protocol and shortcuts persist");
             typeof(MainWindow).GetField("_settings",BindingFlags.NonPublic|BindingFlags.Instance)!.SetValue(main,loaded);
             typeof(MainWindow).GetMethod("LoadSettingsToUi",BindingFlags.NonPublic|BindingFlags.Instance)!.Invoke(main,null);
-            for(var attempt=0;attempt<100 && App.Hotkey!.GetStatus(QuickAction.Lookup).Key!="F";attempt++) await Task.Delay(10);
-            Check(App.Hotkey!.GetStatus(QuickAction.Lookup).Key=="F"&&App.Hotkey.GetStatus(QuickAction.Translate).Key=="G"&&App.Hotkey.GetStatus(QuickAction.SaveQuote).Key=="H","loaded settings configure actual global shortcuts");
-            Check(((TextBox)typeof(MainWindow).GetField("_translateShortcutInput",BindingFlags.NonPublic|BindingFlags.Instance)!.GetValue(main)!).Text=="G","shortcut inputs follow restored settings");
+            for(var attempt=0;attempt<100 && App.Hotkey!.GetStatus(QuickAction.Lookup).Key!=settings.LookupShortcut;attempt++) await Task.Delay(10);
+            Check(App.Hotkey!.GetStatus(QuickAction.Lookup).Key==settings.LookupShortcut&&App.Hotkey.GetStatus(QuickAction.Lookup).IsRegistered&&App.Hotkey.GetStatus(QuickAction.Translate).Key==settings.TranslateShortcut&&App.Hotkey.GetStatus(QuickAction.Translate).IsRegistered&&App.Hotkey.GetStatus(QuickAction.SaveQuote).Key==settings.QuoteShortcut&&App.Hotkey.GetStatus(QuickAction.SaveQuote).IsRegistered,"loaded settings configure actual global shortcuts");
+            Check(((TextBox)typeof(MainWindow).GetField("_translateShortcutInput",BindingFlags.NonPublic|BindingFlags.Instance)!.GetValue(main)!).Text==settings.TranslateShortcut,"shortcut inputs follow restored settings");
             main.Close();Check(!main.IsVisible,"closing main window hides instead of exiting");Check(store.GetAllWords().Count>0,"hidden window retains live storage");main.ShowAndActivate();
             Check(main.IsVisible,"hidden main window can reopen");await main.HandleQuickActionAsync(QuickAction.Translate,0);
             Check((typeof(MainWindow).GetField("_quickCard",BindingFlags.NonPublic|BindingFlags.Instance)!.GetValue(main) as Window)?.IsVisible==true,"manual quick action opens input card");

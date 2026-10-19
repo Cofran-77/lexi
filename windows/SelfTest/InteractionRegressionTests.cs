@@ -16,7 +16,7 @@ public static class InteractionRegressionTests
         var lines = new List<string>(); var exit = 1;
         var folder = Environment.GetEnvironmentVariable("LEXI_DATA_DIR")!;
         void Check(bool value,string label) { if(!value) throw new Exception(label); lines.Add("PASS "+label); }
-        object? Call(string name,params object[] args) => typeof(MainWindow).GetMethod(name,BindingFlags.Instance|BindingFlags.NonPublic)!.Invoke(window,args);
+        object? Call(string name,params object[] args) => Invoke(window,name,args);
         object? Field(string name) => typeof(MainWindow).GetField(name,BindingFlags.Instance|BindingFlags.NonPublic)!.GetValue(window);
         async Task Snapshot(string name) { await Task.Delay(100); using var bitmap=new RenderTargetBitmap(new PixelSize((int)window.Bounds.Width,(int)window.Bounds.Height),new Vector(96,96)); bitmap.Render(window); bitmap.Save(Path.Combine(folder,name+".png")); }
         try
@@ -26,18 +26,22 @@ public static class InteractionRegressionTests
             store.AddWord("interactionsample","/test/","测试词","definition"); Call("RefreshWords");
             var word=store.GetAllWords().Single(w=>w.Word=="interactionsample");
             var plan=DailyStudyPlanRules.Create("便签布局测试",DailyStudyPlanSource.Archive,"档案",[new DailyStudyPlanWord {Id=word.Id.ToString(),Word=word.Word,Meaning=word.Translation}],1,false,1);
+            ((List<DailyStudyPlan>)Field("_learningPlans")!).Add(plan);
             Call("ShowPage","learning"); Call("StartDailyLearning",plan);
             var session=Field("_dailyLearningSession"); var memory=(LearningMemoryCoordinator)Field("_planMemory")!; var sessionId=memory.CurrentSessionId;
-            Call("ToggleGlobalFocus");
-            Check(!window.FindControl<Border>("SidebarBorder")!.IsVisible,"global focus hides management navigation");
+            Check((bool)Field("_globalFocusActive")! && !window.FindControl<Border>("SidebarBorder")!.IsVisible,"starting a plan enters global focus and hides management navigation");
             Check(ReferenceEquals(session,Field("_dailyLearningSession")) && ((LearningMemoryCoordinator)Field("_planMemory")!).CurrentSessionId==sessionId,"focus enters plan using the same round and memory session");
             await Snapshot("plan-focus-light");
             Call("ToggleGlobalFocus");
-            Check(window.FindControl<Border>("SidebarBorder")!.IsVisible && ReferenceEquals(session,Field("_dailyLearningSession")),"focus exits without losing plan session");
+            Check(window.FindControl<Border>("SidebarBorder")!.IsVisible && ReferenceEquals(session,Field("_dailyLearningSession")),"global focus exits without losing plan session");
             window.FindControl<Button>("NavSettings")!.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             Check((bool)Field("_settingsDrawerOpen")! && (string)Field("_currentPage")! == "settings" && window.FindControl<ScrollViewer>("PageSettings")!.IsVisible,"settings opens as a full page");
             Call("CloseSettingsDrawer");
             Check(!(bool)Field("_settingsDrawerOpen")! && ReferenceEquals(session,Field("_dailyLearningSession")),"closing settings preserves the task session");
+            Call("ExitDailyLearning");
+            var cleanupPlans=(List<DailyStudyPlan>)Field("_learningPlans")!;
+            cleanupPlans.RemoveAll(candidate=>candidate.Id==plan.Id);
+            Check((bool)Call("SaveLearningPlans",cleanupPlans)!,"interaction fixture plan is removed before drawer tests");
             await PlanDrawerInteractionTests.RunAsync(window,Check);
             await StudyKeySurfaceTests.RunAsync(window,Check);
             await KeyboardInteractionTests.RunAsync(window,Check);
@@ -68,5 +72,24 @@ public static class InteractionRegressionTests
         }
         catch(Exception ex) { lines.Add("FAIL "+ex); }
         finally { File.WriteAllLines(Path.Combine(folder,"interaction-result.txt"),lines); window.ForceClose(); (Application.Current!.ApplicationLifetime as IClassicDesktopStyleApplicationLifetime)!.Shutdown(exit); }
+    }
+
+    private static object? Invoke(MainWindow window,string name,params object?[] args)
+    {
+        var flags=BindingFlags.Instance|BindingFlags.NonPublic;
+        var methods=typeof(MainWindow).GetMethods(flags).Where(method =>
+        {
+            if(method.Name!=name)return false;
+            var parameters=method.GetParameters();
+            if(args.Length<parameters.Count(p=>!p.IsOptional)||args.Length>parameters.Length)return false;
+            return args.Select((arg,index)=>arg==null?!parameters[index].ParameterType.IsValueType:
+                parameters[index].ParameterType.IsInstanceOfType(arg)).All(valid=>valid);
+        }).OrderBy(method=>method.GetParameters().Length).ToArray();
+        if(methods.Length==0)throw new MissingMethodException($"{name} has no overload for {args.Length} arguments");
+        var target=methods[0];var targetParameters=target.GetParameters();
+        var invocation=new object?[targetParameters.Length];Array.Copy(args,invocation,args.Length);
+        for(var index=args.Length;index<invocation.Length;index++)
+            invocation[index]=targetParameters[index].DefaultValue;
+        return target.Invoke(window,invocation);
     }
 }

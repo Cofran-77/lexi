@@ -37,9 +37,9 @@ public static class PlanDrawerInteractionTests
             foreach(var item in new[]{(1100d,760d,3),(900d,640d,2),(760d,520d,1)})
             {
                 window.Width=item.Item1;window.Height=item.Item2; await Task.Delay(160);window.UpdateLayout();
-                var grid=Field<StackPanel>("_learningPlansPanel").GetVisualDescendants().OfType<ResponsivePlanGrid>().Single(g=>g.IsEffectivelyVisible);
-                check(grid.Columns==item.Item3,"plan grid uses "+item.Item3+" columns at "+item.Item1);
-                check(grid.Children.All(c=>c.Bounds.Right<=grid.Bounds.Width+1),"plan cards remain within content width at "+item.Item1);
+                var cards=Field<StackPanel>("_learningPlansPanel").GetVisualDescendants().OfType<Border>().Where(b=>b.Classes.Contains("plan-card")&&b.IsEffectivelyVisible).ToList();
+                check(cards.Count==30,"plan rows remain rendered at "+item.Item1);
+                check(cards.All(card=>card.Parent is StackPanel list&&card.Bounds.Right<=list.Bounds.Width+1),"plan cards remain within content width at "+item.Item1);
                 await Snapshot("plans-"+item.Item1+"-light");
             }
             window.RequestedThemeVariant=ThemeVariant.Dark;

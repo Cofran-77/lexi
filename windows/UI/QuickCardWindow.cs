@@ -133,7 +133,9 @@ internal sealed class QuickCardWindow : Window
         _cancel.Classes.Add("ghost");
         _allow.Classes.Add("secondary");
         _allow.Content = L("打开系统设置", "Open System Settings"); _allow.Margin = new Thickness(0, 0, 6, 6); _allow.IsVisible = false;
-        _allow.Click += (_, _) => _status.Text = "请直接输入文本，或在其他应用选中文本后使用快捷键。";
+        _allow.Click += (_, _) => _status.Text = L(
+            "请直接输入文本，或在其他应用选中文本后使用快捷键。",
+            "Enter text here, or select text in another app and use the shortcut.");
 
         var actions = new WrapPanel { Orientation = Orientation.Horizontal };
         foreach (var button in new[] { _run, _save, _copy, _pronounce, _detail, _cancel })

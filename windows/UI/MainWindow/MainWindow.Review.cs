@@ -18,16 +18,18 @@ public partial class MainWindow
     private bool _reviewRoundStarted;
     private Dictionary<long,int> _reviewVersions = [];
     private int _reviewUndoRevision;
-    private DateTime _reviewDay = DateTime.Today;
+    private DateOnly _reviewDay = LearningDay.TodayBjt(DateTime.UtcNow);
     private WordItem? _reviewWord;
     private bool _reviewRevealed;
     private bool _reviewRestoreRevealed;
     private bool _reviewBusy;
+    private bool _reviewRatedPending;
     private int _reviewEpoch;
 
     private void BindReviewEvents()
     {
         ReviewRevealBtn.Click += (_, _) => RevealReview();
+        ReviewNextBtn.Click += async (_, _) => await AdvanceReviewAsync();
         ReviewRememberBtn.Click += async (_, _) => await RateReviewAsync(true);
         ReviewUnfamiliarBtn.Click += async (_, _) => await RateReviewAsync(false);
         ReviewUnsureBtn.Click += async (_, _) => await RateReviewRatingAsync(StudyRating.Unsure);
@@ -37,6 +39,7 @@ public partial class MainWindow
         ToolTip.SetTip(ReviewUnsureBtn, "模糊 (↓ 或 2)");
         ToolTip.SetTip(ReviewRememberBtn, "认识 (→ 或 3)");
         ToolTip.SetTip(ReviewRevealBtn, "揭晓释义 (Space / Enter)");
+        ToolTip.SetTip(ReviewNextBtn, "下一词 (Space / Enter)");
         ToolTip.SetTip(ReviewRoundUndoBtn, "撤销 (Ctrl+Z)");
     }
 
@@ -47,7 +50,7 @@ public partial class MainWindow
         {
             _reviewWord = null; _reviewRoundStarted = false;
             ReviewCardHost.IsVisible = false; ReviewEmptyCard.IsVisible = true;
-            ReviewRevealBtn.IsVisible = ReviewRatingBar.IsVisible = false;
+            ReviewRevealBtn.IsVisible = ReviewRatingBar.IsVisible = ReviewNextBtn.IsVisible = false;
             SetStatus("复习断点暂时无法恢复，原记录已保留：" + ex.Message);
         }
     }
@@ -70,7 +73,8 @@ public partial class MainWindow
 
     private List<WordItem> GetPendingReviewWords()
     {
-        if (_reviewDay != DateTime.Today) { _reviewHandled.Clear(); _reviewDay = DateTime.Today; _reviewRoundStarted = false; }
+        var today = LearningDay.TodayBjt(DateTime.UtcNow);
+        if (_reviewDay != today) { _reviewHandled.Clear(); _reviewDay = today; _reviewRoundStarted = false; }
         var dueIds = DueArchiveIds();
         return _allWords.Where(w => dueIds.Contains(w.Id)
             && (!_reviewHandled.TryGetValue(w.Id, out var handledRevision) || handledRevision != w.Archive.Revision))
@@ -100,18 +104,21 @@ public partial class MainWindow
             _reviewWord = _reviewRound.HasCurrent ? ResolveReviewWord(_reviewRound.Current) : null;
         }
         _reviewRevealed = false;
-        ReviewRemainingText.Text = $"已完成 {_reviewRound.Completed} / {_reviewRound.Total} · 连续认识 {_reviewRound.CurrentStreak} / {_reviewRound.CurrentTarget}";
+        _reviewRatedPending = false;
+        ReviewRemainingText.Text = UiText.Format(
+            $"已完成 {_reviewRound.Completed} / {_reviewRound.Total} · 连续认识 {_reviewRound.CurrentStreak} / {_reviewRound.CurrentTarget}");
         ReviewRoundUndoBtn.IsEnabled = _reviewUndo != null;
         ReviewAnswer.IsVisible = ReviewRatingBar.IsVisible = false;
         ReviewMeaningText.Text = ""; ReviewDefinitionText.Text = "";
         ReviewRevealBtn.IsVisible = _reviewWord != null;
+        ReviewNextBtn.IsVisible = false;
         ReviewCardHost.IsVisible = _reviewWord != null;
         ReviewEmptyCard.IsVisible = _reviewWord == null;
         ReviewBackOne.IsVisible = due.Count > 1;
         ReviewBackTwo.IsVisible = due.Count > 2;
         ReviewWordText.Text = _reviewWord?.Word ?? "";
         ReviewPhoneticText.Text = _reviewWord?.Phonetic ?? "";
-        ReviewHintText.Text = "先回忆再揭晓。首次认识即可完成；模糊或忘记后需连续认识三次。";
+        ReviewHintText.Text = UiText.Text("先回忆再揭晓。首次认识即可完成；模糊或忘记后需连续认识三次。");
         PresentReviewMemory(_reviewWord);
         if (_reviewRestoreRevealed) { _reviewRestoreRevealed = false; RevealReview(); }
         if (resetPose) SetReviewPose(0, 1);
@@ -151,17 +158,66 @@ public partial class MainWindow
         ReviewDefinitionText.IsVisible = !string.IsNullOrWhiteSpace(_reviewWord.Definition);
         ReviewAnswer.IsVisible = ReviewRatingBar.IsVisible = true;
         ReviewRevealBtn.IsVisible = false;
-        ReviewHintText.Text = "按刚才的回忆判断，不必勉强。";
+        ReviewHintText.Text = UiText.Text("按刚才的回忆判断，不必勉强。");
         ReviewRememberBtn.Focus();
         PersistLearningSurface("review");
     }
 
+    /// <summary>
+    /// 评分完成后的中间态：先完成状态切换，再把焦点交给可用的「下一词」。
+    /// 评分条此时隐藏（忘记后只保留居中的下一词），空格与鼠标走同一条推进路径。
+    /// </summary>
+    private void ShowReviewRatedState()
+    {
+        _reviewRatedPending = true;
+        ReviewRevealBtn.IsVisible = false;
+        ReviewRatingBar.IsVisible = false;
+        ReviewRatingBar.IsEnabled = true;
+        ReviewAnswer.IsVisible = true;
+        ReviewNextBtn.IsVisible = true;
+        ReviewNextBtn.IsEnabled = true;
+        ReviewRoundUndoBtn.IsEnabled = _reviewUndo != null;
+        if (_currentPage == "review") ReviewNextBtn.Focus();
+    }
+
+    /// <summary>幂等推进：只有处于已评分待推进状态时才会换卡，重复点击/空格不会跳跃或卡死。</summary>
+    private async Task AdvanceReviewAsync()
+    {
+        if (_reviewBusy || _restoring || !_databaseAvailable || !_reviewRatedPending) return;
+        _reviewRatedPending = false;
+        _reviewBusy = true;
+        var epoch = _reviewEpoch;
+        try
+        {
+            if (_reviewRound.IsFinished || !_reviewRound.HasCurrent)
+            {
+                if (epoch == _reviewEpoch) RenderReviewCard();
+                PersistLearningSurface("review");
+                return;
+            }
+            if (!ReduceMotionBox.IsChecked.GetValueOrDefault() && _currentPage == "review")
+            {
+                if (!await MoveReviewCardAsync(epoch, 0, -32, false)) return;
+                RenderReviewCard(resetPose: false);
+                SetReviewPose(32, 0);
+                if (!await MoveReviewCardAsync(epoch, 32, 0, true)) return;
+                SetReviewPose(0, 1);
+            }
+            else if (epoch == _reviewEpoch)
+            {
+                RenderReviewCard();
+            }
+            PersistLearningSurface("review");
+        }
+        finally { _reviewBusy = false; }
+    }
+
     private Task RateReviewAsync(bool remembered) => RateReviewRatingAsync(remembered ? StudyRating.Known : StudyRating.Forgot);
 
-    private async Task RateReviewRatingAsync(StudyRating rating)
+    private Task RateReviewRatingAsync(StudyRating rating)
     {
-        if (_reviewWord == null || !_reviewRevealed || _reviewBusy || _restoring || !_databaseAvailable) return;
-        if (_reviewDay != DateTime.Today) { OpenReviewDeck(); SetStatus("日期已变化，今日复习队列已刷新，请重新回忆。"); return; }
+        if (_reviewWord == null || !_reviewRevealed || _reviewRatedPending || _reviewBusy || _restoring || !_databaseAvailable) return Task.CompletedTask;
+        if (_reviewDay != LearningDay.TodayBjt(DateTime.UtcNow)) { OpenReviewDeck(); SetStatus("日期已变化，今日复习队列已刷新，请重新回忆。"); return Task.CompletedTask; }
         _reviewBusy = true;
         ReviewRatingBar.IsEnabled = false;
         var word = _reviewWord;
@@ -183,26 +239,19 @@ public partial class MainWindow
             _reviewUndoRevision = updated?.Archive.Revision ?? -1;
             if (result.Completed && updated != null) _reviewHandled[word.Id] = updated.Archive.Revision;
             UpdateReviewBadge();
-            if (!ReduceMotionBox.IsChecked.GetValueOrDefault() && _currentPage == "review" && epoch == _reviewEpoch)
-            {
-                var direction = rating == StudyRating.Known ? 1 : -1;
-                if (!await MoveReviewCardAsync(epoch, 0, direction * 48, false)) return;
-                RenderReviewCard(resetPose: false);
-                SetReviewPose(-direction * 32, 0);
-                if (_reviewWord != null && !await MoveReviewCardAsync(epoch, -direction * 32, 0, true)) return;
-                SetReviewPose(0, 1);
-            }
-            else if (epoch == _reviewEpoch) RenderReviewCard();
+            // 评分先落地并进入"待推进"状态；换卡由「下一词」/空格触发，连续作答不会冻结。
+            ShowReviewRatedState();
             PersistLearningSurface("review");
             SetStatus(result.Completed ? "已完成本轮并更新 FSRS 排期。" : rating == StudyRating.Forgot ? "连击已清零，将在本轮重学。" : rating == StudyRating.Unsure ? "连击减一，将在本轮稍后再出现。" : "认识次数已记录，继续累计三次。" );
         }
         catch (Exception ex)
         {
-            if (memoryRated) { try { UndoReviewMemory(); } catch (Exception undoError) { SetStatus("复习回滚失败：" + undoError.Message); return; } }
+            if (memoryRated) { try { UndoReviewMemory(); } catch (Exception undoError) { SetStatus("复习回滚失败：" + undoError.Message); return Task.CompletedTask; } }
             checkpoint.Restore(); _reviewBusy = false; RenderReviewCard(); RevealReview();
             SetStatus("本次复习未完成，请重试：" + ex.Message);
         }
         finally { _reviewBusy = false; ReviewRatingBar.IsEnabled = true; }
+        return Task.CompletedTask;
     }
 
     private void UndoRoundRating()
@@ -224,6 +273,7 @@ public partial class MainWindow
             _reviewUndo.Restore();
             _reviewHandled.Remove(_reviewUndoWord);
             _reviewUndo = null;
+            _reviewRestoreRevealed = true;
             RefreshWords(); CaptureReviewVersions(); RenderReviewCard();
             PersistLearningSurface("review");
             SetStatus("已撤销上一次评价与对应排期变更。");

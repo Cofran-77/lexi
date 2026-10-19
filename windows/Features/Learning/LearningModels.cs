@@ -9,6 +9,11 @@ namespace Lexi.Features.Learning;
 /// </summary>
 public sealed class PlanCreationState
 {
+    public sealed record ScheduleEstimate(
+        int Days,
+        string ChineseDescription,
+        string EnglishDescription);
+
     public DailyStudyPlanSource Source { get; }
     public HashSet<string> SelectedIds { get; } = new(StringComparer.Ordinal);
     public string PlanName { get; set; } = "";
@@ -28,24 +33,52 @@ public sealed class PlanCreationState
     /// <summary>
     /// 计算预计天数与尾日剩余词数说明。
     /// </summary>
-    public static (int Days, string Description) CalculateEstimate(int totalWords, int dailyQuota)
+    public static ScheduleEstimate CalculateSchedule(int totalWords, int dailyQuota)
     {
-        if (totalWords <= 0) return (0, "请至少选择 1 个词条");
-        if (dailyQuota <= 0) return (0, "每日词数需大于 0");
+        if (totalWords <= 0)
+        {
+            return new ScheduleEstimate(
+                0,
+                "请至少选择 1 个词条",
+                "Select at least one entry.");
+        }
+
+        if (dailyQuota <= 0)
+        {
+            return new ScheduleEstimate(
+                0,
+                "每日词数需大于 0",
+                "The daily target must be greater than zero.");
+        }
 
         var days = (totalWords + dailyQuota - 1) / dailyQuota;
         if (dailyQuota >= totalWords)
         {
-            return (1, $"每日目标超过或等于选词总数，预计 1 天完成（首日学习全部 {totalWords} 词）。");
+            return new ScheduleEstimate(
+                1,
+                $"每日目标超过或等于选词总数，预计 1 天完成（首日学习全部 {totalWords} 词）。",
+                $"The daily target is at least the selected total; completion is expected in 1 day (all {totalWords} words on day 1).");
         }
 
         var remainder = totalWords % dailyQuota;
         if (remainder == 0)
         {
-            return (days, $"预计 {days} 天完成（每天学习 {dailyQuota} 词）。");
+            return new ScheduleEstimate(
+                days,
+                $"预计 {days} 天完成（每天学习 {dailyQuota} 词）。",
+                $"Completion is expected in {days} days ({dailyQuota} words per day).");
         }
 
-        return (days, $"预计 {days} 天完成（前 {days - 1} 天每天 {dailyQuota} 词，最后 1 天学习剩余 {remainder} 词）。");
+        return new ScheduleEstimate(
+            days,
+            $"预计 {days} 天完成（前 {days - 1} 天每天 {dailyQuota} 词，最后 1 天学习剩余 {remainder} 词）。",
+            $"Completion is expected in {days} days ({dailyQuota} words per day for the first {days - 1} days, then {remainder} words on the final day).");
+    }
+
+    public static (int Days, string Description) CalculateEstimate(int totalWords, int dailyQuota)
+    {
+        var estimate = CalculateSchedule(totalWords, dailyQuota);
+        return (estimate.Days, estimate.ChineseDescription);
     }
 }
 

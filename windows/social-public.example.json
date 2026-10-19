@@ -1,0 +1,4 @@
+{
+  "project_url": "https://<project-ref>.supabase.co",
+  "public_key": "sb_publishable_<public-client-key>"
+}

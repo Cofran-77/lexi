@@ -9,9 +9,8 @@ namespace Lexi.Features.Learning;
 /// <summary>
 /// 1.2.3 拼写训练准备组件：
 /// - 纯色卡片（最大宽 640，高约 320），删除多层卡片与冗长说明
-/// - 仅保留两项练习范围（全部词条 / 仅薄弱项），空 weak 严格禁用薄弱项
-/// - 删除可见模式选择，默认辅助拼写（Hints 恒为 true）
-/// - 保留 MemoryModeRadio / AssistedModeRadio 作为不可见字段以兼容历史反射测试
+/// - 保留淡写 / 默写模式选择
+/// - 保留两项练习范围（全部词条 / 仅薄弱项），空 weak 严格禁用薄弱项
 /// - 唯一开始键与取消键，全部文本使用 UiText.Bilingual 双语国际化
 /// </summary>
 public class PracticeSetupControl : UserControl
@@ -22,16 +21,18 @@ public class PracticeSetupControl : UserControl
     private readonly TextBlock _titleBlock;
     private readonly TextBlock _subtitleBlock;
 
+    private readonly TextBlock _modeSectionHeader;
+    private readonly RadioButton _assistedModeRadio;
+    private readonly TextBlock _assistedModeDesc;
+    private readonly RadioButton _memoryModeRadio;
+    private readonly TextBlock _memoryModeDesc;
+
     private readonly TextBlock _scopeSectionHeader;
     private readonly RadioButton _allScopeRadio;
     private readonly TextBlock _allScopeDesc;
     private readonly RadioButton _weakScopeRadio;
     private readonly TextBlock _weakScopeDesc;
     private readonly Border _weakOptionBorder;
-
-    // 历史兼容不可见字段：不暴露至视觉树
-    private readonly RadioButton _memoryModeRadio = new() { IsVisible = false };
-    private readonly RadioButton _assistedModeRadio = new() { IsVisible = false, IsChecked = true };
 
     private readonly Button _cancelButton;
     private readonly Button _startButton;
@@ -40,7 +41,7 @@ public class PracticeSetupControl : UserControl
     public int WeakWords { get; }
 
     public bool OnlyWeak => _weakScopeRadio.IsChecked == true && WeakWords > 0;
-    public bool Hints => true; // 1.2.3 统一产品方案：Hints 恒为 true
+    public bool Hints => _assistedModeRadio.IsChecked == true;
 
     public Button StartButton => _startButton;
     public Button CancelButton => _cancelButton;
@@ -90,7 +91,48 @@ public class PracticeSetupControl : UserControl
         headerStack.Children.Add(_subtitleBlock);
         mainLayout.Children.Add(headerStack);
 
-        // 2. 范围区（仅两项范围，无模式选择）
+        // 2. 练习模式
+        var modeGroup = new StackPanel { Spacing = 8 };
+        _modeSectionHeader = new TextBlock
+        {
+            FontSize = 14,
+            FontWeight = FontWeight.SemiBold,
+            TextWrapping = TextWrapping.Wrap
+        };
+        _modeSectionHeader.Bind(TextBlock.ForegroundProperty, this.GetResourceObservable("InkBrush"));
+        modeGroup.Children.Add(_modeSectionHeader);
+
+        var assistedOption = CreateOptionContainer();
+        var assistedStack = new StackPanel { Spacing = 2 };
+        _assistedModeRadio = new RadioButton
+        {
+            GroupName = "PracticeMode",
+            FontSize = 14,
+            FontWeight = FontWeight.Medium,
+            IsChecked = true
+        };
+        assistedStack.Children.Add(_assistedModeRadio);
+        _assistedModeDesc = CreateOptionDescription();
+        assistedStack.Children.Add(_assistedModeDesc);
+        assistedOption.Child = assistedStack;
+        modeGroup.Children.Add(assistedOption);
+
+        var memoryOption = CreateOptionContainer();
+        var memoryStack = new StackPanel { Spacing = 2 };
+        _memoryModeRadio = new RadioButton
+        {
+            GroupName = "PracticeMode",
+            FontSize = 14,
+            FontWeight = FontWeight.Medium
+        };
+        memoryStack.Children.Add(_memoryModeRadio);
+        _memoryModeDesc = CreateOptionDescription();
+        memoryStack.Children.Add(_memoryModeDesc);
+        memoryOption.Child = memoryStack;
+        modeGroup.Children.Add(memoryOption);
+        mainLayout.Children.Add(modeGroup);
+
+        // 3. 范围区
         var scopeGroup = new StackPanel { Spacing = 8 };
         _scopeSectionHeader = new TextBlock
         {
@@ -157,7 +199,7 @@ public class PracticeSetupControl : UserControl
         scopeGroup.Children.Add(_weakOptionBorder);
         mainLayout.Children.Add(scopeGroup);
 
-        // 3. 底部操作区（唯一开始键 + 取消键）
+        // 4. 底部操作区（唯一开始键 + 取消键）
         var actionsGrid = new Grid
         {
             ColumnDefinitions = new ColumnDefinitions("*,Auto,Auto"),
@@ -217,6 +259,18 @@ public class PracticeSetupControl : UserControl
         return border;
     }
 
+    private TextBlock CreateOptionDescription()
+    {
+        var description = new TextBlock
+        {
+            FontSize = 12,
+            Margin = new Thickness(26, 0, 0, 0),
+            TextWrapping = TextWrapping.Wrap
+        };
+        description.Bind(TextBlock.ForegroundProperty, this.GetResourceObservable("MutedBrush"));
+        return description;
+    }
+
     /// <summary>
     /// 双语刷新所有 UI 文本。
     /// </summary>
@@ -224,8 +278,18 @@ public class PracticeSetupControl : UserControl
     {
         _titleBlock.Text = UiText.Bilingual("拼写训练准备", "Practice Setup");
         _subtitleBlock.Text = UiText.Bilingual(
-            "选择训练范围，针对性强化单词拼写记忆。",
-            "Configure practice scope to target spelling retention.");
+            "选择练习方式与范围，针对性强化单词拼写记忆。",
+            "Choose a practice mode and scope to target spelling retention.");
+
+        _modeSectionHeader.Text = UiText.Bilingual("练习方式", "Practice Mode");
+        _assistedModeRadio.Content = UiText.Bilingual("淡写", "Guided spelling");
+        _assistedModeDesc.Text = UiText.Bilingual(
+            "逐字母显示提示，可直接查看答案；适合初次拼写或薄弱词巩固。",
+            "Show letter-level hints and allow answer reveal; suited to first attempts and difficult words.");
+        _memoryModeRadio.Content = UiText.Bilingual("默写", "Dictation");
+        _memoryModeDesc.Text = UiText.Bilingual(
+            "默认隐藏拼写提示，根据释义独立回忆；答错后显示完整答案。",
+            "Hide spelling hints and recall from meaning; reveal the full answer after a mistake.");
 
         _scopeSectionHeader.Text = UiText.Bilingual("练习范围", "Practice Scope");
         _allScopeRadio.Content = UiText.Bilingual($"全部词条（共 {TotalWords} 词）", $"All Words ({TotalWords} words)");

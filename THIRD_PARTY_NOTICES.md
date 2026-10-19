@@ -1,24 +1,32 @@
 # 第三方代码与资源说明
 
-根目录 PolyForm Noncommercial LICENSE 覆盖其适用范围内的项目原创代码和文档；`macos/` 导入原有内容保留该目录 LICENSE。两者均不覆盖以下第三方内容。构建后实际分发的依赖也须保留对应通知。
+根目录 PolyForm Noncommercial LICENSE 与 `macos/LICENSE` 只覆盖各自适用的原创内容，不重新授权下列第三方材料。
 
-| 内容 | 来源 / 许可 | 仓库中的保留位置 |
+| 内容 | 来源 / 许可 | 保留位置 |
 | --- | --- | --- |
-| ECDICT 常用词子集 | [skywind3000/ECDICT](https://github.com/skywind3000/ECDICT)，MIT | Windows `Notices/ECDICT-LICENSE.txt`；Android `app/src/main/assets/notices/` |
-| FSRS Rust 库 | Open Spaced Repetition，BSD-3-Clause | `windows/native/fsrs-optimizer/vendor/fsrs/LICENSE` |
-| Avalonia | MIT（部分 native 依赖有独立通知） | Windows `Notices/`；NuGet package metadata |
-| .NET、SQLite 等桌面依赖 | 各自许可 | Windows `Notices/` 及项目依赖清单 |
-| SkiaSharp、HarfBuzz 与 native 组件 | 各自许可 / 第三方通知 | Windows `Notices/` |
-| Inter 字体 | SIL Open Font License 1.1 | `windows/Notices/INTER-LICENSE.txt`，通过 Avalonia.Fonts.Inter 依赖引入 |
-| AndroidX / Compose、Kotlin、协程、OkHttp | 通常为 Apache-2.0，按各包发布内容为准 | Gradle 声明与依赖发布包 |
-| Gradle Wrapper | Apache-2.0 | Android Wrapper 与 `android/GRADLE-LICENSE.txt` |
+| ECDICT 常用词子集 | [skywind3000/ECDICT](https://github.com/skywind3000/ECDICT)，MIT | Windows `Notices/ECDICT-LICENSE.txt`；macOS `lexi_avalonia/Notices/ECDICT-LICENSE.txt`；Android notices |
+| FSRS Rust 库 | Open Spaced Repetition，BSD-3-Clause | 两端 `native/fsrs-optimizer/vendor/fsrs/LICENSE` 及许可证索引 |
+| Avalonia、.NET、SkiaSharp、HarfBuzz | 各自许可和第三方通知 | 两端 `Notices/` 与 NuGet 依赖 |
+| Inter 字体 | SIL Open Font License 1.1 | Windows / macOS `Notices/INTER-LICENSE.txt` |
+| AndroidX、Compose、Kotlin、协程、OkHttp | 通常为 Apache-2.0，以各发布包为准 | Gradle 依赖与 Android notices |
+| Gradle Wrapper | Apache-2.0 | `android/GRADLE-LICENSE.txt` |
 
-## IELTS 学习资料
+## IELTS 资料
 
-Windows 配套专题资料来自 [hefengxian/my-ielts](https://github.com/hefengxian/my-ielts)，适配时固定到提交 5cef573933663c4673c6e0093f1df04e68018b1a。上游 README 明确声明禁止商业用途；原书、词汇编排、音频和讲义的权利归各自权利人。Lexi 保留来源信息，不将这些资料归为 Cofran-77 或 DespairJasper 原创，不由根目录许可重新授权。来源声明不等于原书权利人的授权证明。
+IELTS 教材、词汇编排和音频来自 [hefengxian/my-ielts](https://github.com/hefengxian/my-ielts)，适配基线为 `5cef573933663c4673c6e0093f1df04e68018b1a`。上游声明禁止商业用途；原书、词汇、音频与讲义权利归各自权利人。保留来源不代表提供额外的原权利人授权。
 
-资料随当前 Windows 安装包及专题资源 ZIP 提供。详见 [资源说明](docs/RESOURCES.md) 与 windows/Notices/MY-IELTS-SOURCE.md。第三方依赖许可与通知继续分别保留。
+- Windows Git 源码排除这些书籍和音频，自包含安装包随发布方现有发布边界提供。
+- macOS 上游公开 Git 仓库跟踪其 IELTS 资源，源码同步保留同一公开集合。
 
-## 平台合作与许可
+## 考试词书
 
-macOS 参考项目 [DespairJasper/lexi-macos](https://github.com/DespairJasper/lexi-macos) 由合作作者维护，本仓库已将其 3.1.3 源码导入 `macos/`，保留 `macos/LICENSE` 的 Lexi 非商业许可。macOS 的 ECDICT、Avalonia、Inter、SkiaSharp、.NET 和 FSRS 及 Rust 依赖声明分别保存在 `macos/lexi_avalonia/Notices/` 与 `macos/native/fsrs-optimizer/vendor/fsrs/LICENSE`；索引见 [macOS NOTICES](macos/NOTICES.md)。此次不导入 IELTS 教材与音频。许可适用范围见 LICENSE-POLICY.md，不自动修改外部仓库或第三方许可。
+新增桌面考试词书来自上游适配数据，具体固定版本、去重和来源记录保留在：
+
+- Windows：`windows/Assets/Exams/`、`windows/Notices/`
+- macOS：`macos/lexi_avalonia/Assets/Exams/`、`macos/lexi_avalonia/Notices/`
+
+第三方词书不由项目许可重新授权。使用、再分发或商业化前应自行核对来源条款。
+
+## macOS
+
+macOS 3.3.1 源码同步自 [DespairJasper/lexi-macos](https://github.com/DespairJasper/lexi-macos)。依赖声明索引见 [macOS NOTICES](macos/NOTICES.md)。

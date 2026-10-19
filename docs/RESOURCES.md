@@ -1,31 +1,53 @@
-# 学习资料与来源
-
-## 安装与资源
-
-Windows 1.2.4 当前安装包包含离线词典及配套专题学习资料，安装后本地加载，无需另行下载。Android 按其已实现的功能集提供，不包含 Windows 专题工作区。
-
-开发者可安装当前 Windows 版，将安装目录中的 Assets/IELTS 复制到 windows/Assets/IELTS 后构建。Git 中保留格式示例和资源哈希清单，避免在提交历史中重复存放约 500 MB 音频和资料。
+# 学习资源与第三方内容
 
 ## 离线词典
 
-dictionary.sqlite3 来自 ECDICT 常用词子集，共 59,026 条，采用原项目 MIT 许可。原作者版权与许可保留。
+Windows 与 macOS 均包含 59,026 条 ECDICT 常用词子集，采用 MIT 许可。词典文件为平台自用的 SQLite，不包含个人词库或学习记录。
 
-## 专题资料
+来源：[skywind3000/ECDICT](https://github.com/skywind3000/ECDICT)。许可与来源说明保留在两端 `Notices/`。
 
-来源：[hefengxian/my-ielts](https://github.com/hefengxian/my-ielts)，适配基线提交 5cef573933663c4673c6e0093f1df04e68018b1a。上游声明禁止商业用途，原书、词汇编排、音频和讲义权利归各自权利人。来源声明不是原书权利人的授权证明；Lexi 不将这些材料声明为原创或重新授权。
+## Windows 发行边界
 
-当前本地适配包括 22 个词汇章节、3,674 条词汇记录、179 条听力词、376 条阅读替换记录、100 条写作句子和配套文件。阅读来源称“538”，实际已提供的记录为 376 条，不补造缺失内容。部分视频链接失效不代表安装包缺文件，也不保证外部网站永久可用。自动生成翻译保留来源，不作为标准答案。
+Windows Git 源码：
 
-## 资源完整性
+- 保留 `windows/Assets/IELTS/README.md` 与 `catalog.example.json`。
+- 通过 `.gitignore` 排除第三方 IELTS 书籍、讲义和音频。
+- 保留考试词书目录、离线词典与项目自有代码。
 
-[STUDY-RESOURCES-MANIFEST.json](STUDY-RESOURCES-MANIFEST.json) 记录适配基线与文件 SHA256。下载附件另附 SHA256SUMS.txt，安装包和资源 ZIP 分别校验。固定适配目录在程序输出的 Assets/IELTS，应用不自动更新教材。
+Windows 自包含安装包：
 
-自备资料可按 catalog.example.json 格式接入。路径相对于资料目录，解析器限制越界访问。接入与分发第三方内容应遵循其权利和使用条件。
+- 包含离线词典、FSRS 助手和当前专题学习资料。
+- 只在发布方现有分发边界内提供资料，不自动从第三方站点抓取。
 
-## macOS 3.1.3 源码资源
+开发者如需运行依赖完整资料的本地 UI 检查，必须先确认自己拥有相关使用和构建权利，再把资料放入本地 `windows/Assets/IELTS/`。该目录不会进入公开 Git。
 
-`macos/lexi_avalonia/Assets/dictionary.sqlite3` 保留 59,026 条离线词典；词典 MIT 声明、字体与运行库通知在 `macos/lexi_avalonia/Notices/`，FSRS vendor 在 `macos/native/fsrs-optimizer/vendor/fsrs/`。
+## macOS 公开源码
 
-按现有 Git 资源约定，不导入约 502 MB、3,881 个第三方 IELTS 教材与音频文件。原文件路径、大小和 SHA256 保留在 [macOS 来源清单](MACOS-SOURCE-MANIFEST.json)。`macos/lexi_avalonia/Assets/IELTS/` 仅保留说明与 `catalog.example.json`；示例不是完整教材，不提供原始资源的下载授权。
+macOS 上游公开 Git 仓库跟踪 `macos/lexi_avalonia/Assets/IELTS/` 下的离线资源和音频。同步到本仓库时保留相同路径、内容和公开范围，不增加来源仓库之外的私人资料。
 
-有权使用原资源的开发者应在本机恢复到上述 IELTS 目录，再运行完整专题功能与回归。原应用 DMG 和此 Git 源码树的资源范围不同；已核实的安装入口见 [macOS README](../macos/README.md)。
+macOS 源码还包含：
+
+- `Assets/dictionary.sqlite3` 离线词典。
+- `Assets/Exams/` 考试词书与清单。
+- `Notices/` 依赖、词典、字体和第三方资料声明。
+- `native/fsrs-optimizer/vendor/fsrs/` 固定版本 FSRS 源码与许可。
+
+## IELTS 资料
+
+主要来源：[hefengxian/my-ielts](https://github.com/hefengxian/my-ielts)，适配基线 `5cef573933663c4673c6e0093f1df04e68018b1a`。
+
+上游声明禁止商业用途。原书、词汇编排、音频和讲义权利归各自权利人。Lexi 保留来源，不把这些内容声明为项目原创，也不由根目录许可重新授权。来源声明不等于原权利人另行授权。
+
+## 考试词书
+
+考试专题包含 IELTS、CET-4、CET-6、考研、GMAT、TOEFL、GRE 与 20 本词书。每本词书使用独立学习身份，同一单词跨书不共享未完成轮次。
+
+固定版本、来源和导入清单分别保留在：
+
+- `windows/Assets/Exams/`
+- `macos/lexi_avalonia/Assets/Exams/`
+- 两端 `Notices/`
+
+## 自备资料
+
+Windows 可按 `catalog.example.json` 格式接入自备目录。路径相对于资源目录，解析器限制越界访问。分发或公开第三方资料前，应自行确认版权、许可和商业使用条件。

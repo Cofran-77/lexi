@@ -190,14 +190,16 @@ public class PlanWordRowControl : UserControl
             Classes = { "ghost" },
             Padding = new Thickness(6, 2),
             FontSize = 11,
-            Content = "详细 ▾",
+            Content = UiText.Bilingual("详细 ▾", "Show details ▾"),
             VerticalAlignment = VerticalAlignment.Top,
             IsVisible = hasDetails
         };
         _expandToggleBtn.Click += (_, _) =>
         {
             _expandPanel.IsVisible = !_expandPanel.IsVisible;
-            _expandToggleBtn.Content = _expandPanel.IsVisible ? "收起 ▴" : "详细 ▾";
+            _expandToggleBtn.Content = _expandPanel.IsVisible
+                ? UiText.Bilingual("收起 ▴", "Hide details ▴")
+                : UiText.Bilingual("详细 ▾", "Show details ▾");
         };
         Grid.SetColumn(_expandToggleBtn, 1);
         headerRow.Children.Add(_expandToggleBtn);
@@ -279,7 +281,7 @@ public class PlanWordPickerControl : UserControl
 
         var colSelect = new TextBlock
         {
-            Text = "选择",
+            Text = UiText.Bilingual("选择", "Select"),
             FontSize = 12,
             Opacity = 0.7,
             HorizontalAlignment = HorizontalAlignment.Center
@@ -289,7 +291,7 @@ public class PlanWordPickerControl : UserControl
 
         var colWord = new TextBlock
         {
-            Text = "单词 · 音标",
+            Text = UiText.Bilingual("单词 · 音标", "Word · Phonetic"),
             FontSize = 12,
             Opacity = 0.7
         };
@@ -298,7 +300,7 @@ public class PlanWordPickerControl : UserControl
 
         var colMeaning = new TextBlock
         {
-            Text = "中文释义与详解",
+            Text = UiText.Bilingual("中文释义与详解", "Meaning & details"),
             FontSize = 12,
             Opacity = 0.7
         };

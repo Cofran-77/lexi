@@ -1,17 +1,59 @@
 # 验证记录
 
-Windows 1.2.4 工程编译通过，0 错误、6 项既有警告。专题资源逐项核对 3,881 个文件，3,852 个词条音频引用存在；资源目录通过实际解析器加载。安装包与发布附件 SHA256 一致。
+本文件只记录实际执行的检查，不把编译成功等同于全部功能或设备认证。
 
-Android 0.2.2-alpha APK 沿用原有开发签名，源码比对一致。尚未覆盖全部真机、系统版本与付费 AI 服务。
+## 发布输入核对
 
-这些检查不代表所有功能和设备已经完成验收。
+- Windows 源码版本：3.3.1。
+- macOS 源码版本：3.3.1。
+- macOS 来源提交：`d6cf5758928a937b79f535e6fdcd39038bc6e5f8`。
+- Windows 安装包：`Lexi-3.3.1-x64-setup.exe`，525,547,528 字节。
+- Windows SHA256：`30be541a845f3f42418886a15e9016e3685cdaf250b31f5392fd7607863590d6`。
+- macOS DMG：`Lexi-3.3.1-macOS-arm64.dmg`，531,257,599 字节。
+- macOS SHA256：`72df2d153e31e6c6a2cc4abd61f9420db04ad1c84d7bdefafd9d86f55642a354`。
+- 两端 Git 源树不含嵌套 `.git`、用户数据库、登录文件、私钥或真实客户端配置。
 
-## macOS 3.1.3 接入核验 · 2026-10-09
+## Windows
 
-- 在整理后的 `macos/` 运行 .NET 8 Release 编译：0 错误、3 项编译器警告（泛型约束、未使用变量、测试代码的可空参数）。构建未依赖被排除的 IELTS 资源或预编译助手。
-- `python3 macos/scripts/verify_source_integrity.py` 通过：受保护资产、原 UI 控件/事件/绑定、59,026 条离线字典与 3.1.3 发布版本保持一致。
-- 比对暂存 Git 内容与原来源哈希：644 个源码、脚本、资产和许可文件逐字节一致；原 README 与忽略规则按 monorepo 整合。Git 中不导入构建产物、私人数据、签名私钥或 3,881 个 IELTS 教材/音频文件。
-- 使用原已打包 3.1.3 应用在隔离数据目录执行 `--focus-test` 与 `--learning-test`：退出码均为 0，分别记录 49 / 121 个 PASS，无 FAIL；从这两个模式选择六张真实界面截图。该应用包含原本地资源，不能把此结果当作缺教材的 Git 树已通过全部 UI 回归。
-- 更新/新增 Markdown 的本地链接及图片路径全部可解析；Windows / Android 源码与原有截图未改动。
+- 最终发布树完成 `dotnet publish`，自包含目录生成成功。
+- Rust FSRS 助手以 release 模式构建成功，最终 helper 为 2,321,920 字节。
+- 安装包资源注入后通过完整 IELTS 校验：`IeltsVerified=True`。
+- 打包复制 4,147 个文件，排除 5 个发布边界文件，生成 4,177 条卸载记录。
+- `test-packaging.ps1` 全部 PASS。
+- 最终发布树的 `--visual123-test`：138 PASS，0 FAIL。
+- 最终发布树的 `--learning-integration`：29 PASS，0 FAIL。
+- 上述运行使用独立 `LEXI_DATA_DIR`，未读取或改写正在使用的用户数据。
+- 已知边界：`--redesign-test` 在宽度 1100 的 exam topics grid placement 断言失败；因此不宣称 Windows 全量 UI 测试通过。
+- 最终 EXE 由已发布安装包重新计算 SHA256 并核对为上文记录值。
 
-此次核验没有重跑全部 macOS 回归、签名打包链或其他两端功能测试；本仓库现有 CI 仍只编译 Windows / Android。原源码的 CRLF、空白和文件模式保留，文档改动通过单独 diff 空白检查。
+## macOS
+
+- 从上游提交 `d6cf5758928a937b79f535e6fdcd39038bc6e5f8` 只读同步源码，不修改或推送上游仓库。
+- 同步前逐文件比对 4,612 个上游跟踪文件：Missing 0、Extra 0、Changed 0、Hash errors 0。
+- 在 LF 规范化后的最终暂存导出树中运行：
+
+```sh
+cd macos
+python3 -X utf8 -B scripts/verify_source_integrity.py
+```
+
+- 源码哈希、UI 契约、59,026 条离线词典、3.3.1 应用身份与卸载门禁均通过。
+- 可执行位与上游 Git tree 对齐后复核。
+- DMG 为上游 3.3.1 Apple Silicon 发布资产；最终 SHA256 与上文记录值一致。
+
+## 隐私检查
+
+- 扫描 Token、API Key、Cookie、Session、私钥、service role 配置、DPAPI 和真实环境文件。
+- 排除个人词库、用户 SQLite、学习记录、计划、日志、缓存和签名材料。
+- Windows 打包清理规则及其 `test-packaging.ps1` 检查覆盖用户数据排除项。
+- 核对 `social-public.json` 不进入 Git。
+- 人工检查 Windows 5 张与 macOS 9 张截图，未发现账号、头像、通知、Cookie、Token 或本机路径。
+- 核对 macOS 公开源码保留的 `dictionary.sqlite3`、考试词书和 IELTS 资源与上游公开范围一致，不属于用户词库或学习记录。
+- 最终暂存树复核 947 个历史跟踪路径全部恢复，无嵌套 `.git`，安装包与 DMG 仅作为 Release 资产。
+
+## Release 后核对
+
+- 回下载 EXE、DMG 和 `.sha256`。
+- 核对资产名、字节数和 SHA256。
+- 检查 README 图片、下载链接与 Release 页面。
+- 确认提交作者、提交者、标签和 GitHub 上传账户均为 DespairJasper。

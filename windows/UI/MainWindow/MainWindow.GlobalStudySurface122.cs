@@ -34,7 +34,7 @@ public partial class MainWindow
         _globalStudyContent = new Border { Child = reading, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
         Grid.SetRow(_globalStudyContent,1);layout.Children.Add(_globalStudyContent);
         _globalStudySurface = new Border { Name = "UnifiedFocusSurface", Child = layout, IsVisible = false };
-        _globalStudySurface.Bind(Border.BackgroundProperty, this.GetResourceObservable("PaperBrush"));
+        _globalStudySurface.Bind(Border.BackgroundProperty, this.GetResourceObservable("StudyGradientBrush"));
         Grid.SetRow(_globalStudySurface,1); _globalStudySurface.SetValue(Panel.ZIndexProperty,150);
         ((Grid)((Grid)RootWindowBorder.Child!).Children[0]).Children.Add(_globalStudySurface);
         _globalStudySurface.SizeChanged += (_,_) => ResizeGlobalStudyContent();
@@ -55,8 +55,14 @@ public partial class MainWindow
     private void ResizeGlobalStudyContent()
     {
         if(_globalStudySurface==null || _globalStudyContent==null || _globalStudyCanvas==null)return;
-        _globalStudyContent.Width=_globalStudyContent.MaxWidth=Math.Min(680,Math.Max(260,_globalStudySurface.Bounds.Width-64));
-        _globalStudyContent.MaxHeight=Math.Max(180,_globalStudySurface.Bounds.Height-100);
+        var surfaceWidth=_globalStudySurface.Bounds.Width;
+        if(!double.IsFinite(surfaceWidth)||surfaceWidth<=0)surfaceWidth=Bounds.Width;
+        if(!double.IsFinite(surfaceWidth)||surfaceWidth<=0)surfaceWidth=Width;
+        var surfaceHeight=_globalStudySurface.Bounds.Height;
+        if(!double.IsFinite(surfaceHeight)||surfaceHeight<=0)surfaceHeight=Bounds.Height;
+        if(!double.IsFinite(surfaceHeight)||surfaceHeight<=0)surfaceHeight=Height;
+        _globalStudyContent.Width=_globalStudyContent.MaxWidth=Math.Min(680,Math.Max(260,surfaceWidth-64));
+        _globalStudyContent.MaxHeight=Math.Max(180,surfaceHeight-100);
         var word=_globalStudyCanvas.GetVisualDescendants().OfType<SelectableTextBlock>().FirstOrDefault();
         if(word!=null)word.FontSize=Math.Clamp(48-word.Text?.Length*.4??40,36,44);
     }
@@ -93,10 +99,11 @@ public partial class MainWindow
         else if(_currentPage=="learning" && _dailyLearningSession!=null && _activeLearningPlan!=null)
         {
             var round=_dailyLearningSession.Round;
-            var word=round.HasCurrent?_activeLearningPlan.Words.Single(w=>w.Id==round.Current):null;
+            var displayWordId=_planRatedPending?_planRatedWordId:round.Current;
+            var word=displayWordId is not null?_activeLearningPlan.Words.Single(w=>w.Id==displayWordId):null;
             model.Word=word?.Word??"";model.Phonetic=word?.Phonetic??"";model.Meaning=word?.Meaning??"";
             model.Details=word?.Definition??"";model.Example=word?.Example??"";
-            model.MeaningVisible=round.CurrentStep==StudyStep.Learn||_planAnswerVisible;
+            model.MeaningVisible=_planRatedPending||round.CurrentStep==StudyStep.Learn||_planAnswerVisible;
             _globalStudyProgress.Text=$"{_activeLearningPlan.Name} · {round.Completed} / {round.Total}";
         }
         else

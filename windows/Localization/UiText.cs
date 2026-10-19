@@ -11,24 +11,36 @@ internal static class UiText
 {
     internal static string Language { get; private set; } = "zh-CN";
     private static readonly Dictionary<string, (string Chinese, string English)> Rendered = new(StringComparer.Ordinal);
+    private static readonly HashSet<string> MissingEnglish = new(StringComparer.Ordinal);
     private sealed class Caption { public string Source = ""; public string Last = ""; }
-    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<Control, Caption> Captions = new();
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<Control, Dictionary<string, Caption>> Captions = new();
+    internal static IReadOnlyCollection<string> MissingEnglishKeysForAudit => MissingEnglish;
     internal static string Normalize(string? language) => language == "en" ? "en" : "zh-CN";
     internal static string Text(string chinese)
     {
-        var english = UiCatalog.English.GetValueOrDefault(chinese, chinese);
+        if (!UiCatalog.English.TryGetValue(chinese, out var english))
+        {
+            MissingEnglish.Add(chinese);
+            english = chinese;
+        }
         Remember(chinese, english);
         return Language == "en" ? english : chinese;
     }
     internal static string Bilingual(string chinese, string english, string? language = null)
     {
+        UiCatalog.English.TryAdd(chinese, english);
         Remember(chinese, english);
         return (language ?? Language) == "en" ? english : chinese;
     }
     internal static string Format(FormattableString value)
     {
         var chinese = value.ToString(CultureInfo.CurrentCulture);
-        var english = string.Format(CultureInfo.CurrentCulture, UiCatalog.English.GetValueOrDefault(value.Format, value.Format), value.GetArguments());
+        if (!UiCatalog.English.TryGetValue(value.Format, out var format))
+        {
+            MissingEnglish.Add(value.Format);
+            format = value.Format;
+        }
+        var english = string.Format(CultureInfo.CurrentCulture, format, value.GetArguments());
         Remember(chinese, english);
         return Language == "en" ? english : chinese;
     }
@@ -43,9 +55,55 @@ internal static class UiText
         if (Rendered.TryGetValue(rendered, out var pair)) return Language == "en" ? pair.English : pair.Chinese;
         return Text(rendered);
     }
-    internal static string RedisplayFor(Control owner, string rendered)
+    internal static string RuntimeText(string message)
     {
-        var caption = Captions.GetOrCreateValue(owner);
+        if (Language != "en" || string.IsNullOrEmpty(message)) return message;
+        if (UiCatalog.English.TryGetValue(message, out var exact)) return exact;
+
+        // Status messages are often built from localized templates at runtime.
+        // Match the checked-in templates before falling back to a prefix such as
+        // "Could not save: " so exception details remain intact.
+        foreach (var (chinese, english) in UiCatalog.English
+                     .Where(pair => pair.Key.Contains('{'))
+                     .OrderByDescending(pair => pair.Key.Length))
+        {
+            var placeholders = Regex.Matches(chinese, @"\{(\d+)\}")
+                .Select(match => match.Groups[1].Value)
+                .Distinct()
+                .OrderBy(value => value, StringComparer.Ordinal)
+                .ToList();
+            if (placeholders.Count == 0) continue;
+            var pattern = Regex.Escape(chinese);
+            var groupByIndex = new Dictionary<int, int>();
+            for (var group = 1; group <= placeholders.Count; group++)
+            {
+                var index = int.Parse(placeholders[group - 1], CultureInfo.InvariantCulture);
+                pattern = pattern.Replace(Regex.Escape("{" + index + "}"), "(.*?)", StringComparison.Ordinal);
+                groupByIndex[index] = group;
+            }
+            var match = Regex.Match(message, "^" + pattern + "$", RegexOptions.Singleline);
+            if (!match.Success) continue;
+            return Regex.Replace(english, @"\{(\d+)\}", replacement =>
+            {
+                var index = int.Parse(replacement.Groups[1].Value, CultureInfo.InvariantCulture);
+                return groupByIndex.TryGetValue(index, out var group) ? match.Groups[group].Value : "";
+            });
+        }
+
+        foreach (var (chinese, english) in UiCatalog.English
+                     .Where(pair => pair.Key.EndsWith('：') && message.StartsWith(pair.Key, StringComparison.Ordinal))
+                     .OrderByDescending(pair => pair.Key.Length))
+            return english + message[chinese.Length..];
+        return message;
+    }
+    internal static string RedisplayFor(Control owner, string rendered, string slot = "text")
+    {
+        var captions = Captions.GetOrCreateValue(owner);
+        if (!captions.TryGetValue(slot, out var caption))
+        {
+            caption = new Caption();
+            captions[slot] = caption;
+        }
         // Keep each control's source: several Chinese captions can legitimately
         // share an English translation, so a global reverse map is ambiguous.
         if (caption.Source.Length == 0 || rendered != caption.Last && rendered != Text(caption.Source))
@@ -53,6 +111,8 @@ internal static class UiText
                 : Rendered.TryGetValue(rendered, out var pair) ? pair.Chinese : rendered;
         return caption.Last = Text(caption.Source);
     }
+    internal static bool ContainsChinese(string? text) =>
+        !string.IsNullOrEmpty(text) && text.Any(ch => ch is >= '\u3400' and <= '\u9fff' or >= '\uf900' and <= '\ufaff');
     internal static void Apply(string? language)
     {
         Language = Normalize(language);

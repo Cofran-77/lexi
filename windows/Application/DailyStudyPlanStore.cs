@@ -61,7 +61,8 @@ public sealed class DailyStudyPlanStore
             (p.OriginalWordIds.Count > 0 && (p.OriginalWordIds.Count != p.Words.Count ||
                 !new HashSet<string>(p.OriginalWordIds, StringComparer.Ordinal).SetEquals(p.Words.Select(w => w.Id)))) ||
             (p.Status == DailyStudyPlanStatus.Completed) != (p.CompletedWordIds.Count == p.Words.Count) ||
-            (p.LastBatchCompletedDate is not null && p.CompletedWordIds.Count == 0)) ||
+            (p.LastBatchCompletedDate is not null && p.CompletedWordIds.Count == 0) ||
+            (p.LastReviewCompletedDate is not null && p.CompletedWordIds.Count == 0)) ||
             plans.Select(p => p.Id).Distinct(StringComparer.Ordinal).Count() != plans.Count)
             throw new InvalidDataException("计划结构无效。");
     }

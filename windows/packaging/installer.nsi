@@ -3,11 +3,19 @@ Unicode true
 !include "LogicLib.nsh"
 
 !ifndef VERSION
-  !define VERSION "1.2.4"
+  !define VERSION "3.3.1"
 !endif
 
 !ifndef OUTDIR
   !define OUTDIR "..\..\Lexi-${VERSION}-Windows-x64"
+!endif
+
+!ifndef STAGING
+  !error "STAGING must point to the clean packaging staging directory."
+!endif
+
+!ifndef UNINSTALL_LIST
+  !error "UNINSTALL_LIST must point to the generated uninstall file list."
 !endif
 
 Name "Lexi ${VERSION}"
@@ -102,7 +110,7 @@ FunctionEnd
 Section "Lexi" SEC01
   SetShellVarContext current
   SetOutPath "$INSTDIR"
-  File /r /x "*.pdb" "..\publish\*.*"
+  File /r /x "*.pdb" "${STAGING}\*.*"
   WriteUninstaller "$INSTDIR\Uninstall.exe"
 !ifndef TEST_ROOT
   CreateShortcut "$DESKTOP\Lexi 生词本（新版）.lnk" "$INSTDIR\Lexi.exe"
@@ -128,12 +136,13 @@ Section "Uninstall"
   RMDir "$SMPROGRAMS\Lexi"
 !endif
   ; Remove only packaged files; never recursively delete a user-selected directory.
-  !include "lexi-uninstall-files.nsh"
+  !include "${UNINSTALL_LIST}"
   Delete "$INSTDIR\Uninstall.exe"
   RMDir "$INSTDIR"
 !ifndef TEST_ROOT
   DeleteRegKey HKCU "Software\LexiNative"
   DeleteRegKey HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\LexiNative"
+  ; The GitHub sign-in handler is registered per user on first login; remove it with the app.
+  DeleteRegKey HKCU "Software\Classes\com.lexi.windows"
 !endif
 SectionEnd
-

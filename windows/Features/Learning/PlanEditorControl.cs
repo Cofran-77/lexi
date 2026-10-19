@@ -255,10 +255,10 @@ public class PlanEditorControl : UserControl
             return;
         }
 
-        var (days, desc) = PlanCreationState.CalculateEstimate(_wordCount, daily);
+        var estimate = PlanCreationState.CalculateSchedule(_wordCount, daily);
         SummaryBlock.Text = UiText.Bilingual(
-            $"选词规模：共 {_wordCount} 词 · 每日学习 {daily} 词 · {desc}",
-            $"Scope: {_wordCount} words · Daily target: {daily} · {desc}");
+            $"选词规模：共 {_wordCount} 词 · 每日学习 {daily} 词 · {estimate.ChineseDescription}",
+            $"Scope: {_wordCount} words · Daily target: {daily} · {estimate.EnglishDescription}");
     }
 
     /// <summary>

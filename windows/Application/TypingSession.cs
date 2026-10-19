@@ -22,12 +22,13 @@ public sealed class TypingSession
     public int Retries { get; private set; }
     private readonly HashSet<int> _revealed = [];
     private bool _answerViewed;
+    public bool AnswerViewed => _answerViewed;
     public int AssistedCount { get; private set; }
     public int UnassistedCorrectCount { get; private set; }
     public string HintText => Current == null ? "" : string.Concat(Normalize(Current.Word).Select((ch,i)=>char.IsLetter(ch)&&!_revealed.Contains(i)?'_':ch));
     public bool RevealHint()
     {
-        if (!Hints || Current == null || Outcome == TypingOutcome.Correct) return false;
+        if (Current == null || Outcome is TypingOutcome.Correct or TypingOutcome.Finished) return false;
         var target=Normalize(Current.Word);
         for(var i=0;i<target.Length;i++) if(char.IsLetter(target[i])&&!_revealed.Contains(i))
         { _revealed.Add(i); return true; }
@@ -59,6 +60,11 @@ public sealed class TypingSession
         var target = Normalize(Current.Word);
         if (input.Length > 0 && !_clock.IsRunning) _clock.Start();
         Input = input;
+        if (Outcome == TypingOutcome.Retry && input.Length > 0)
+        {
+            FailedInput = "";
+            ErrorPositions = [];
+        }
         // No-hint mode intentionally exposes no per-letter correctness before full length.
         if (!Hints && input.Length < target.Length) return Outcome = TypingOutcome.Pending;
         var errors = Enumerable.Range(0, Math.Max(input.Length, target.Length))

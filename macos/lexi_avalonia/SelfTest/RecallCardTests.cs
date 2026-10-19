@@ -50,6 +50,7 @@ public static class RecallCardTests
             C<TextBox>("VocabSearchInput").Text = "does-not-match-anything";
             w.Width = 840; w.Height = 600;
             Click("NavReview");
+            Click("ReviewStartAllBtn");
             check(C<TextBlock>("ReviewWordText").Text == "recall-one" && C<TextBlock>("ReviewRemainingText").Text == "已完成 0/2 · 剩余 2",
                 "recall ignores archive filters, excludes future words and counts this round");
             check(!C<Border>("ReviewAnswer").IsVisible && C<TextBlock>("ReviewMeaningText").Text == "" && C<Grid>("ReviewRatingBar").IsVisible,
@@ -77,6 +78,11 @@ public static class RecallCardTests
                 && Label("ReviewUnfamiliarBtn") == "记错了  E", "answer footer switches to Next Space and Wrong E");
             check(C<TextBlock>("ReviewRemainingText").Text == "已完成 0/2 · 剩余 2" && Round().Unsure == 1 && Round().Completed == 0,
                 "unsure does not count as remembered and stays in this round");
+            await Task.Delay(80);
+            var ratingBar=C<Grid>("ReviewRatingBar"); var nextAction=C<Button>("ReviewRememberBtn"); var wrongAction=C<Button>("ReviewUnfamiliarBtn");
+            var nextCenter=nextAction.TranslatePoint(new Point(nextAction.Bounds.Width/2,0),ratingBar)!.Value.X;
+            var wrongCenter=wrongAction.TranslatePoint(new Point(wrongAction.Bounds.Width/2,0),ratingBar)!.Value.X;
+            check(Math.Abs(nextCenter+wrongCenter-ratingBar.Bounds.Width)<1 && Math.Abs(nextCenter-ratingBar.Bounds.Width/4)<1, "review answer actions are symmetric about page center");
             await Snapshot("review-back-long");
             var button = C<Button>("ReviewRememberBtn"); var corner = button.TranslatePoint(new Point(button.Bounds.Width, button.Bounds.Height), w);
             check(button.IsEffectivelyVisible && corner.HasValue && corner.Value.Y < 600 && corner.Value.X < 840, "long answer keeps rating actions inside 840x600");
@@ -128,6 +134,8 @@ public static class RecallCardTests
             check(C<TextBlock>("ReviewHintText").Text!.Contains("已改判为忘记") && Round().Completed == 0 && Round().Forgot == 1,
                 "reclassification returns the word to this round");
             check(!C<Button>("ReviewUnfamiliarBtn").IsVisible, "forgot cannot be reclassified twice");
+            await Task.Delay(80);
+            check(Math.Abs(C<Button>("ReviewRememberBtn").TranslatePoint(new Point(C<Button>("ReviewRememberBtn").Bounds.Width/2,0),C<Grid>("ReviewRatingBar"))!.Value.X-C<Grid>("ReviewRatingBar").Bounds.Width/2)<1, "single review next action is centered after forgotten reclassification");
 
             // 模糊与忘记的词必须在本轮再次出现，并且要攒够 3 次「认识」才算完全记住。
             Press(Key.Space); await Task.Delay(450);
@@ -163,7 +171,7 @@ public static class RecallCardTests
             var beforeUndo = Stored("recall-one");
             // 模拟新的一天：清掉今天的同日去重记录，让这个词可以再次推进阶段。
             Sql($"DELETE FROM review_logs WHERE word_id = {beforeUndo.Id} AND action = 'batch_review' AND log_date = '{DateTime.Today:yyyy-MM-dd}'");
-            store.ExecuteBatch([beforeUndo.Id], "today"); Call("RefreshWords"); Click("NavLookup"); Click("NavReview");
+            store.ExecuteBatch([beforeUndo.Id], "today"); Call("RefreshWords"); Click("NavLookup"); Click("NavReview"); Click("ReviewStartAllBtn");
             Press(Key.Q); await Task.Delay(40);
             check(Stored("recall-one").Stage == beforeUndo.Stage + 1, "know it advances exactly one stage");
             Press(Key.Space, KeyModifiers.Alt);
@@ -188,7 +196,7 @@ public static class RecallCardTests
             Press(Key.Q); await Task.Delay(40);
             // 裁定 O-1（findings.md §P）：`today` 是显式手动覆盖，会把已建 FSRS 卡的词重新推回今日队列。
             store.ExecuteBatch([beforeUndo.Id], "today");
-            Call("RefreshWords"); Click("NavLookup"); Click("NavReview");
+            Call("RefreshWords"); Click("NavLookup"); Click("NavReview"); Click("ReviewStartAllBtn");
             // 非空转前置条件：队列真的被重建过（否则下面看到的 ReviewWordText 只是上一张卡残留的文本，
             // 空队列时 OnReviewRatingAsync 会直接 return，后面两条断言都会假绿）。
             check(Round().HasCurrent && Round().Current.Word == "recall-one" && C<Grid>("ReviewRatingBar").IsVisible,
@@ -203,7 +211,7 @@ public static class RecallCardTests
             check(Stored("recall-one").Stage == reviewedStage, "same-day rating preserves scheduling idempotence");
 
             // 页面切换取消未完成的动画后，重新打开不能留下半透明的卡。
-            Click("NavLookup"); Click("NavReview");
+            Click("NavLookup"); Click("NavReview"); Click("ReviewStartAllBtn");
             await Task.Delay(500);
             check(C<Border>("ReviewCard").Opacity == 1 && Math.Abs(CardY()) < 0.01, "page navigation cancels old animation without fading the reopened deck");
 
@@ -211,7 +219,7 @@ public static class RecallCardTests
             C<CheckBox>("OpaqueMaterialBox").IsChecked = true;
             C<CheckBox>("ReduceMotionBox").IsChecked = true;
             store.ExecuteBatch([beforeUndo.Id], "today");
-            Call("RefreshWords"); Click("NavLookup"); Click("NavReview");
+            Call("RefreshWords"); Click("NavLookup"); Click("NavReview"); Click("ReviewStartAllBtn");
             var instant = (Task)Call("AdvanceReviewAsync")!;
             check(instant.IsCompleted && C<Border>("ReviewCard").Opacity == 1 && Math.Abs(CardY()) < 0.01,
                 "reduced motion changes cards immediately without transient opacity");
@@ -235,6 +243,46 @@ public static class RecallCardTests
                 && !unionDue.Any(word => word.Word == "recall-one")
                 && !deckDue.Any(word => word.Word == "recall-one"),
                 "master keeps a word out of today's deck even while its FSRS card is due");
+
+            // 回归（3.2.3 重发）：用户真机报告「评分点击一次后界面就动弹不得」。
+            // 真机路径：评分 → 揭示答案 → 焦点落到「下一词 Space」按钮上，按钮会把 Space 消化成 Click；
+            // 这些断言只走真实按钮 Click 和「聚焦控件上的」键事件，不再直发 PageReview（那会绕过按钮焦点链路）。
+            // 首遍第一张固定、其余乱序 → 断言用 Round() 的当前词对照，不硬编码第二张是谁。
+            C<CheckBox>("ReduceMotionBox").IsChecked = true;
+            store.AddWord("recall-lock-a", "/lɒk/", "卡死回归甲", "");
+            store.AddWord("recall-lock-b", "/lɒk/", "卡死回归乙", "");
+            store.AddWord("recall-lock-c", "/lɒk/", "卡死回归丙", "");
+            var lockIds = store.GetAllWords().Where(x => x.Word.StartsWith("recall-lock-", StringComparison.Ordinal)).Select(x => x.Id).ToArray();
+            store.ExecuteBatch(lockIds, "today");
+            Call("RefreshWords"); Click("NavLookup"); Click("NavReview"); Click("ReviewStartAllBtn");
+            check(C<TextBlock>("ReviewWordText").Text == "recall-lock-a" && C<Grid>("ReviewRatingBar").IsVisible,
+                "deadlock regression opens a non-empty fresh review deck");
+            // 键盘路径复现用户真机操作：鼠标点击评分按钮 → 产品必须自己把焦点交给「下一词 Space」按钮，
+            // 然后空格键要能继续换卡。这里绝不手动 Focus——焦点没落到按钮上就必须失败（这正是真机空格失效的根因）。
+            var lockShown = C<TextBlock>("ReviewWordText").Text;
+            Click("ReviewRememberBtn"); await Task.Delay(60);
+            check(C<Border>("ReviewAnswer").IsVisible && Label("ReviewRememberBtn") == "下一词  Space",
+                "mouse rating reveals the answer and renames the action to Next word");
+            var focusedAfterReveal = w.FocusManager?.GetFocusedElement() as Control;
+            check(ReferenceEquals(focusedAfterReveal, C<Button>("ReviewRememberBtn")),
+                "revealing the answer hands keyboard focus to the Next word button");
+            (focusedAfterReveal ?? w).RaiseEvent(new KeyEventArgs { RoutedEvent = InputElement.KeyDownEvent, Key = Key.Space });
+            (focusedAfterReveal ?? w).RaiseEvent(new KeyEventArgs { RoutedEvent = InputElement.KeyUpEvent, Key = Key.Space });
+            await Task.Delay(60);
+            check(Round().Completed == 1 && C<TextBlock>("ReviewWordText").Text == Round().Current.Word
+                && C<TextBlock>("ReviewWordText").Text != lockShown,
+                "Space advances the deck right after a mouse rating");
+            var lockSecond = C<TextBlock>("ReviewWordText").Text;
+            Click("ReviewRememberBtn"); await Task.Delay(60);
+            Click("ReviewRememberBtn"); await Task.Delay(60);
+            check(Round().Completed == 2 && C<TextBlock>("ReviewWordText").Text == Round().Current.Word
+                && C<TextBlock>("ReviewWordText").Text != lockSecond,
+                "mouse click on Next word advances the deck instead of freezing");
+            var lockThird = C<TextBlock>("ReviewWordText").Text;
+            Click("ReviewRememberBtn"); await Task.Delay(60);
+            Click("ReviewUnfamiliarBtn"); await Task.Delay(80);
+            check(C<TextBlock>("ReviewWordText").Text == lockThird && C<TextBlock>("ReviewHintText").Text!.Contains("已改判为忘记"),
+                "mouse click on Wrong E after a rating reclassifies instead of freezing");
         }
         finally
         {

@@ -33,16 +33,16 @@ public partial class MainWindow
         if (item.OptSynonyms) modules.Add("synonyms");
         if (item.OptAntonyms) modules.Add("antonyms");
         if (item.OptPhrases) modules.Add("phrases");
-        if (modules.Count == 0) { item.AiStatusText = "请先勾选需要生成的内容。"; return; }
+        if (modules.Count == 0) { item.AiStatusText = UiText.Text("请先勾选需要生成的内容。"); return; }
         if (string.IsNullOrWhiteSpace(_settings.ApiKey))
         {
-            item.AiStatusText = "请先在「模型与偏好」配置 API Key。";
+            item.AiStatusText = UiText.Text("请先在「模型与偏好」配置 API Key。");
             SetStatus(item.AiStatusText); ShowPage("settings"); return;
         }
         using var cts = new CancellationTokenSource();
         _rowAiRequests[item.Id] = cts;
         item.IsGeneratingAi = true;
-        item.AiStatusText = "正在生成所选内容…";
+        item.AiStatusText = UiText.Text("正在生成所选内容…");
         try
         {
             var result = await _aiService.GenerateExpansionAsync(item.Word, modules, _settings, cts.Token, item.Archive.SourceExcerpt);
@@ -51,8 +51,8 @@ public partial class MainWindow
             if (result == null) return;
             item.AiStatusText = result.HasContent ? "已生成并保存，可在编辑档案中修订。" : "没有适合的扩展内容；不编造固定搭配。";
         }
-        catch (OperationCanceledException) { item.AiStatusText = "已取消生成。"; }
-        catch (Exception ex) { item.AiStatusText = "生成失败：" + ex.Message; }
+        catch (OperationCanceledException) { item.AiStatusText = UiText.Text("已取消生成。"); }
+        catch (Exception ex) { item.AiStatusText = UiText.Text("生成失败：") + ex.Message; }
         finally
         {
             item.IsGeneratingAi = false;

@@ -4,6 +4,7 @@ using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Interactivity;
+using Avalonia.Threading;
 using Lexi.Controls;
 
 namespace Lexi;
@@ -11,6 +12,9 @@ namespace Lexi;
 /// <summary>Focused study surface shared by lookup and archive decks.</summary>
 public partial class MainWindow
 {
+    private static readonly SolidColorBrush StreakKnownBrush = new(Color.Parse("#268D98"));
+    private static readonly SolidColorBrush StreakEmptyBrush = new(Color.Parse("#BFC9CFD4"));
+
     private Border? _focusHost;
     private StudyCanvasControl? _focusCanvas;
     private Button? _focusEntry;
@@ -35,7 +39,7 @@ public partial class MainWindow
     private void InitializeFocus()
     {
         if (_focusHost != null) return;
-        _focusEntry = new Button { Name = "FocusEntryButton", Content = "专注学习", Padding = new Thickness(12, 7) };
+        _focusEntry = new Button { Name = "FocusEntryButton", Content = UiText.Text("专注学习"), Padding = new Thickness(12, 7) };
         _focusEntry.Classes.Add("secondary"); _focusEntry.Click += (_, _) => EnterFocusFromLookup();
         if (LookupResultCard.Child is Panel headerHost)
         {
@@ -53,7 +57,7 @@ public partial class MainWindow
         top.Children.Add(back);
         _focusProgress = new TextBlock { Name = "FocusProgress", FontSize = 15, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(22, 0), TextWrapping = TextWrapping.Wrap };
         Grid.SetColumn(_focusProgress, 1); top.Children.Add(_focusProgress);
-        _focusStreak = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 5, Margin = new Thickness(0, 0, 16, 0), VerticalAlignment = VerticalAlignment.Center };
+        _focusStreak = new StackPanel { Orientation = Orientation.Vertical, Spacing = 2, Margin = new Thickness(0, 0, 16, 0), VerticalAlignment = VerticalAlignment.Center };
         Grid.SetColumn(_focusStreak, 2); top.Children.Add(_focusStreak);
         _focusTopActions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, VerticalAlignment = VerticalAlignment.Center };
         Grid.SetColumn(_focusTopActions, 3); top.Children.Add(_focusTopActions);
@@ -71,6 +75,7 @@ public partial class MainWindow
         bottom.Children.Add(_focusFeedback); bottom.Children.Add(_focusActions);
         Grid.SetRow(bottom, 2); layout.Children.Add(bottom);
         _focusHost = new Border { Name = "FocusHost", Child = layout, IsVisible = false, Focusable = true };
+        _focusHost.Bind(Border.BackgroundProperty, this.GetResourceObservable("StudyGradientBrush"));
         Grid.SetRow(_focusHost, 1);
         _focusHost.SetValue(Panel.ZIndexProperty, 100);
         ((Grid)RootWindowBorder.Child!).Children.Add(_focusHost);
@@ -87,6 +92,7 @@ public partial class MainWindow
     private void EnterFocusFromLookup()
     {
         if (_focusActive || _restoring || !_databaseAvailable || !LookupResultCard.IsVisible) return;
+        _focusScopeSource = "lookup";
         _focusIeltsWords.Clear();
         var text = ResultWordText.Text?.Trim(); if (string.IsNullOrWhiteSpace(text)) return;
         var archive = _allWords.FirstOrDefault(w => w.Word.Equals(text, StringComparison.OrdinalIgnoreCase));
@@ -105,12 +111,13 @@ public partial class MainWindow
     {
         if (!_focusActive) return;
         PersistLearningSurface("focus");
-        _focusActive = false; _focusHost!.IsVisible = false; PageLookup.IsVisible = _focusPreviousPage == "lookup"; LookupPageHost.IsVisible = _focusPreviousPage == "lookup";
+        var returnPage = NormalizeFocusReturnPage(_focusPreviousPage);
+        _focusActive = false;
+        _focusHost!.IsVisible = false;
         SetGlobalFocusChrome(false);
-        PageVocab.IsVisible = _focusPreviousPage == "vocab"; PageReview.IsVisible = _focusPreviousPage == "review"; PageSettings.IsVisible = _focusPreviousPage == "settings"; _learningHubPage.IsVisible = _focusPreviousPage == "learning";
-        if (_ieltsPage != null) _ieltsPage.IsVisible = _focusPreviousPage == "ielts";
-        if (_quotesPage != null) _quotesPage.IsVisible = _focusPreviousPage == "quotes";
-        _focusEntry?.Focus(); SetStatus("已退出专注学习，当前词库进度已保留。");
+        ShowPage(returnPage);
+        FocusVisiblePageEntry();
+        SetStatus("已退出专注学习，当前词库进度已保留。");
     }
 
     private void RenderFocus()
@@ -118,13 +125,19 @@ public partial class MainWindow
         if (!_focusActive || _focusRound == null) return;
         _focusActions!.Children.Clear();
         _focusTopActions!.Children.Clear();
-        _focusProgress!.Text = $"专注学习 · 已完成 {_focusRound.Completed}/{_focusRound.Total} · 连击 {_focusRound.CurrentStreak}/{_focusRound.CurrentTarget}";
+        _focusProgress!.Text = UiText.Format(
+            $"专注学习 · 已完成 {_focusRound.Completed}/{_focusRound.Total} · 连击 {_focusRound.CurrentStreak}/{_focusRound.CurrentTarget}");
         _focusStreak!.Children.Clear();
         for (var index = 0; index < StudyRound<string>.RequiredStreak; index++)
         {
-            var dot = new Border { Width = 16, Height = 6, CornerRadius = new CornerRadius(3) };
-            dot.Bind(Border.BackgroundProperty, this.GetResourceObservable(index < _focusRound.CurrentStreak ? "PrimaryGreen" : "LineBrush"));
-            _focusStreak.Children.Add(dot);
+            var bottomUpIndex = StudyRound<string>.RequiredStreak - 1 - index;
+            _focusStreak.Children.Add(new Border
+            {
+                Width = 3,
+                Height = 7,
+                CornerRadius = new CornerRadius(1.5),
+                Background = bottomUpIndex < _focusRound.CurrentStreak ? StreakKnownBrush : StreakEmptyBrush
+            });
         }
         var current = _focusRated ? _focusRatedWord ?? "" : _focusRound.HasCurrent ? _focusRound.Current : "";
         var sourceWord = _focusIeltsWords.GetValueOrDefault(current);
@@ -149,10 +162,16 @@ public partial class MainWindow
             Meaning = meaning,
             Details = details,
             MeaningVisible = _focusAnswerVisible,
-            Placeholder = _focusAnswerVisible ? "" : "先回忆这个词的含义"
+            Placeholder = _focusAnswerVisible ? "" : UiText.Text("先回忆这个词的含义")
         });
         PersistLearningSurface("focus");
-        _focusFeedback!.Text = _focusRound.IsFinished ? "本轮已完成。你可以退出专注。" : _focusRound.CurrentStep == StudyStep.Learn ? "学习卡：看过释义后开始回忆。" : _focusRated ? (_focusLastRating == StudyRating.Known ? "已记为认识。" : "稍后会再次出现。") : "先自己回忆，再揭晓释义。";
+        _focusFeedback!.Text = UiText.Text(_focusRound.IsFinished
+            ? "本轮已完成。你可以退出专注。"
+            : _focusRound.CurrentStep == StudyStep.Learn
+                ? "学习卡：看过释义后开始回忆。"
+                : _focusRated
+                    ? (_focusLastRating == StudyRating.Known ? "已记为认识。" : "稍后会再次出现。")
+                    : "先自己回忆，再揭晓释义。");
         if(_focusCanvas!=null)_focusCanvas.Speak=()=>GetLearningAudio().Play(FocusDisplayWord(current),sourceWord==null?null:IeltsCatalog.ResolveAsset(sourceWord.AudioPath));
         if (_focusRound.HasCurrent && !_focusRated)
         {
@@ -168,6 +187,7 @@ public partial class MainWindow
         {
             if (_focusUndo != null) _focusActions.Children.Add(FocusButton("撤销", UndoFocus));
             if (_focusRated && _focusLastRating != StudyRating.Forgot) _focusActions.Children.Add(FocusButton("记错了，改为忘记", ReclassifyFocus));
+            ScheduleFocusPrimary();
             return;
         }
         if (_focusRated)
@@ -175,6 +195,7 @@ public partial class MainWindow
             _focusActions.Children.Add(FocusButton("撤销", UndoFocus));
             if (_focusLastRating != StudyRating.Forgot) _focusActions.Children.Add(FocusButton("记错了，改为忘记", ReclassifyFocus));
             _focusActions.Children.Add(FocusButton("下一词", () => { _focusRated = false; _focusAnswerVisible = false; RenderFocus(); }, true));
+            ScheduleFocusPrimary();
             return;
         }
         if (_focusRound.CurrentStep == StudyStep.Learn)
@@ -201,7 +222,51 @@ public partial class MainWindow
             _focusActions.Children.Add(FocusButton("撤销", UndoFocus));
             if (!_focusRound.IsFinished) _focusActions.Children.Add(FocusButton("下一词", () => { _focusRated = false; _focusAnswerVisible = false; RenderFocus(); }, true));
         }
+        ScheduleFocusPrimary();
     }
+
+    private void ScheduleFocusPrimary()
+    {
+        Dispatcher.UIThread.Post(() =>
+        {
+            if (!_focusActive || _focusHost?.IsVisible != true) return;
+            var buttons = _focusActions?.Children.OfType<Button>().Where(button => button.IsEnabled).ToList() ?? [];
+            var target = buttons.FirstOrDefault(button => button.Classes.Contains("primary"))
+                ?? buttons.FirstOrDefault()
+                ?? (Control?)_focusHost;
+            target?.Focus();
+        }, DispatcherPriority.Input);
+    }
+
+    private void FocusVisiblePageEntry()
+    {
+        if (_focusActive)
+        {
+            ScheduleFocusPrimary();
+            return;
+        }
+        Control? target = _currentPage switch
+        {
+            "lookup" => LookupInput,
+            "vocab" => NavVocab,
+            "review" => NavReview,
+            "learning" => _navLearningHub,
+            "ielts" => _ieltsWorkspace,
+            "exams" => _examBookList,
+            "statistics" => _statisticsPeriodButtons.FirstOrDefault(),
+            "social" => _socialNav,
+            "quotes" => _quotesNav,
+            "settings" => NavSettings,
+            _ => NavLookup
+        };
+        if (target?.IsEffectivelyEnabled == true) target.Focus();
+    }
+
+    private static string NormalizeFocusReturnPage(string? page) =>
+        page is "lookup" or "vocab" or "review" or "learning" or "ielts"
+            or "exams" or "statistics" or "social" or "quotes"
+            ? page
+            : "lookup";
 
     private Button FocusButton(string label, Action action, bool primary = false)
     {
@@ -280,6 +345,7 @@ public partial class MainWindow
     private void EnterArchiveFocusWithFirst(WordItem? first)
     {
         if (_restoring || !_databaseAvailable || _focusActive) return;
+        _focusScopeSource = "archive";
         _focusIeltsWords.Clear();
         var words = _allWords.Where(w => w.Selected).ToList(); if (words.Count == 0) words = _allWords.ToList();
         if (first != null) { words.RemoveAll(w => w.Id == first.Id); words.Insert(0, first); }

@@ -39,8 +39,8 @@ public partial class MainWindow
     {
         if (_studySurfaceThemed) return;
         _studySurfaceThemed = true;
-        if (_focusHost != null) _focusHost.Bind(Border.BackgroundProperty, this.GetResourceObservable("PaperBrush"));
-        if (_studyWorkspaceHost != null) _studyWorkspaceHost.Bind(Panel.BackgroundProperty, this.GetResourceObservable("PaperBrush"));
+        if (_focusHost != null) _focusHost.Bind(Border.BackgroundProperty, this.GetResourceObservable("StudyGradientBrush"));
+        if (_studyWorkspaceHost != null) _studyWorkspaceHost.Bind(Panel.BackgroundProperty, this.GetResourceObservable("StudyGradientBrush"));
         ApplyReviewCanvasTheme();
     }
 

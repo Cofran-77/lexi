@@ -20,8 +20,7 @@ public static class LearningIntegrationTests
             if (!condition) throw new Exception(label);
             lines.Add("PASS " + label);
         }
-        object? Call(string name, params object[] args) => typeof(MainWindow)
-            .GetMethod(name, BindingFlags.NonPublic | BindingFlags.Instance)!.Invoke(window, args);
+        object? Call(string name, params object[] args) => Invoke(window, name, args);
         T Field<T>(string name) => (T)typeof(MainWindow).GetField(name, BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(window)!;
         void Click(string name) => window.FindControl<Button>(name)!.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
         try
@@ -36,15 +35,16 @@ public static class LearningIntegrationTests
             Check(!window.FindControl<Border>("ReviewAnswer")!.IsVisible, "review starts with hidden answer");
             Click("ReviewRevealBtn");
             Click("ReviewUnsureBtn");
+            Click("ReviewNextBtn");
             var round = Field<StudyRound<long>>("_reviewRound");
             Check(round.CurrentTarget == 3 && round.Completed == 0, "unsure switches actual review queue to three recognitions");
-            Click("ReviewRevealBtn"); Click("ReviewRememberBtn");
+            Click("ReviewRevealBtn"); Click("ReviewRememberBtn"); Click("ReviewNextBtn");
             Check(round.CurrentStreak == 1 && round.Completed == 0, "first recognition remains in queue");
             Click("ReviewRoundUndoBtn");
             Check(round.CurrentStreak == 0 && round.Completed == 0, "UI undo restores incomplete streak without negative count");
             Click("NavLookup"); Click("NavReview");
             Check(round.CurrentTarget == 3, "navigation retains the active review round");
-            for (var i = 0; i < 3; i++) { Click("ReviewRevealBtn"); Click("ReviewRememberBtn"); }
+            for (var i = 0; i < 3; i++) { Click("ReviewRevealBtn"); Click("ReviewRememberBtn"); Click("ReviewNextBtn"); }
             Check(round.IsFinished && store.GetAllWords().Single(w => w.Id == word.Id).ReviewCount == 1,
                 "three recognitions complete and persist one scheduled review");
             Click("ReviewRoundUndoBtn");
@@ -70,8 +70,7 @@ public static class LearningIntegrationTests
     {
         check(window.FindControl<Panel>("PagesHost")!.Children.Any(p => p.Name == "LearningHubPage" && p.IsVisible),
             "learning page is reachable through actual page host");
-        object? Call(string name, params object[] args) => typeof(MainWindow)
-            .GetMethod(name, BindingFlags.NonPublic | BindingFlags.Instance)!.Invoke(window, args);
+        object? Call(string name, params object[] args) => Invoke(window, name, args);
         T Field<T>(string name) => (T)typeof(MainWindow).GetField(name, BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(window)!;
         Field<TextBox>("_planName").Text = "每日一词";
         Field<TextBox>("_planQuota").Text = "1";
@@ -79,7 +78,7 @@ public static class LearningIntegrationTests
         Call("CreateLearningPlan");
         var plans = Field<List<DailyStudyPlan>>("_learningPlans");
         check(plans.Count == 1 && plans[0].DailyWordCount == 1, "UI creates and saves archive plan");
-        Call("OpenPlanCreator", DailyStudyPlanSource.Archive, null!);
+        Call("OpenPlanCreator", DailyStudyPlanSource.Archive, null!, null!, null!);
         await Task.Delay(150);
         var creator = Field<ContentControl>("_planCreatorContent");
         check(creator.GetLogicalDescendants().OfType<TextBox>().Any(b => b.Name == "PlanCreatorSearch") &&
@@ -130,6 +129,7 @@ public static class LearningIntegrationTests
         }
         window.FindControl<Button>("ThemeToggleBtn")!.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
         window.Width = 760; window.Height = 520; await Task.Delay(100);
+        Call("AdvanceDailyLearningAfterRating");
         typeof(MainWindow).GetField("_planAnswerVisible", BindingFlags.NonPublic | BindingFlags.Instance)!.SetValue(window, true);
         Call("RenderDailyLearning"); await Task.Delay(100);
         using (var studyBitmap = new RenderTargetBitmap(new PixelSize((int)window.Bounds.Width, (int)window.Bounds.Height), new Vector(96,96)))
@@ -145,7 +145,9 @@ public static class LearningIntegrationTests
         window.Width = 1100; window.Height = 760;
         Call("ShowPage", "lookup"); Call("ShowPage", "learning");
         check(session.Round.CurrentStreak == 1, "plan streak survives navigation");
-        RevealAndRate(StudyRating.Known); RevealAndRate(StudyRating.Known);
+        RevealAndRate(StudyRating.Known);
+        Call("AdvanceDailyLearningAfterRating");
+        RevealAndRate(StudyRating.Known);
         check(session.Round.IsFinished, "plan card flow completes batch");
         var archive = Field<IVocabularyArchive>("_vocabService");
         var planKey = WordKeyResolver.FromArchive(archive.GetAllWords().Single(w => w.Word == "apple")).Key;
@@ -189,5 +191,28 @@ public static class LearningIntegrationTests
         using var bitmap = new RenderTargetBitmap(new PixelSize((int)window.Bounds.Width, (int)window.Bounds.Height), new Vector(96,96));
         bitmap.Render(window);
         bitmap.Save(Path.Combine(Environment.GetEnvironmentVariable("LEXI_DATA_DIR")!, "learning-narrow.png"));
+    }
+
+    private static object? Invoke(MainWindow window, string name, params object?[] args)
+    {
+        var flags = BindingFlags.NonPublic | BindingFlags.Instance;
+        var methods = typeof(MainWindow).GetMethods(flags).Where(method =>
+        {
+            if (method.Name != name) return false;
+            var parameters = method.GetParameters();
+            if (args.Length < parameters.Count(p => !p.IsOptional) || args.Length > parameters.Length) return false;
+            return args.Select((arg, index) => arg == null
+                ? !parameters[index].ParameterType.IsValueType
+                : parameters[index].ParameterType.IsInstanceOfType(arg)).All(valid => valid);
+        }).OrderBy(method => method.GetParameters().Length).ToArray();
+        if (methods.Length == 0)
+            throw new MissingMethodException($"{name} has no overload for {args.Length} arguments");
+        var target = methods[0];
+        var targetParameters = target.GetParameters();
+        var invocation = new object?[targetParameters.Length];
+        Array.Copy(args, invocation, args.Length);
+        for (var index = args.Length; index < invocation.Length; index++)
+            invocation[index] = targetParameters[index].DefaultValue;
+        return target.Invoke(window, invocation);
     }
 }

@@ -61,8 +61,11 @@ public static class RecallCardTests
                 check(C<TextBlock>("ReviewWordText").Text == "recall-one" && C<Border>("ReviewAnswer").IsVisible && store.GetAllWords().Single(x => x.Id == before.Id).Stage == before.Stage, "failed rating retains revealed card and unchanged progress");
             }
             finally { Sql("DROP TRIGGER recall_fail"); }
-            var first = (Task)Call("RateReviewAsync", true)!;
-            var second = (Task)Call("RateReviewAsync", true)!;
+            await (Task)Call("RateReviewAsync", true)!;
+            check(C<Button>("ReviewNextBtn").IsVisible && C<Border>("ReviewAnswer").IsVisible && !C<Grid>("ReviewRatingBar").IsVisible,
+                "rating exposes the next-word handoff without leaving the rating bar active");
+            var first = (Task)Call("AdvanceReviewAsync")!;
+            var second = (Task)Call("AdvanceReviewAsync")!;
             // At the handoff the new card must start invisible rather than pop in.
             var partialEntry = false;
             var lastExitOpacity = 1d;
@@ -84,7 +87,7 @@ public static class RecallCardTests
             check(partialEntry, "next recall card enters progressively instead of flashing fully visible");
             check(monotonic && C<Border>("ReviewCard").Opacity == 1, "card opacity is monotonic across exit and entry with no snap-back");
             var ratedKey = WordKeyResolver.FromArchive(store.GetAllWords().Single(x => x.Id == before.Id)).Key;
-            check(store.GetAllWords().Single(x => x.Id == before.Id).Stage == before.Stage && ServiceFactory.OpenMemory(store).GetCard(ratedKey)?.Reps == 1, "double rating commits exactly one FSRS review without advancing legacy stage");
+            check(store.GetAllWords().Single(x => x.Id == before.Id).Stage == before.Stage && ServiceFactory.OpenMemory(store).GetCard(ratedKey)?.Reps == 1, "double advance commits exactly one FSRS review without advancing legacy stage");
             check(C<TextBlock>("ReviewWordText").Text == "recall-two" && C<TextBlock>("ReviewMeaningText").Text == "", "next card hides its answer");
 
             Click("ReviewRoundUndoBtn");
@@ -93,6 +96,7 @@ public static class RecallCardTests
             check(ServiceFactory.OpenMemory(store).GetCard(firstKey) == null, "review undo restores FSRS pre-state");
             Click("ReviewRevealBtn");
             await (Task)Call("RateReviewAsync", true)!;
+            await (Task)Call("AdvanceReviewAsync")!;
             store.ExecuteBatch([before.Id], "today");
             Call("RefreshWords"); Click("NavLookup"); Click("NavReview");
             check(ServiceFactory.OpenMemory(store).GetCard(firstKey)?.NextReviewAtUtc?.ToLocalTime().Date == DateTime.Today, "explicit today action overrides the actual FSRS due date");
@@ -113,8 +117,9 @@ public static class RecallCardTests
             C<CheckBox>("ReduceMotionBox").IsChecked = true;
             store.ExecuteBatch([before.Id], "today");
             Call("RefreshWords"); Click("NavReview"); Click("ReviewRevealBtn");
-            var instant = (Task)Call("RateReviewAsync", false)!;
-            check(instant.IsCompleted && C<Border>("ReviewCard").Opacity == 1, "reduced motion changes cards immediately without transient opacity");
+            await (Task)Call("RateReviewAsync", false)!;
+            var instant = (Task)Call("AdvanceReviewAsync")!;
+            check(instant.IsCompleted && C<Border>("ReviewCard").Opacity == 1, "reduced motion advances cards immediately without transient opacity");
             await instant;
             var saved = store.LoadSettings();
             check(saved.HighContrast && saved.OpaqueMaterial && saved.ReduceMotion && w.TransparencyLevelHint.SequenceEqual(new[] { WindowTransparencyLevel.None }), "accessibility preferences persist and disable transparency");

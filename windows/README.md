@@ -1,6 +1,6 @@
 # Lexi for Windows
 
-Windows 10 / 11 x64 桌面版，当前应用版本 1.2.4。使用 C#、Avalonia 11.3.12 与 .NET 8，作者 Cofran-77、DespairJasper。
+Windows 10 / 11 x64 桌面版，当前应用版本 3.3.1。使用 C#、Avalonia 11.3.12 与 .NET 8，作者 Cofran-77、DespairJasper。
 
 ## 功能
 
@@ -10,14 +10,23 @@ Windows 10 / 11 x64 桌面版，当前应用版本 1.2.4。使用 C#、Avalonia 
 - 可选 AI 内容生成、句子翻译和金句本。
 - CSV / JSON 词条迁移、打印、本端备份与恢复。
 - 专题词汇、听力、语法与写作工作区，安装包附带当前配套资料。
+- 考试专题：IELTS、CET-4、CET-6、考研、GMAT、TOEFL、GRE，内置 20 本考试词书、66,974 条按书独立身份保存的词条。
+- 学习统计：初学 / 复习 / 拼写时长、学习词数、连续天数、峰值与易忘词，预测数据与实际数据分开呈现。
+- 一起学习（可选，需登录）：一对一好友、邀请码、逐好友逐方向分享授权、共同学习日与 121 点平均稳定性预测曲线。
 
-1.2.4 修复小浮框磨砂材质遮挡新界面的问题，磨砂限于浮框内部，保持主页面清晰。此后的发布许可修订不改变应用功能版本。
+3.3.1 为累计升级版本，一次更新包含 Glacier Blue 视觉与布局、考试专题与 20 本词书、学习统计、一起学习、数据库 v3 加法迁移与备份空间治理，以及复习卡内部 ID、评分后“下一词”/空格无响应等修复。本地学习不依赖登录：离线词典、词书、计划、复习与 FSRS 始终可用。
 
 ## 安装与数据
 
 从 [Releases](https://github.com/Cofran-77/lexi/releases) 下载 Windows 安装程序，包含 .NET 运行环境与 FSRS 助手。安装包未签名；Windows 可能提示未知发布者。
 
 词库默认保存在 `%LOCALAPPDATA%\Lexi`。更新前备份并从托盘完全退出。安装更新与卸载不主动删除该数据目录；备份仍应由用户保存。安装包包含离线词典及当前专题资料，查词、个人档案和专题练习可直接使用。第三方资料的来源与限制见独立声明。
+
+## 一起学习配置
+
+一起学习复用现有 Supabase 项目与 GitHub OAuth，不新建后端、项目或用户池。Windows 客户端默认使用本机回环 `http://127.0.0.1:<port>/auth/callback/`，避免依赖 Windows 专用回调放行；只有本机回环监听无法启动时才注册并使用 `com.lexi.windows://auth/callback`。若启用协议回退，发布方需在同一个 Supabase 项目的 Redirect URLs 中放行该 Windows 地址。GitHub OAuth 不需要另建应用。
+
+生产客户端的 `social-public.json`（`project_url` + `sb_publishable_...`）由发布流程注入，仓库只保留 `social-public.example.json`，已被 `.gitignore` 排除。客户端只接受 `sb_publishable_` 前缀的 publishable key；`service_role`、数据库密码和 OAuth secret 不得进入客户端、构建产物或仓库。
 
 ## 学习快捷键
 

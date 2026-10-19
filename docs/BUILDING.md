@@ -2,7 +2,15 @@
 
 ## Windows
 
-开发环境：Windows 10/11 x64、.NET SDK 8、Rust stable（使用 FSRS Rust 库的 edition 2024，至少 Rust 1.85；建议当前稳定版本）。打包另需 NSIS 3 Unicode。NuGet、Cargo 首次还原需要联网。
+### 环境
+
+- Windows 10 / 11 x64。
+- .NET SDK 8。
+- Rust 1.85+，FSRS 依赖使用 Rust 2024 edition。
+- NSIS 3 Unicode，用于安装包。
+- NuGet 与 Cargo 首次还原需要联网。
+
+### 编译
 
 ```powershell
 git clone https://github.com/Cofran-77/lexi.git
@@ -12,34 +20,97 @@ dotnet build windows/Lexi.csproj -c Release
 dotnet run --project windows/Lexi.csproj
 ```
 
-Rust 助手输出为 `windows/native/fsrs-optimizer/target/release/fsrs-optimizer.exe`，桌面项目在文件存在时复制它；打包脚本要求助手已经构建。仓库不跟踪这个二进制文件，但公开 Windows 安装包包含该助手。
+Rust 助手输出为 `windows/native/fsrs-optimizer/target/release/fsrs-optimizer.exe`。它不进入 Git，但正式安装包必须包含。
 
-生成自包含安装包：
+### 安装包
 
 ```powershell
-pwsh -File windows/packaging/build-installer.ps1 -Version 1.2.4 -Dotnet dotnet
-pwsh -File windows/packaging/package-release.ps1 -Version 1.2.4
+pwsh -File windows/packaging/build-installer.ps1 `
+  -Version 3.3.1 `
+  -Dotnet <dotnet-path> `
+  -Nsis <makensis-path>
 ```
 
-默认输出到仓库根目录 `Lexi-1.2.4-Windows-x64/` 和相应源码/分发 ZIP。Git 工程保留资源格式示例；构建完整专题版本时，先安装当前 Windows 版，将安装目录中的 Assets/IELTS 内容复制到 windows/Assets/IELTS。现有构建规则会复制资源到输出；普通用户直接安装完整 Windows 安装包即可。安装程序需要 NSIS 位于默认路径或通过 `-Nsis` 指定。
+如需把合法的公开客户端配置注入安装包，可增加：
+
+```powershell
+-SocialConfigPath <social-public.json>
+```
+
+该 JSON 只应包含公开项目 URL 和 `sb_publishable_` 客户端 key。真实配置文件不提交，示例为 `windows/social-public.example.json`。`service_role`、数据库密码和 OAuth secret 不得放进客户端。
+
+默认输出为仓库根目录的 `Lexi-3.3.1-Windows-x64/Lexi-3.3.1-x64-setup.exe`。发布资产还应生成：
+
+```text
+Lexi-3.3.1-x64-setup.exe.sha256
+```
 
 ### 测试
 
-按改动选择检查，不要求每次都运行全软件测试：领域测试位于 `windows/tests/`，UI/交互自检位于 `windows/SelfTest/`。例如：
-
 ```powershell
 dotnet run --project windows/tests/MemoryTests/MemoryTests.csproj -c Release
+dotnet run --project windows/tests/LearningTests/LearningTests.csproj -c Release
 ```
 
-某些历史 UI 测试依赖未公开的 IELTS 资源。运行自检必须使用隔离 `LEXI_DATA_DIR`，不要指向个人词库；测试入口与所需资源需先读相应测试源码。本仓库工作流验证当前工程编译，不把编译成功当成全功能验收。
+UI / 自检程序必须使用隔离 `LEXI_DATA_DIR`：
+
+```powershell
+$env:LEXI_DATA_DIR = Join-Path $env:TEMP ('lexi-test-' + [guid]::NewGuid())
+dotnet run --project windows/Lexi.csproj -c Release -- --visual123-test
+Remove-Item Env:LEXI_DATA_DIR
+```
+
+测试入口和所需资源以源码为准。依赖未公开 IELTS 资料的历史 UI 测试不能当作公开源码树的默认验收。当前 Windows Release 已知有一个 1100 宽度的 exam topics grid placement 断言失败，不能宣称全量 UI 测试通过。
+
+## macOS
+
+### 环境
+
+- Apple Silicon Mac，macOS 12+。
+- .NET SDK 8。
+- Python 3.10+。
+- 完整打包需要 Rust、Cargo 缓存和 macOS DMG 工具。
+
+### 编译与完整性
+
+```sh
+cd macos
+python3 scripts/verify_source_integrity.py
+dotnet build lexi_avalonia/Lexi.csproj -c Release
+bash scripts/run_tests.sh
+```
+
+源码入口：
+
+```sh
+cd macos
+bash 启动Lexi源码.command
+```
+
+### 发布
+
+```sh
+cd macos
+bash scripts/release.sh
+bash scripts/package_dmg.sh --no-build
+```
+
+`release.sh` 会执行回归、签名、隔离数据验收、许可证/隐私检查和发布证明。现有 pin 绑定原发布身份与 helper，自行签名发布时必须先：
+
+1. 重建并审计 `fsrs-optimizer`。
+2. 更新 `packaging/fsrs-helper-pin.json`。
+3. 生成自己的签名身份。
+4. 更新 `packaging/release-pin.json` 的 designated requirement。
+
+详细步骤与数据保留说明见 [macOS README](../macos/README.md)。
 
 ## Android
 
-环境：JDK 17、Android SDK Platform 35、Build Tools 35。工程使用 Gradle Wrapper 8.9、AGP 8.7.3、Kotlin 2.0.21、Compose BOM 2024.12.01。Android Studio 打开 `android/` 即可；本机 SDK 路径放到不提交的 `local.properties`。
+环境为 JDK 17、Android SDK Platform 35、Build Tools 35、Gradle Wrapper 8.9。
 
 ```powershell
 cd android
-./gradlew.bat assembleDebug
+.\gradlew.bat assembleDebug
 ```
 
 ```sh
@@ -48,31 +119,18 @@ chmod +x gradlew
 ./gradlew assembleDebug
 ```
 
-输出：`app/build/outputs/apk/debug/app-debug.apk`。依赖仓库保留工程已有阿里镜像与官方源配置；不需要 macOS 编译环境。
+输出为 `android/app/build/outputs/apk/debug/app-debug.apk`。Android 仍是 0.2.2-alpha 预览，不等同桌面端 FSRS-6 功能集。
 
-模拟器/真机仪器测试在 `app/src/androidTest`，可按改动执行 `./gradlew connectedDebugAndroidTest`。需要连接设备，不代表 CI 已认证全部 Android / MagicOS 版本。
+## CI
 
-### 签名与升级
+`.github/workflows/build.yml` 分别编译 Windows、macOS 和 Android。CI 只验证源码可编译，不替代安装包签名、真实 OAuth、好友同步、AI 服务或真机验收。
 
-当前 Release 提供 Android 源码与已有开发签名 APK。开发私钥不公开。本地生成的 debug APK 可能使用不同签名，不能保证覆盖已安装的旧 APK。正式分发需要维护自己的长期 release 签名；切换签名前先导出数据，卸载前应导出数据。
+## 发布检查
 
-## macOS
-
-当前接入 3.1.3，运行面向 Apple Silicon / macOS 12+。开发需要 macOS 与 .NET SDK 8；个人 FSRS 助手另需 Rust 工具链。全部入口从 `macos/` 执行：
-
-```sh
-cd macos
-dotnet build lexi_avalonia/Lexi.csproj -c Release
-bash 启动Lexi源码.command
-python3 scripts/verify_source_integrity.py
-# 提供合法本地 IELTS 资源后，运行完整领域与 UI 回归
-bash scripts/run_tests.sh
-# 构建助手：使用自己已安装的 Rust 工具链
-bash scripts/build_fsrs_optimizer.sh
-```
-
-本机 SDK 可放在 `macos/.tools/dotnet/`，或使用 `DOTNET_ROOT` / PATH；不提交 SDK。Git 中的 IELTS 目录只保留结构示例，不含教材或音频；完整专题测试依赖原资源，见 [资源说明](RESOURCES.md)。构建应用本身不要求助手二进制存在；完整打包要求先构建并验证助手。
-
-签名与发布脚本在 `macos/scripts/`，配置在 `macos/packaging/`。现有 release pin 和 helper SHA256 绑定原发布身份与已审计助手；自己的发布身份须显式更新 pin 并完成审计，不能直接复用作者的签名证明。完整签名、DMG、数据保留和校验步骤见 [macOS README](../macos/README.md)。
-
-本仓库 CI 目前仍仅编译 Windows / Android。macOS 的本地验证单独记录于 [验证记录](VERIFICATION.md)，不宣称 CI 已覆盖 macOS。
+1. 运行平台构建和定向测试。
+2. 使用隔离数据生成截图。
+3. 生成 EXE / DMG 与 SHA256。
+4. 扫描 Git 树，排除数据库、Cookie、Session、Token、日志和签名材料。
+5. 检查 README 图片与本地链接。
+6. 推送源码和标签。
+7. 创建 Release 并上传二进制，再回下载核对大小、哈希和页面链接。

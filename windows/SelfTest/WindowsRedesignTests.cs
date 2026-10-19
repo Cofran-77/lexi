@@ -76,7 +76,7 @@ public static class WindowsRedesignTests
             store.DeleteSessionCheckpoint("review", reviewId);
             archive.ExecuteBatch([word.Id], "today"); Call("RefreshWords");
             window.FindControl<CheckBox>("ReduceMotionBox")!.IsChecked = true;
-            Click("NavReview"); Click("ReviewRevealBtn"); Click("ReviewUnsureBtn");
+            Click("NavReview"); Click("ReviewRevealBtn"); Click("ReviewUnsureBtn"); Click("ReviewNextBtn");
             Click("ReviewRevealBtn"); Click("ReviewRememberBtn");
             var actualRound = (StudyRound<long>)Field("_reviewRound")!;
             Check(actualRound.CurrentStreak == 1, "actual review contains partial streak before restart");
@@ -153,8 +153,40 @@ public static class WindowsRedesignTests
             }
             window.Width = 1100; window.Height = 760;
             Click("ThemeToggleBtn"); await Snapshot(window, "ielts-dark"); Click("ThemeToggleBtn");
+
+            // The exam topics page once stacked all three columns into (0,0); a screenshot still
+            // looks plausible there, so the grid placement and the rendered rectangles are asserted.
+            Call("OpenExamTopics");
+            await Task.Delay(150);
+            var examBody = (Grid)Field("_examTopicsBody")!;
+            var examBooks = (Control)Field("_examBookColumnControl")!;
+            var examUnits = (Control)Field("_examUnitColumnControl")!;
+            var examWords = (Control)Field("_examWordColumnControl")!;
+            static bool Overlaps(Control a, Control b, Visual root)
+            {
+                var originA = a.TranslatePoint(new Point(0, 0), root) ?? default;
+                var originB = b.TranslatePoint(new Point(0, 0), root) ?? default;
+                return new Rect(originA, a.Bounds.Size).Intersects(new Rect(originB, b.Bounds.Size));
+            }
+            foreach (var width in new[] { 1100d, 840d, 760d })
+            {
+                window.Width = width; window.Height = width == 760 ? 520 : 760;
+                await Snapshot(window, "exam-topics-" + (int)width);
+                var placedApart = width >= 960
+                    ? Grid.GetColumn(examBooks) == 0 && Grid.GetColumn(examUnits) == 1 && Grid.GetColumn(examWords) == 2 &&
+                      Grid.GetRow(examBooks) == 0 && Grid.GetRow(examUnits) == 0 && Grid.GetRow(examWords) == 0
+                    : Grid.GetRow(examBooks) == 0 && Grid.GetRow(examUnits) == 0 && Grid.GetColumn(examUnits) == 1 &&
+                      Grid.GetRow(examWords) == 1 && Grid.GetColumn(examWords) == 0 && Grid.GetColumnSpan(examWords) == 2;
+                Check(placedApart, "exam topics grid placement at width " + width);
+                if (examBody.IsVisible)
+                    Check(!Overlaps(examBooks, examUnits, examBody) && !Overlaps(examBooks, examWords, examBody) &&
+                          !Overlaps(examUnits, examWords, examBody),
+                        "exam topics panels do not overlap at width " + width);
+            }
+            window.Width = 1100; window.Height = 760;
+
             var section = IeltsCatalog.Load().Sections.Where(s => s.Kind == "vocabulary").MaxBy(s => s.Entries.Count)!;
-            Call("OpenPlanCreator", DailyStudyPlanSource.Ielts, section);
+            Call("OpenPlanCreator", DailyStudyPlanSource.Ielts, section, null!, null!);
             await Task.Delay(200);
             var creator = (ContentControl)Field("_planCreatorContent")!;
             Check(creator.GetVisualDescendants().OfType<CheckBox>().Count(c => c.IsEffectivelyVisible) <= 12,

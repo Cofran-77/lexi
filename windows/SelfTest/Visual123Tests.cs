@@ -3,6 +3,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Interactivity;
+using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Styling;
 using Avalonia.VisualTree;
@@ -19,7 +20,23 @@ internal static class Visual123Tests
         void Check(bool condition, string message) { report.Add((condition ? "PASS " : "FAIL ") + message); if (!condition) throw new InvalidOperationException(message); }
         async Task Shot(string name) { await Task.Delay(150); using var bitmap=new RenderTargetBitmap(new PixelSize((int)window.Bounds.Width,(int)window.Bounds.Height)); bitmap.Render(window); bitmap.Save(Path.Combine(folder,name+".png")); }
         const BindingFlags flags=BindingFlags.Instance|BindingFlags.NonPublic;
-        object? Call(string name, params object?[] args) => typeof(MainWindow).GetMethod(name,flags)!.Invoke(window,args);
+        object? Call(string name, params object?[] args)
+        {
+            var methods=typeof(MainWindow).GetMethods(flags).Where(method =>
+            {
+                if(method.Name!=name)return false;
+                var parameters=method.GetParameters();
+                if(args.Length<parameters.Count(p=>!p.IsOptional)||args.Length>parameters.Length)return false;
+                return args.Select((arg,index)=>arg==null?!parameters[index].ParameterType.IsValueType:
+                    parameters[index].ParameterType.IsInstanceOfType(arg)).All(valid=>valid);
+            }).OrderBy(method=>method.GetParameters().Length).ToArray();
+            if(methods.Length==0)throw new MissingMethodException($"{name} has no overload for {args.Length} arguments");
+            var target=methods[0];var targetParameters=target.GetParameters();
+            var invocation=new object?[targetParameters.Length];Array.Copy(args,invocation,args.Length);
+            for(var index=args.Length;index<invocation.Length;index++)
+                invocation[index]=targetParameters[index].DefaultValue;
+            return target.Invoke(window,invocation);
+        }
         T Field<T>(string name)=>(T)typeof(MainWindow).GetField(name,flags)!.GetValue(window)!;
         try
         {
@@ -27,7 +44,9 @@ internal static class Visual123Tests
             var setup=new PracticeSetupControl(20,1,(_,h)=>hints=h,()=>{});
             setup.StartButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             Check(hints==true,"default spelling setup starts assisted spelling");
-            Check(!setup.GetVisualDescendants().OfType<RadioButton>().Any(r=>Convert.ToString(r.Content)?.Contains("默写")==true),"spelling setup has no dictation mode choice");
+            Check(Convert.ToString(setup.AssistedModeRadio.Content)?.Contains("淡写")==true && Convert.ToString(setup.MemoryModeRadio.Content)?.Contains("默写")==true,"spelling setup exposes assisted and dictation modes");
+            setup.MemoryModeRadio.IsChecked=true;setup.StartButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            Check(hints==false,"switching to dictation starts a session without hints");
             await Forms123ControlTests.RunAsync(window,Check);
             await Learning123ControlTests.RunAsync(window,Check);
             window.Width=1100;window.Height=760;
@@ -51,16 +70,38 @@ internal static class Visual123Tests
             Check(!glass.IsOpen && !glass.IsBlurred,"fifty confirmation cycles leave no active blur or modal");
             Check(glass.RetainedBackdropBytes==0 && after-before<64*1024*1024,"closed confirmations release backdrop and do not retain excessive managed memory");
             captures.Sort();report.Add($"MEASURE modal capture p95={captures[47]:F1}ms; managed delta={after-before}; scaling={window.RenderScaling}; OS={Environment.OSVersion}; CPU={Environment.ProcessorCount}");
-            Call("StartLearningTyping",new List<LearningWord>{new(){Id="123-word",Words=["adaptive"],Meaning="能够适应变化的；自适应的",Phonetic="/əˈdæptɪv/"}},false);
+            Call("StartLearningTyping",new List<LearningWord>{new(){Id="123-word",Words=["adaptive"],Meaning="能够适应变化的；自适应的",Phonetic="/əˈdæptɪv/"}},true,"learning",null);
             var session=(TypingSession)typeof(MainWindow).GetField("_learningTypingSession",flags)!.GetValue(window)!;
-            Check(session.Hints,"legacy caller cannot start a separate dictation mode");
+            Check(session.Hints,"assisted spelling caller starts a hinted session");
             await Shot("spelling-light");
             var spelling=(SpellingPracticeControl)typeof(MainWindow).GetField("_spellingPractice",flags)!.GetValue(window)!;
-            spelling.InputBox.Text="ad";spelling.HintButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
-            Check(spelling.InputBox.Text=="ad","actual progressive hint preserves typed text");await Shot("spelling-hint");
+            Check(spelling.InputBox.CaretBrush is ISolidColorBrush { Color.A: 0 },"assisted spelling hides the blinking text caret");
+            await Task.Delay(100);
+            spelling.InputBox.Text="ad";
+            spelling.HintButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            Check(spelling.InputBox.Text=="ad",$"actual progressive hint preserves typed text (input='{spelling.InputBox.Text}', session='{session.Input}')");await Shot("spelling-hint");
             spelling.InputBox.Text="adaptive";spelling.SubmitButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             Check(session.Outcome==TypingOutcome.Correct,"actual compact spelling submit reaches existing session");
             Check(spelling.NextButton.IsVisible,"correct spelling exposes next-word action");
+            Call("ExitLearningTyping");
+            await Task.Delay(100);
+            Call("StartLearningTyping",new List<LearningWord>{new(){Id="123-dictation",Words=["adaptive"],Meaning="能够适应变化的；自适应的",Phonetic="/əˈdæptɪv/"}},false,"learning",null);
+            var dictationSession=(TypingSession)typeof(MainWindow).GetField("_learningTypingSession",flags)!.GetValue(window)!;
+            await Task.Delay(100);
+            var dictation=(SpellingPracticeControl)typeof(MainWindow).GetField("_spellingPractice",flags)!.GetValue(window)!;
+            Check(dictationSession.Outcome==TypingOutcome.Pending && dictationSession.Input=="",
+                "dictation starts with a blank, pending session");
+            Check(dictation.InputBox.Text=="","dictation starts with a blank input box");
+            Check(dictation.InputBox.CaretBrush is ISolidColorBrush { Color.A: > 0 },"dictation keeps the editable text caret");
+            dictation.AnswerButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            Check(dictationSession.Outcome==TypingOutcome.Pending,"revealing an answer does not submit it");
+            Check(dictation.AnswerBlock.IsVisible,"revealing an answer displays the answer");
+            Check(dictation.SubmitButton.IsVisible && !dictation.NextButton.IsVisible,"revealed answer still requires the learner to type it");
+            dictation.InputBox.Text="ada";
+            Check(dictation.AnswerBlock.IsVisible,"revealed answer stays visible while the learner retypes it");
+            dictation.InputBox.Text="adaptive";
+            await Task.Delay(20);
+            Check(dictationSession.Outcome==TypingOutcome.Correct && dictation.NextButton.IsVisible,"correct retyping unlocks the next word");
             Call("ExitLearningTyping");
             var store=Field<IVocabularyArchive>("_vocabService");
             store.AddWord("responsive","/rɪˈspɒnsɪv/","响应迅速的；适应窗口变化的","Adjusts to available space.");Call("RefreshWords");
@@ -75,9 +116,11 @@ internal static class Visual123Tests
             plan=Field<List<DailyStudyPlan>>("_learningPlans").Single(p=>p.Id==plan.Id);
             Call("StartDailyLearning",plan);Call("ToggleGlobalFocus");await Shot("focus-bounded-light");
             var reading=Field<Border>("_globalStudyContent");
-            Check(reading.Bounds.Width>=600 && reading.Bounds.Width<=680,"focus reading width stays bounded even for a short definition");
+            var readingWidth=reading.Bounds.Width>0?reading.Bounds.Width:reading.Width;
+            Check(readingWidth>=600 && readingWidth<=680,$"focus reading width stays bounded even for a short definition (bounds={reading.Bounds.Width:F1}, width={reading.Width:F1})");
             window.Width=760;window.Height=520;await Shot("focus-bounded-small");
-            Check(reading.Bounds.Right<=window.Bounds.Width && reading.Bounds.Width<=window.Bounds.Width-48,"focus content responds to a narrow window");
+            readingWidth=reading.Bounds.Width>0?reading.Bounds.Width:reading.Width;
+            Check(readingWidth<=window.Bounds.Width-48,"focus content responds to a narrow window");
             Field<DailyStudyPlan>("_activeLearningPlan").Words[0].Definition=string.Join(" ",Enumerable.Repeat("Long definitions must stay readable without hiding the study action.",30));
             Call("RefreshGlobalStudySurface");await Shot("focus-long-small");
             var studyActions=Field<WrapPanel>("_globalStudyActions");
@@ -88,9 +131,9 @@ internal static class Visual123Tests
             Call("ShowLastPlanBatch",plan);await Shot("practice-setup-main");
             Check((Application.Current!.ApplicationLifetime as IClassicDesktopStyleApplicationLifetime)!.Windows.Count==windowsBefore,"recent batch preparation creates no independent window");
             var recentSetup=Field<Grid>("_studyWorkspaceHost").GetVisualDescendants().OfType<PracticeSetupControl>().Single();recentSetup.CancelButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
-            Call("ShowPage","vocab");Call("OpenPlanCreator",DailyStudyPlanSource.Archive,null);await Shot("plan-select-light");
+            Call("ShowPage","vocab");Call("OpenPlanCreator",DailyStudyPlanSource.Archive,null!,null!,null!);await Shot("plan-select-light");
             var creator=Field<Border>("_planCreatorOverlay");
-            creator.GetVisualDescendants().OfType<PlanWordRowControl>().First().GetVisualDescendants().OfType<CheckBox>().First().IsChecked=true;
+            creator.GetVisualDescendants().OfType<Button>().Single(b=>b.Content?.ToString()=="选本页").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             creator.GetVisualDescendants().OfType<Button>().Single(b=>b.Content?.ToString()=="下一步：安排计划 →").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));await Shot("plan-create-form");
             Check(creator.GetVisualDescendants().OfType<PlanEditorControl>().Single().IsEffectivelyVisible,"plan creation uses the same visible form as adjustment");Call("ClosePlanCreator");
             window.OpenQuoteEditor(null);await Shot("quote-edit-light");

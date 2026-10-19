@@ -1,35 +1,51 @@
 # 架构与平台边界
 
-Windows、Android 与 macOS 是独立工程；此仓库采用 monorepo 便于共同维护文档与版本，不意味着共享所有运行时代码。
+Lexi 是双桌面平台 monorepo。Windows 和 macOS 使用相近的 C#、Avalonia、SQLite 与 Rust 技术栈，但各有独立源码、测试、资源和发布门禁，不共享所有运行时代码。
 
 ## Windows
 
-- `Domain/`：基础档案和复习排期契约。
-- `Application/`：学习会话、计划、教材目录模型与档案迁移服务。
-- `Infrastructure/`、`Services/`、`Platform/`：SQLite、AI、Windows 密钥/文档/系统集成；部分文件由项目显式链接编译。
-- `Features/`、`Controls/`、`Shell/`、`Styles/`：学习、档案、IELTS、设置及视图组件。
-- `MainWindow.*`：页面与服务的实际集成；不是另一个独立前端项目。
-- `native/fsrs-optimizer/`：Rust 参数训练助手；vendor/fsrs 是保留原许可的第三方库。
-- `tests/` 与 `SelfTest/`：领域及交互检查；其中一些 UI 测试需要合法的本地教材资源。
+`windows/` 的公开源码包括：
 
-长期复习以 FSRS-6 记忆模型与真实评分记录为依据；计划轮内的强化进度和长期排期不同，不能把完成一次拼写简单等同为固定日期升级。
+- `Domain/`、`Application/`：领域模型、学习会话、计划、记忆与迁移契约。
+- `Infrastructure/`、`Services/`、`Platform/`：SQLite、备份、AI、Windows 密钥和系统集成。
+- `Features/`、`Controls/`、`Shell/`、`Styles/`、`UI/`：桌面界面与交互组件。
+- `native/fsrs-optimizer/`：FSRS-6 参数训练 Rust 助手与固定版本依赖。
+- `tests/`、`SelfTest/`：领域、集成和 UI 自检。
+- `packaging/`：自包含 publish、NSIS 安装器、校验和发行清单。
 
-## Android
-
-Kotlin / Compose 主界面；`app/src/main/java/org/lexi/archive` 包含 ViewModel、SQLite repository、数据迁移、服务与 UI。固定复习日期规则尚未与 Windows FSRS 模型统一。Android PROCESS_TEXT 与分享是系统入口，不申请全局悬浮窗或无障碍监听。
+Windows 公开 Git 源码按 `.gitignore` 只保留 IELTS 资源说明与示例目录；自包含安装包按现有发行边界包含配套资料。两者资源范围不同。
 
 ## macOS
 
-已接入 `macos/` 下的 3.1.3 源码，原有内部目录保持不变：
+`macos/` 保持上游工程结构：
 
-- `lexi_avalonia/`：Avalonia UI；`Core/`、`Domain/`、`Application/`、`Infrastructure/`、`Services/`、`Platform/` 分担记忆契约、存储、会话与 macOS 集成。
-- `lexi_avalonia/tests/`、`SelfTest/`：领域和真实 UI 回归、隔离数据截图入口。
-- `native/fsrs-optimizer/`：个人 FSRS-6 Rust 训练助手和固定版本 fsrs vendor 源码。
-- `scripts/`、`packaging/`：SDK 定位、回归、数据备份、签名、DMG、发布证明与隐私检查。
-- 跨应用查词、翻译、金句卡片；FSRS-6、个人参数与 Context 校准在本机运行。钥匙串保护 AI Key。
+- `lexi_avalonia/`：Avalonia UI、领域逻辑、服务、平台适配和测试。
+- `lexi_avalonia/Assets/`：离线词典、考试词书和上游公开跟踪的 IELTS 资源。
+- `native/fsrs-optimizer/`：个人 FSRS-6 训练助手、补丁、vendor 源码和许可。
+- `scripts/`：源码完整性、测试、数据备份、隐私检查、签名与 DMG 打包。
+- `packaging/`：版本、签名身份和 FSRS helper pin。
 
-应用版本与 Dock 唤醒行为保留原 3.1.3 实现；更新检查仍读取 `DespairJasper/lexi-macos` 正式 Release。导入原许可保留于 `macos/LICENSE`。
+macOS 的 release pin 绑定了原发布身份和已审计 helper 字节。自行发布必须生成自己的签名身份并显式更新 pin，不能绕过门禁冒充原发布身份。
 
-## 资源与数据
+## Android
 
-离线字典为 MIT 授权 ECDICT 子集。Git 不跟踪用户数据库、个人设置、API Key 或签名材料。第三方专题资料在当前 Windows 分发附件中单独提供，来源与权利声明保留。各端本地数据库有自己的恢复流程；词条迁移经 CSV/兼容 JSON 完成，而非直接共享 SQLite 文件。
+Android 0.2.2-alpha 继续作为独立 Kotlin / Compose 工程保留在 `android/`。其固定日期复习规则尚未迁移桌面端 FSRS-6，不与两个桌面平台宣称行为完全一致。
+
+## 本地数据与可选服务
+
+词库、计划、学习轨迹、金句、统计和 FSRS 状态存储在平台本地数据库或数据目录。离线功能不依赖项目账户。
+
+「一起学习」是可选覆盖层：
+
+- 客户端使用公开 Supabase 项目 URL 与 publishable key。
+- 用户通过 GitHub OAuth 登录后才能创建好友关系。
+- 云端只接收账号资料、好友关系、当日达标和用户逐项授权的摘要。
+- 完整词库、逐词历史、计划内容、API Key 和个人记忆模型留在本机。
+
+服务端管理密钥、数据库密码、OAuth secret、真实客户端配置、用户数据库、Cookie、Session 和日志不进入公开源码。
+
+## 发布边界
+
+- EXE、DMG、ZIP 和 APK 不作为 Git 文件提交，只进入 Release 或既有发布渠道。
+- `bin/`、`obj/`、`target/`、`publish/`、SDK、缓存和构建日志被忽略。
+- 所有截图使用隔离数据目录，发布前人工检查账号、好友、通知、路径和词库内容。

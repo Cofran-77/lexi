@@ -13,3 +13,10 @@ gradlew text eol=lf
 *.png binary
 *.ico binary
 *.jar binary
+
+# Keep release-integrity inputs byte-stable in exported archives on Windows.
+macos/lexi_avalonia/Notices/INTER-LICENSE.txt text eol=lf
+macos/lexi_avalonia/Notices/ECDICT-LICENSE.txt text eol=lf
+macos/scripts/release_proof.py text eol=lf
+macos/scripts/install_app.py text eol=lf
+macos/卸载Lexi.command text eol=lf

@@ -152,10 +152,15 @@ public partial class MainWindow
     private void UpdateDataInfo()
     {
         DataLocationText.Text = _vocabService.DatabasePath;
-        DataIdentityText.Text = $"当前词库 · {_allWords.Count} 个词 · 最近收藏 {(_allWords.Count > 0 ? _allWords.Max(w => w.CreatedAt) : "暂无")}";
+        var latest = _allWords.Count > 0
+            ? _allWords.Max(w => w.CreatedAt)
+            : UiText.Bilingual("暂无", "None");
+        DataIdentityText.Text = UiText.Format($"当前词库 · {_allWords.Count} 个词 · 最近收藏 {latest}");
         var folder = Path.Combine(Path.GetDirectoryName(_vocabService.DatabasePath)!, "backups");
         var path = Directory.Exists(folder) ? Directory.EnumerateFiles(folder, "lexi-*.sqlite3").OrderByDescending(Path.GetFileName, StringComparer.Ordinal).FirstOrDefault() : null;
-        LastBackupText.Text = path != null && File.Exists(path) ? "最近备份：" + File.GetLastWriteTime(path).ToString("yyyy-MM-dd HH:mm:ss") : "暂无备份，收藏后自动备份。";
+        LastBackupText.Text = path != null && File.Exists(path)
+            ? UiText.Format($"最近备份：{File.GetLastWriteTime(path):yyyy-MM-dd HH:mm:ss}")
+            : UiText.Bilingual("暂无备份，收藏后自动备份。", "No backup yet. One is created after you save a word.");
     }
 
     private async Task BackupNowAsync()
@@ -165,7 +170,7 @@ public partial class MainWindow
         {
             var databasePath = _vocabService.DatabasePath;
             var backup = await Task.Run(() => _backups.Create(databasePath));
-            LastBackupText.Text = "最近备份：" + File.GetLastWriteTime(backup).ToString("yyyy-MM-dd HH:mm:ss");
+            LastBackupText.Text = UiText.Format($"最近备份：{File.GetLastWriteTime(backup):yyyy-MM-dd HH:mm:ss}");
             SetStatus("备份已保存：" + backup);
         }
         catch (Exception ex) { SetStatus("备份未完成：" + ex.Message); }
@@ -224,7 +229,7 @@ public partial class MainWindow
             // Open a read-only connection; never migrate or modify an unconfirmed backup.
             var count = await Task.Run(() => _backups.Inspect(path));
             _pendingRestore = path;
-            RestoreDescriptionText.Text = $"{Path.GetFileName(path)}\n包含 {count} 个词。";
+            RestoreDescriptionText.Text = UiText.Format($"{Path.GetFileName(path)}\n包含 {count} 个词。");
             RestoreOverlay.IsVisible = true;
         }
         catch (Exception ex) { SetStatus("不能恢复该文件：" + ex.Message); }

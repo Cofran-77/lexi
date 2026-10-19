@@ -14,8 +14,21 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 8.0.x
-      - name: Compile Windows source (not full UI acceptance)
+      - name: Test FSRS optimizer
+        run: cargo test --locked --manifest-path windows/native/fsrs-optimizer/Cargo.toml
+      - name: Compile Windows source
         run: dotnet build windows/Lexi.csproj -c Release
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - name: Verify preserved source and release identity
+        run: python3 macos/scripts/verify_source_integrity.py
+      - name: Compile macOS source
+        run: dotnet build macos/lexi_avalonia/Lexi.csproj -c Release
   android:
     runs-on: ubuntu-latest
     steps:

@@ -19,7 +19,6 @@ public partial class MainWindow
     private Grid? _ieltsSubContent;
     private ScrollViewer? _ieltsSubContentPage;
     private IeltsWorkspaceControl? _ieltsWorkspace;
-    private Button? _ieltsNav;
     private readonly HashSet<string> _ieltsSelected = [];
     private LearningProgress _ieltsProgress = new();
     private string? _ieltsProgressPath;
@@ -48,13 +47,6 @@ public partial class MainWindow
         _ieltsPage.Children.Add(_ieltsSubContentPage);
 
         this.FindControl<Panel>("PagesHost")!.Children.Add(_ieltsPage);
-
-        // 导航按钮
-        _ieltsNav = new Button { Name = "NavIelts", Content = IeltsI18n.T("IELTS 专题") };
-        _ieltsNav.Classes.Add("nav");
-        _ieltsNav.HorizontalAlignment = HorizontalAlignment.Stretch;
-        _ieltsNav.Click += (_, _) => ShowIeltsCatalog();
-        this.FindControl<StackPanel>("LearningNavHost")!.Children.Add(_ieltsNav);
 
         Closed += (_, _) =>
         {
@@ -122,7 +114,7 @@ public partial class MainWindow
                 sharedSelection: _ieltsSelected,
                 playerProvider: GetLearningAudio,
                 setStatus: SetStatus,
-                startTyping: (words, hints) => StartLearningTyping(words, hints),
+                startTyping: (words, hints) => StartIeltsTyping(words, hints),
                 createPlan: section => OpenPlanCreator(DailyStudyPlanSource.Ielts, section),
                 startSynonyms: words => StartIeltsSynonyms(words),
                 openResources: ShowIeltsResources,
@@ -297,9 +289,6 @@ public partial class MainWindow
 
     public void RefreshIeltsLanguage()
     {
-        if (_ieltsNav != null)
-            _ieltsNav.Content = IeltsI18n.T("IELTS 专题");
-
         _archivedWordCache = null;
         _ieltsWorkspace?.RefreshLanguage();
         foreach (var browser in _ieltsSubContent?.Children.OfType<IeltsSynonymBrowser>() ?? [])

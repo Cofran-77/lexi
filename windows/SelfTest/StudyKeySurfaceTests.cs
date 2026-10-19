@@ -10,7 +10,24 @@ public static class StudyKeySurfaceTests
     public static async Task RunAsync(MainWindow window,Action<bool,string> check)
     {
         var flags=BindingFlags.Instance|BindingFlags.NonPublic;
-        object? Call(string name,params object[] args)=>typeof(MainWindow).GetMethod(name,flags)!.Invoke(window,args);
+        object? Call(string name,params object?[] args)
+        {
+            var methods=typeof(MainWindow).GetMethods(flags).Where(method=>
+            {
+                if(method.Name!=name)return false;
+                var parameters=method.GetParameters();
+                if(args.Length<parameters.Count(parameter=>!parameter.IsOptional)||args.Length>parameters.Length)return false;
+                return args.Select((argument,index)=>argument==null?!parameters[index].ParameterType.IsValueType:
+                    parameters[index].ParameterType.IsInstanceOfType(argument)).All(valid=>valid);
+            }).OrderBy(method=>method.GetParameters().Length).ToArray();
+            if(methods.Length==0)throw new MissingMethodException($"{name} has no overload for {args.Length} arguments");
+            var target=methods[0];
+            var parameters=target.GetParameters();
+            var invocation=new object?[parameters.Length];
+            Array.Copy(args,invocation,args.Length);
+            for(var index=args.Length;index<invocation.Length;index++)invocation[index]=parameters[index].DefaultValue;
+            return target.Invoke(window,invocation);
+        }
         T Field<T>(string name)=>(T)typeof(MainWindow).GetField(name,flags)!.GetValue(window)!;
         KeyEventArgs Down(Control target,Key key,KeyModifiers modifiers=KeyModifiers.None)
         {var e=new KeyEventArgs {RoutedEvent=InputElement.KeyDownEvent,Key=key,KeyModifiers=modifiers};target.RaiseEvent(e);return e;}

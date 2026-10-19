@@ -22,7 +22,7 @@ public partial class MainWindow
         ++_lookupVersion;
         _lookupAiCts?.Cancel();
         LookupBtn.IsEnabled = true;
-        LookupBtn.Content = "查询 ↵";
+        LookupBtn.Content = UiText.Text("查询 ↵");
     }
 
     private void CancelAiConnectionTest()

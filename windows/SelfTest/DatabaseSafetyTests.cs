@@ -41,6 +41,8 @@ public static class DatabaseSafetyTests
                 Check(Scalar(check, "SELECT translation FROM words") == "durable-23", "repeated reopen preserves latest edits");
                 Check(Scalar(check, "SELECT settings_json FROM app_settings").Contains("not-persisted") == false, "backups do not enable key persistence");
             }
+            // Explicitly capture the latest edit; routine backups now use a time interval.
+            using (var current = new VocabularyService(path)) current.CreateManualBackup();
             Check(Directory.GetFiles(Path.Combine(folder, "backups"), "*.sqlite3").Length <= 20, "snapshot retention bounded");
             // A corrupt preexisting file must fail before schema/init or backup rotation.
             var corrupt = Path.Combine(folder, "corrupt.sqlite3");
@@ -78,6 +80,67 @@ public static class DatabaseSafetyTests
             rejected = false;
             try { using var bad = new VocabularyService(interrupted); } catch (InvalidDataException) { rejected = true; }
             Check(rejected && !File.Exists(interrupted), "interrupted restore never silently creates empty vocabulary");
+            // 阶段化恢复现场：只有明确阶段才自动收尾；未知记录仍然 fail-closed（上面已覆盖）。
+            var staged = Path.Combine(folder, "staged.sqlite3");
+            using (var service = new VocabularyService(staged)) service.AddWord("staged-word", "/st/", "候选前中断", "before candidate");
+            var stagedCandidate = Path.Combine(folder, ".restore-staged-candidate.sqlite3");
+            File.Copy(staged, stagedCandidate);
+            WriteMarker(staged, "staged", stagedCandidate, Path.Combine(folder, "staged-archive"));
+            using (var service = new VocabularyService(staged)) Check(service.GetAllWords().Count == 1, "staged 中断保留原词库");
+            Check(!File.Exists(stagedCandidate) && !File.Exists(staged + ".restore-pending.json"), "staged 中断丢弃未生效候选");
+
+            var moving = Path.Combine(folder, "moving.sqlite3");
+            using (var service = new VocabularyService(moving)) service.AddWord("moving-word", "/mv/", "回滚", "rollback");
+            var movingArchive = Path.Combine(folder, "moving-archive");
+            Directory.CreateDirectory(movingArchive);
+            var movingCandidate = Path.Combine(folder, ".restore-moving-candidate.sqlite3");
+            File.Copy(moving, movingCandidate);
+            File.Move(moving, Path.Combine(movingArchive, "moving.sqlite3"));
+            WriteMarker(moving, "moving", movingCandidate, movingArchive);
+            using (var service = new VocabularyService(moving))
+                Check(service.GetAllWords().Single().Word == "moving-word", "moving 中断回滚到恢复前词库");
+            Check(!File.Exists(moving + ".restore-pending.json") && !File.Exists(movingCandidate), "moving 中断清理候选与现场记录");
+
+            var installing = Path.Combine(folder, "installing.sqlite3");
+            using (var service = new VocabularyService(installing)) service.AddWord("old-word", "/old/", "旧", "old");
+            var installingArchive = Path.Combine(folder, "installing-archive");
+            Directory.CreateDirectory(installingArchive);
+            File.Move(installing, Path.Combine(installingArchive, "installing.sqlite3"));
+            var installingCandidate = Path.Combine(folder, "installing-candidate.sqlite3");
+            using (var service = new VocabularyService(installingCandidate)) service.AddWord("new-word", "/new/", "新", "new");
+            WriteMarker(installing, "installing", installingCandidate, installingArchive);
+            using (var service = new VocabularyService(installing))
+                Check(service.GetAllWords().Single().Word == "new-word", "installing 中断完成安装");
+            Check(!File.Exists(installing + ".restore-pending.json") && !File.Exists(installingCandidate), "installing 中断清理现场");
+
+            var installed = Path.Combine(folder, "installed.sqlite3");
+            using (var service = new VocabularyService(installed)) service.AddWord("installed-word", "/in/", "已安装", "installed");
+            WriteMarker(installed, "installed", Path.Combine(folder, ".restore-missing-candidate.sqlite3"), Path.Combine(folder, "installed-archive"));
+            using (var service = new VocabularyService(installed))
+                Check(service.GetAllWords().Single().Word == "installed-word", "installed 中断保留已安装词库");
+            Check(!File.Exists(installed + ".restore-pending.json"), "installed 中断清理现场记录");
+
+            // 恢复旧快照时，未确认的 JSON 重放必须失效，否则过期计划/进度会覆盖较新的 JSON 文件。
+            var outboxSource = Path.Combine(folder, "outbox-source.sqlite3");
+            string outboxBackup;
+            using (var service = new VocabularyService(outboxSource))
+            {
+                service.AddWord("outbox-word", "/ob/", "重放", "replay");
+                using (var raw = Open(outboxSource))
+                using (var insert = raw.CreateCommand())
+                {
+                    insert.CommandText = "INSERT INTO mutation_outbox (kind,payload_json,created_at_utc,applied_at_utc,attempts) VALUES ('json.snapshot.v1','{}',$at,NULL,0)";
+                    insert.Parameters.AddWithValue("$at", DateTime.UtcNow.ToString("O"));
+                    insert.ExecuteNonQuery();
+                }
+                outboxBackup = service.CreateManualBackup();
+            }
+            var outboxTarget = Path.Combine(folder, "outbox-target.sqlite3");
+            using (var service = new VocabularyService(outboxTarget)) { }
+            DatabaseSafety.RestoreBackup(outboxBackup, outboxTarget);
+            using (var restored = Open(outboxTarget))
+                Check(Scalar(restored, "SELECT count(*) FROM mutation_outbox WHERE applied_at_utc IS NULL") == "0",
+                    "恢复旧快照时未确认 JSON 重放被失效");
             using (var guard = new InstallationGuard(folder))
             {
                 rejected = false;
@@ -94,6 +157,10 @@ public static class DatabaseSafetyTests
     {
         var c = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = path, Pooling = false }.ToString()); c.Open(); return c;
     }
+    private static void WriteMarker(string target, string stage, string candidate, string archive) =>
+        DatabaseSafety.WriteRestoreMarker(target + ".restore-pending.json",
+            new DatabaseSafety.RestoreMarker(DatabaseSafety.RestoreMarkerFormat, stage, target, candidate, archive, [target]),
+            createNew: true);
     private static string Scalar(SqliteConnection c, string sql) { using var cmd = c.CreateCommand(); cmd.CommandText = sql; return cmd.ExecuteScalar()?.ToString() ?? ""; }
     private static void Check(bool ok, string message) { if (!ok) throw new Exception("Safety regression: " + message); }
 }

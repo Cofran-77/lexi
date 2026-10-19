@@ -39,6 +39,10 @@ public interface IVocabularyArchive : IDisposable
     void EditWord(long id, string translation);
     AppSettings LoadSettings();
     void SaveSettings(AppSettings settings);
+    /// <summary>只写入受白名单约束的冷启动页面，不触碰凭据、备份与其他设置。</summary>
+    void SaveNavigationState(string page);
+    /// <summary>只写入考试专题的窄选择状态，不触碰凭据、备份、导航与其他设置。</summary>
+    void SaveExamSelection(string topicId, string? bookId, string? sectionId, IReadOnlyCollection<string> wordIds);
     string CreateManualBackup();
 }
 
@@ -67,4 +71,3 @@ public interface IQuoteArchive
     QuoteItem SaveQuote(long? id, string original, string translation, string source, string notes);
     void DeleteQuote(long id);
 }
-

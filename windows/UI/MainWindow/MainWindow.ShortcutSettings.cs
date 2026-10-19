@@ -72,8 +72,14 @@ public partial class MainWindow
         ToolTip.SetTip(ReviewUnsureBtn,UiText.Text("模糊")+" · "+ShortcutHint(ShortcutAction.Unsure));
         ToolTip.SetTip(ReviewRememberBtn,UiText.Text("认识")+" · "+ShortcutHint(ShortcutAction.Known));
         ToolTip.SetTip(ReviewRevealBtn,UiText.Text("揭晓释义")+" · "+ShortcutHint(ShortcutAction.Primary));
+        ToolTip.SetTip(ReviewNextBtn,UiText.Text("下一词")+" · "+ShortcutHint(ShortcutAction.Primary));
         ToolTip.SetTip(ReviewRoundUndoBtn,UiText.Text("撤销")+" · "+ShortcutHint(ShortcutAction.Undo));
         ToolTip.SetTip(GlobalFocusButton,UiText.Text("专注")+" · "+ShortcutHint(ShortcutAction.ToggleGlobalFocus));
+        // The review footer is the only place that names the live keys, so it reads the same
+        // configured gestures the buttons use instead of a hard-coded "Space".
+        ReviewShortcutHintText.Text=UiText.Bilingual(
+            $"{ShortcutHint(ShortcutAction.Primary)} 查看释义 · {ShortcutHint(ShortcutAction.Forgot)} 忘记 · {ShortcutHint(ShortcutAction.Unsure)} 模糊 · {ShortcutHint(ShortcutAction.Known)} 认识；模糊或忘记后需连续认识三次",
+            $"{ShortcutHint(ShortcutAction.Primary)} reveal · {ShortcutHint(ShortcutAction.Forgot)} forgot · {ShortcutHint(ShortcutAction.Unsure)} unsure · {ShortcutHint(ShortcutAction.Known)} known; unsure or forgotten needs three straight correct answers");
         if(_focusActive)RenderFocus();
         if(_currentPage=="learning"&&_studyWorkspaceHost.IsVisible&&_dailyLearningSession!=null)RenderDailyLearning();
     }

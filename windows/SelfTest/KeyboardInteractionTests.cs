@@ -52,7 +52,7 @@ public static class KeyboardInteractionTests
             report(f11Gestures.Contains("F11"), "ToggleGlobalFocus 包含 F11");
             report(escGestures.Contains("Escape"), "Escape 动作包含 Escape");
 
-            // 3. 验证剔除的裸键不会触发动作
+            // 3. 验证单词卡 Q/W/E 评分键与其余剔除裸键
             var engine = router.Engine;
             var testContext = new StudyShortcutContext(
                 IsStudySessionActive: true,
@@ -60,7 +60,14 @@ public static class KeyboardInteractionTests
                 HasCurrentWord: true
             );
 
-            var removedKeys = new[] { "Q", "W", "E", "A", "S", "C", "Delete" };
+            report(engine.Dispatch(new ShortcutInputEvent("Q"), testContext) == StudyShortcutDispatchResult.RateKnown,
+                "Q 在揭晓未评分时标记认识");
+            report(engine.Dispatch(new ShortcutInputEvent("W"), testContext) == StudyShortcutDispatchResult.RateUnsure,
+                "W 在揭晓未评分时标记模糊");
+            report(engine.Dispatch(new ShortcutInputEvent("E"), testContext) == StudyShortcutDispatchResult.RateForgot,
+                "E 在揭晓未评分时标记忘记");
+
+            var removedKeys = new[] { "A", "S", "C", "Delete" };
             var allRemovedIgnored = true;
             foreach (var rk in removedKeys)
             {
@@ -73,7 +80,7 @@ public static class KeyboardInteractionTests
             }
             if (allRemovedIgnored)
             {
-                report(true, "裸键 Q/W/E/A/S/C/Delete 均被正确丢弃拦截");
+                report(true, "裸键 A/S/C/Delete 均被正确丢弃拦截");
             }
 
             var altSpaceRes = engine.Dispatch(new ShortcutInputEvent("Space", ShortcutModifiers.Alt), testContext);

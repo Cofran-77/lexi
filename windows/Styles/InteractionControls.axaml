@@ -11,10 +11,6 @@
           <SolidColorBrush x:Key="FocusHeaderFooterBrush">#F1F5F9</SolidColorBrush>
           <SolidColorBrush x:Key="FocusMutedBrush">#64748B</SolidColorBrush>
 
-          <SolidColorBrush x:Key="PlanCardBackgroundBrush">#FFFFFF</SolidColorBrush>
-          <SolidColorBrush x:Key="PlanCardBorderBrush">#E2E8F0</SolidColorBrush>
-          <SolidColorBrush x:Key="PlanCardHoverBorderBrush">#93C5FD</SolidColorBrush>
-
           <SolidColorBrush x:Key="DrawerBackgroundBrush">#FFFFFF</SolidColorBrush>
           <SolidColorBrush x:Key="DrawerOverlayBrush">#330F172A</SolidColorBrush>
           <SolidColorBrush x:Key="DrawerHeaderBorderBrush">#E2E8F0</SolidColorBrush>
@@ -33,10 +29,6 @@
           <SolidColorBrush x:Key="FocusHeaderFooterBrush">#182234</SolidColorBrush>
           <SolidColorBrush x:Key="FocusMutedBrush">#94A3B8</SolidColorBrush>
 
-          <SolidColorBrush x:Key="PlanCardBackgroundBrush">#1E293B</SolidColorBrush>
-          <SolidColorBrush x:Key="PlanCardBorderBrush">#334155</SolidColorBrush>
-          <SolidColorBrush x:Key="PlanCardHoverBorderBrush">#60A5FA</SolidColorBrush>
-
           <SolidColorBrush x:Key="DrawerBackgroundBrush">#1E293B</SolidColorBrush>
           <SolidColorBrush x:Key="DrawerOverlayBrush">#66000000</SolidColorBrush>
           <SolidColorBrush x:Key="DrawerHeaderBorderBrush">#334155</SolidColorBrush>
@@ -52,11 +44,11 @@
 
   <!-- Plan Board Card Styles -->
   <Style Selector="Border.plan-card">
-    <Setter Property="Background" Value="{DynamicResource PlanCardBackgroundBrush}" />
-    <Setter Property="BorderBrush" Value="{DynamicResource PlanCardBorderBrush}" />
+    <Setter Property="Background" Value="{DynamicResource CardBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource LineBrush}" />
     <Setter Property="BorderThickness" Value="1" />
-    <Setter Property="CornerRadius" Value="12" />
-    <Setter Property="Padding" Value="16" />
+    <Setter Property="CornerRadius" Value="{DynamicResource CardRadius}" />
+    <Setter Property="Padding" Value="{DynamicResource CardPadding}" />
     <Setter Property="BoxShadow" Value="{DynamicResource SoftCardShadow}" />
     <Setter Property="Transitions">
       <Transitions>
@@ -67,8 +59,30 @@
   </Style>
 
   <Style Selector="Border.plan-card:pointerover">
-    <Setter Property="BorderBrush" Value="{DynamicResource PlanCardHoverBorderBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
     <Setter Property="BoxShadow" Value="{DynamicResource FloatingShadow}" />
+  </Style>
+
+  <!-- Dense plan rows used by the daily overview. Kept separate from the
+       legacy management cards so existing card screens keep their treatment. -->
+  <Style Selector="Border.plan-row-card">
+    <Setter Property="Background" Value="{DynamicResource CardBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource LineBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="8" />
+    <Setter Property="Padding" Value="18,16" />
+    <Setter Property="BoxShadow" Value="0 1 3 0 #0A0F172A" />
+    <Setter Property="Transitions">
+      <Transitions>
+        <BrushTransition Property="BorderBrush" Duration="0:0:0.15" />
+        <BrushTransition Property="Background" Duration="0:0:0.15" />
+      </Transitions>
+    </Setter>
+  </Style>
+
+  <Style Selector="Border.plan-row-card:pointerover">
+    <Setter Property="Background" Value="{DynamicResource TintBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
   </Style>
 
   <Style Selector="TextBlock.plan-card-title">

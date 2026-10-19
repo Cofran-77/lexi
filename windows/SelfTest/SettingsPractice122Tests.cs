@@ -127,7 +127,7 @@ public static class SettingsPractice122Tests
         setupNormal.MemoryModeRadio.IsChecked = true;
         setupNormal.StartButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
         check(startOnlyWeak == true, "仅薄弱项被选中时，回调参数 onlyWeak 为 true");
-        check(startHints == true, "旧模式字段不再允许创建默写模式");
+        check(startHints == false, "选择默写时回调参数 hints 为 false");
 
         // 模拟切换模式为辅助拼写
         setupNormal.AllScopeRadio.IsChecked = true;

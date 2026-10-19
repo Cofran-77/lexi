@@ -22,6 +22,9 @@ public sealed partial class VocabularyService
     /// <summary>长期记忆 schema 版本（写入 schema_migrations.version）。</summary>
     private const int MemorySchemaVersion = 2;
 
+    /// <summary>存储治理 schema 版本（v3，纯加法：维护索引 + 迁移戳，不触碰任何业务行）。</summary>
+    private const int StorageSchemaVersion = 3;
+
     // =====================================================================
     // 1. schema v2 迁移
     // =====================================================================
@@ -55,6 +58,47 @@ public sealed partial class VocabularyService
             }
 
             CaptureLegacyManagedDue(tx);
+            tx.Commit();
+        }
+        catch
+        {
+            tx.Rollback();
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// schema v3：3.3.1 累计升级的版本印记。纯加法、幂等、事务化：
+    /// 只补一条维护查询索引与一条 <c>schema_migrations</c> 戳，
+    /// 不改写 words / review_logs / word_archives / canonical / fsrs_cards 的任何一行。
+    /// 重复启动不应重复迁移或产生重复事件。
+    /// </summary>
+    private void MigrateStorageSchema()
+    {
+        using var tx = _connection.BeginTransaction();
+        try
+        {
+            using (var schema = _connection.CreateCommand())
+            {
+                schema.Transaction = tx;
+                schema.CommandText = """
+                    -- 存储治理（3.2.2 对齐）：按 kind 汇总已应用快照体积时避免全表扫描。
+                    CREATE INDEX IF NOT EXISTS idx_mutation_outbox_applied_kind
+                        ON mutation_outbox(applied_at_utc, kind);
+                    """;
+                schema.ExecuteNonQuery();
+            }
+
+            using (var stamp = _connection.CreateCommand())
+            {
+                stamp.Transaction = tx;
+                stamp.CommandText =
+                    "INSERT INTO schema_migrations (version, applied_at) VALUES ($version, $appliedAt) ON CONFLICT(version) DO NOTHING;";
+                stamp.Parameters.AddWithValue("$version", StorageSchemaVersion);
+                stamp.Parameters.AddWithValue("$appliedAt", UtcText(DateTime.UtcNow));
+                stamp.ExecuteNonQuery();
+            }
+
             tx.Commit();
         }
         catch
@@ -270,8 +314,8 @@ public sealed partial class VocabularyService
         --    见 ComputeCanonicalSignature），聚合量无法表达集合身份。
         --
         --    刻意不升 MemorySchemaVersion：本文件的 DDL 每次启动都整段幂等执行
-        --    （CREATE ... IF NOT EXISTS），新表在老库上会被自动补建；而升版本号会撞上
-        --    DatabaseSafety 与 Archive 的 `version > 2 → throw` 门禁（非本工作流拥有的文件）。
+        --    （CREATE ... IF NOT EXISTS），新表在老库上会被自动补建；表结构变化统一由
+        --    独立的 v3 迁移（MigrateStorageSchema）盖章，避免同一次发布出现两个版本号。
         CREATE TABLE IF NOT EXISTS fsrs_manual_due_overrides (
             override_id INTEGER PRIMARY KEY AUTOINCREMENT,
             word_key TEXT NOT NULL,
@@ -884,7 +928,10 @@ public sealed partial class VocabularyService
         }
 
         // 步骤 10：已提交，再刷新自动备份（失败只设 BackupWarning，不回滚）。
-        BackupAfterMemoryWrite();
+        // 定稿一律生成新的还原点：会话开始（UpsertSession）已经写过一次自动备份，
+        // 若这里仍走去重的 BackupAfterMemoryWrite，15 分钟内的高频定稿就永远拿不到
+        // 与最新 canonical/卡片同刻的快照（评审 P1-7 明确要求「定稿仍然触发一次」）。
+        BackupCommittedState(force: true);
         return new WordSessionCommitResult(true, false, canonical.CanonicalId);
     }
 

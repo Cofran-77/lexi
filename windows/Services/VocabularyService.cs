@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Microsoft.Data.Sqlite;
 using Lexi.Core;
 
@@ -133,6 +134,16 @@ public sealed partial class VocabularyService : IVocabularyArchive, IQuoteArchiv
             if (legacyExists && !migrated && !File.Exists(_dbPath))
                 throw new InvalidOperationException(message);
         }
+        if (customDbPath == null && string.IsNullOrWhiteSpace(
+                Environment.GetEnvironmentVariable("LEXI_DATA_DIR")))
+        {
+            var legacyDirectory = Path.GetDirectoryName(GetLegacyDatabasePath())!;
+            var targetDirectory = Path.GetDirectoryName(_dbPath)!;
+            if (LegacySidecarMigration.TryMigrate(legacyDirectory, targetDirectory, out var sidecarMessage))
+                MigrationMessage = string.IsNullOrWhiteSpace(MigrationMessage)
+                    ? sidecarMessage
+                    : MigrationMessage + " " + sidecarMessage;
+        }
 
         var connStr = new SqliteConnectionStringBuilder
         {
@@ -153,10 +164,13 @@ public sealed partial class VocabularyService : IVocabularyArchive, IQuoteArchiv
             if (Convert.ToInt32(count.ExecuteScalar()) > 0)
             {
                 DatabaseSafety.ValidateApplicationSchema(_connection);
-                LastBackupPath = DatabaseSafety.CreateBackup(_connection, _dbPath);
+                LastBackupPath = NeedsStorageMaintenanceBackup()
+                    ? DatabaseSafety.CreateStorageMaintenanceBackup(_connection, _dbPath)
+                    : DatabaseSafety.CreateBackup(_connection, _dbPath);
             }
             InitializeDatabase();
             DatabaseSafety.Validate(_connection);
+            MaintainStorage();
         }
         catch { _connection.Dispose(); throw; }
     }
@@ -224,6 +238,7 @@ public sealed partial class VocabularyService : IVocabularyArchive, IQuoteArchiv
         MigrateArchiveSchema();
         MigrateQuoteSchema();
         MigrateMemorySchema();
+        MigrateStorageSchema();
     }
 
     public List<WordItem> GetAllWords()
@@ -1040,6 +1055,67 @@ public sealed partial class VocabularyService : IVocabularyArchive, IQuoteArchiv
         BackupCommittedState();
     }
 
+    /// <summary>
+    /// 冷启动页面恢复的窄写入：只改 settings_json 的 LastPage，保留未知字段与凭据状态；
+    /// 原 JSON 损坏时保持原值不动，等用户在设置页修复。
+    /// </summary>
+    public void SaveNavigationState(string page)
+    {
+        var normalized = NavigationState.Normalize(page);
+        string? json;
+        using (var read = _connection.CreateCommand())
+        {
+            read.CommandText = "SELECT settings_json FROM app_settings WHERE id = 1";
+            json = read.ExecuteScalar() as string;
+        }
+        JsonObject? settings;
+        try { settings = json is null ? new JsonObject() : JsonNode.Parse(json) as JsonObject; }
+        catch (JsonException) { return; }
+        if (settings is null) return;
+        if (settings.TryGetPropertyValue("LastPage", out var existing) &&
+            existing is JsonValue value && value.TryGetValue<string>(out var current) &&
+            string.Equals(current, normalized, StringComparison.Ordinal)) return;
+        settings["LastPage"] = normalized;
+        using var cmd = _connection.CreateCommand();
+        cmd.CommandText = @"INSERT INTO app_settings (id, settings_json) VALUES (1, $json)
+            ON CONFLICT(id) DO UPDATE SET settings_json = excluded.settings_json";
+        cmd.Parameters.AddWithValue("$json", settings.ToJsonString());
+        cmd.ExecuteNonQuery();
+    }
+
+    /// <summary>考试专题选择的窄写入；保留设置 JSON 中本版本尚不认识的字段。</summary>
+    public void SaveExamSelection(string topicId, string? bookId, string? sectionId,
+        IReadOnlyCollection<string> wordIds)
+    {
+        ArgumentNullException.ThrowIfNull(wordIds);
+        var topic = ExamCatalog.TopicIds.Contains(topicId, StringComparer.Ordinal) || topicId == "ielts"
+            ? topicId : "ielts";
+        string? json;
+        using (var read = _connection.CreateCommand())
+        {
+            read.CommandText = "SELECT settings_json FROM app_settings WHERE id = 1";
+            json = read.ExecuteScalar() as string;
+        }
+        JsonObject? settings;
+        try { settings = json is null ? new JsonObject() : JsonNode.Parse(json) as JsonObject; }
+        catch (JsonException) { return; }
+        if (settings is null) return;
+
+        settings["ExamTopicId"] = topic;
+        settings["ExamBookId"] = string.IsNullOrWhiteSpace(bookId) ? null : bookId.Trim();
+        settings["ExamSectionId"] = string.IsNullOrWhiteSpace(sectionId) ? null : sectionId.Trim();
+        settings["ExamSelectedWordIds"] = new JsonArray(
+            wordIds.Where(id => !string.IsNullOrWhiteSpace(id))
+                .Select(id => (JsonNode?)JsonValue.Create(id.Trim()))
+                .Where(node => node is not null)
+                .ToArray());
+        using var cmd = _connection.CreateCommand();
+        cmd.CommandText = @"INSERT INTO app_settings (id, settings_json) VALUES (1, $json)
+            ON CONFLICT(id) DO UPDATE SET settings_json = excluded.settings_json";
+        cmd.Parameters.AddWithValue("$json", settings.ToJsonString());
+        cmd.ExecuteNonQuery();
+    }
+
     private void PersistSettings(AppSettings settings)
     {
         var persisted = new AppSettings
@@ -1051,7 +1127,14 @@ public sealed partial class VocabularyService : IVocabularyArchive, IQuoteArchiv
             Timeout = settings.Timeout, ApiKey = "",
             AiContext = string.IsNullOrWhiteSpace(settings.AiContext) ? "日常表达" : settings.AiContext,
             IncludeSourceInAi = settings.IncludeSourceInAi,
-            HighContrast = settings.HighContrast, OpaqueMaterial = settings.OpaqueMaterial, ReduceMotion = settings.ReduceMotion
+            HighContrast = settings.HighContrast, OpaqueMaterial = settings.OpaqueMaterial, ReduceMotion = settings.ReduceMotion,
+            LastPage = NavigationState.Normalize(settings.LastPage),
+            ExamTopicId = ExamCatalog.TopicIds.Contains(settings.ExamTopicId, StringComparer.Ordinal) ||
+                          settings.ExamTopicId == "ielts" ? settings.ExamTopicId : "ielts",
+            ExamBookId = settings.ExamBookId,
+            ExamSectionId = settings.ExamSectionId,
+            ExamSelectedWordIds = (settings.ExamSelectedWordIds ?? [])
+                .Where(id => !string.IsNullOrWhiteSpace(id)).Distinct(StringComparer.Ordinal).ToList()
         };
         using var cmd = _connection.CreateCommand();
         cmd.CommandText = @"INSERT INTO app_settings (id, settings_json) VALUES (1, $json)
@@ -1059,11 +1142,13 @@ public sealed partial class VocabularyService : IVocabularyArchive, IQuoteArchiv
         cmd.Parameters.AddWithValue("$json", JsonSerializer.Serialize(persisted));
         cmd.ExecuteNonQuery();
     }
-    private void BackupCommittedState()
+    private void BackupCommittedState(bool force = false, bool keepOnlyLatest = false)
     {
         try
         {
-            LastBackupPath = DatabaseSafety.CreateBackup(_connection, _dbPath);
+            LastBackupPath = force
+                ? DatabaseSafety.CreateBackup(_connection, _dbPath, keepOnlyLatest: keepOnlyLatest)
+                : DatabaseSafety.CreateAutomaticBackup(_connection, _dbPath);
             BackupWarning = "";
         }
         catch (Exception ex) when (ex is IOException or SqliteException or UnauthorizedAccessException)
@@ -1079,7 +1164,3 @@ public sealed partial class VocabularyService : IVocabularyArchive, IQuoteArchiv
         _connection.Dispose();
     }
 }
-
-
-
-

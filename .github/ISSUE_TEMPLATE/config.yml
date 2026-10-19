@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 下载与版本记录
+    url: https://github.com/Cofran-77/lexi/releases
+    about: 先核对当前发布资产、校验文件和安装说明。
+  - name: 隐私与数据处理
+    url: https://github.com/Cofran-77/lexi/blob/main/docs/PRIVACY.md
+    about: 提交账号、同步或本地数据问题前，请先阅读公开数据边界。

@@ -1,25 +1,42 @@
-# 界面预览来源
+# 界面截图索引
 
-Windows 图片为现有隔离演示截图，保留原文件。macOS 图片于 2026-10-09 使用实际 Lexi 3.1.3 macOS arm64 应用的内置 UI 测试生成，图像直接来自 Avalonia `RenderTargetBitmap`，未经界面改绘。所有运行使用独立 `LEXI_DATA_DIR`，没有读取个人词库或密钥。`Archive fixture`、`IELTS fixture` 为自动化测试创建的演示计划。
+本目录中的截图用于 GitHub README，只展示实际应用与隔离演示数据。截图生成时不读取作者或用户的个人词库、学习记录、登录 Cookie、通知、API Key 或本机连接配置。
 
-| 文件 | 内置模式与原始截图 | 场景 |
-| --- | --- | --- |
-| macos-word-card.png | focus-test / focus-front-with-details-zh.png | 回忆卡正面，三按钮评分 |
-| macos-word-card-answer.png | focus-test / focus-answer-with-details-zh.png | 揭晓释义、例句与词组 |
-| macos-typing.png | learning-test / typing-hints-error.png | 淡写与逐字错误反馈 |
-| macos-spelling.png | learning-test / typing-no-hints-error.png | 默写出错后的正确答案 |
-| macos-plans.png | learning-test / plans-manager-light.png | 独立计划管理页 |
-| macos-plan-editor.png | learning-test / plans-create-dialog.png | 选择词汇、每日数量与顺序 |
+## Windows 3.3.1
 
-复现时使用包含完整合法本地资源的 3.1.3 应用，或在 `macos/` 恢复合法 IELTS 资源后构建。测试截图同时检验真实界面逻辑，应用运行结束后退出；需在已登录的 macOS 图形桌面运行：
+图片位于 `docs/images/windows/`，尺寸均为 1100 × 760。
+
+| 文件 | 场景 |
+| --- | --- |
+| `ielts.png` | IELTS 专题、词书、单元与学习入口 |
+| `exam-topics.png` | IELTS、CET-4、CET-6、考研、GMAT、TOEFL、GRE 分组入口 |
+| `settings.png` | 设置页与学习选项 |
+| `focus.png` | 全局专注学习界面 |
+| `quotes.png` | 金句本 |
+
+Windows 演示运行使用独立的 `LEXI_DATA_DIR`。该变量不得指向 `%LOCALAPPDATA%\Lexi`。
+
+## macOS 3.3.1
+
+图片位于 `docs/images/macos/`，原始尺寸均为 2940 × 1846。
+
+| 文件 | 场景 |
+| --- | --- |
+| `home.png` | 首页、离线查词与扩展入口 |
+| `exams.png` | 七大考试专题与词书目录 |
+| `study-plans.png` | 学习计划总览 |
+| `daily-plan.png` | 今日任务与计划进度 |
+| `study-answer.png` | 单词、音标、释义与回忆反馈 |
+| `study-forgot.png` | 忘记后揭示释义并再次学习 |
+| `statistics.png` | 学习活动、记忆曲线与空状态 |
+| `study-together.png` | 一起学习入口，截图处于未登录状态 |
+| `quotes.png` | 英文金句本 |
+
+macOS 演示运行使用独立的 `LEXI_DATA_DIR`，例如：
 
 ```sh
-# 从仓库 macos/ 目录执行；DATA_ROOT 为本次独立演示目录
-DATA_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/lexi-preview.XXXXXX")"
-mkdir -p "$DATA_ROOT/focus" "$DATA_ROOT/learning"
-LEXI_DATA_DIR="$DATA_ROOT/focus" dist/Lexi.app/Contents/MacOS/Lexi --focus-test
-LEXI_DATA_DIR="$DATA_ROOT/learning" dist/Lexi.app/Contents/MacOS/Lexi --learning-test
-# 核对 focus-result.txt / learning-ui-result.txt 中的 PASS/FAIL 后选取 PNG
+DEMO_DATA="$(mktemp -d "${TMPDIR:-/tmp}/lexi-preview.XXXXXX")"
+LEXI_DATA_DIR="$DEMO_DATA" ./Lexi.app/Contents/MacOS/Lexi
 ```
 
-此次两个模式退出码均为 0，结果文件均包含 PASS 且无 FAIL。截图仅展示相应 UI 场景，不代表全部功能和设备认证。
+截图展示的是 3.3.1 发布候选界面，不构成所有设备、系统版本或第三方 AI 服务的兼容性认证。截图文件重新采集时，应先检查画面中不含账号、好友资料、通知、词库内容、路径或密钥。

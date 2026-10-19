@@ -69,6 +69,7 @@ public partial class App : Application
             // Bind single instance wake up
             if (SingleInstance != null)
             {
+                SingleInstance.ProtocolCallbackRequested += OnProtocolCallbackRequested;
                 SingleInstance.WakeupRequested += () =>
                 {
                     Dispatcher.UIThread.Post(() =>
@@ -98,6 +99,16 @@ public partial class App : Application
         }
 
         base.OnFrameworkInitializationCompleted();
+    }
+
+    private void OnProtocolCallbackRequested(Uri callback)
+    {
+        Dispatcher.UIThread.Post(async () =>
+        {
+            if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop &&
+                desktop.MainWindow is MainWindow window)
+                await window.SocialProtocolActivatedAsync(callback);
+        });
     }
 
     public void ToggleMainWindow()

@@ -64,20 +64,22 @@
   </Style>
   <Style Selector="TextBox.spelling-input">
     <Setter Property="Background" Value="Transparent"/>
-    <Setter Property="BorderThickness" Value="0,0,0,1"/>
+    <Setter Property="BorderBrush" Value="Transparent"/>
+    <Setter Property="BorderThickness" Value="0"/>
     <Setter Property="CornerRadius" Value="0"/>
-    <Setter Property="FontSize" Value="26"/>
+    <Setter Property="Padding" Value="0"/>
   </Style>
   <Style Selector="TextBox.spelling-input /template/ Border#PART_BorderElement">
     <Setter Property="Background" Value="Transparent"/>
+    <Setter Property="BorderBrush" Value="Transparent"/>
     <Setter Property="CornerRadius" Value="0"/>
-    <Setter Property="BorderThickness" Value="0,0,0,1"/>
+    <Setter Property="BorderThickness" Value="0"/>
     <Setter Property="BoxShadow" Value="0 0 0 0 Transparent"/>
   </Style>
   <Style Selector="TextBox.spelling-input:focus /template/ Border#PART_BorderElement">
     <Setter Property="Background" Value="Transparent"/>
-    <Setter Property="BorderThickness" Value="0,0,0,2"/>
-    <Setter Property="BorderBrush" Value="{DynamicResource PrimaryGreen}"/>
+    <Setter Property="BorderBrush" Value="Transparent"/>
+    <Setter Property="BorderThickness" Value="0"/>
     <Setter Property="BoxShadow" Value="0 0 0 0 Transparent"/>
   </Style>
 </Styles>

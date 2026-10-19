@@ -18,11 +18,7 @@
       <!-- Title Bar -->
       <Border Name="DragBar" Background="Transparent" BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,0,0,1" Padding="16,0,0,0">
         <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto,Auto,Auto">
-          <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
-            <Image Source="avares://Lexi/Assets/lexi-logo.png" Width="30" Height="30" Stretch="Uniform" VerticalAlignment="Center"/>
-            <TextBlock Text="lexi" FontSize="20" FontWeight="Bold" VerticalAlignment="Center"/>
-          </StackPanel>
-
+          <!-- 3.2.0 起首页左上角不再显示品牌 Logo/文字；应用图标仍保留在窗口、任务栏与安装器中。 -->
           <Button Name="LanguageToggleBtn" Grid.Column="2" Classes="ghost" Content="EN" ToolTip.Tip="切换界面语言" Margin="0,0,6,0"/>
           <Button Name="ThemeToggleBtn" Grid.Column="3" Classes="ghost" Content="切换深色" ToolTip.Tip="切换浅色 / 深色主题，自动保存" Margin="0,0,12,0"/>
           <Button Name="GlobalFocusButton" Grid.Column="4" Content="专注" Classes="ghost" Focusable="False" ToolTip.Tip="进入 / 退出专注模式 · F11" Margin="0,0,8,0"/>
@@ -44,7 +40,7 @@
       <Grid Name="MainBodyGrid" Grid.Row="1" ColumnDefinitions="208,*">
         <!-- Sidebar Navigation -->
         <Border Name="SidebarBorder" BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,0,1,0" Padding="12,18,12,14" Background="Transparent">
-          <Grid RowDefinitions="Auto,Auto,Auto,*,Auto,Auto">
+          <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,*,Auto,Auto">
             <Button Name="NavLookup" Classes="nav active">
               <Grid ColumnDefinitions="*,Auto">
                 <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
@@ -82,8 +78,8 @@
             </Button>
 
             <!-- Bottom Offline Notice & Settings -->
-            <StackPanel Name="LearningNavHost" Grid.Row="3" VerticalAlignment="Top"/>
-            <StackPanel Grid.Row="4" Spacing="4" Margin="6,0,6,16">
+            <StackPanel Name="LearningNavHost" Grid.Row="4" VerticalAlignment="Top"/>
+            <StackPanel Grid.Row="6" Spacing="4" Margin="6,0,6,16">
               <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
                 <Ellipse Width="7" Height="7" Fill="#16815B"/>
                 <TextBlock Text="离线词库已就绪" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryGreen}"/>
@@ -91,7 +87,7 @@
               <TextBlock Text="59,026 个词条" Classes="muted" FontSize="10" Margin="13,0,0,0"/>
             </StackPanel>
 
-            <Button Name="NavSettings" Grid.Row="5" Classes="nav">
+            <Button Name="NavSettings" Grid.Row="7" Classes="nav">
               <Grid ColumnDefinitions="*,Auto">
                 <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
                   <Path Data="M 9,3.5 L 10,5.5 L 12,5 L 12.5,7 L 14.5,7.5 L 13.5,9.5 L 14.5,11.5 L 12.5,12 L 12,14 L 10,13.5 L 9,15.5 L 8,13.5 L 6,14 L 5.5,12 L 3.5,11.5 L 4.5,9.5 L 3.5,7.5 L 5.5,7 L 6,5 L 8,5.5 Z M 9,7.5 A 2,2 0 1 0 9,11.5 A 2,2 0 1 0 9,7.5"
@@ -491,6 +487,7 @@
                       <Button Name="ReviewUnsureBtn" Grid.Column="2" Classes="secondary" Content="模糊" MinHeight="44" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"/>
                       <Button Name="ReviewRememberBtn" Grid.Column="4" Classes="secondary" Content="认识" MinHeight="44" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"/>
                     </Grid>
+                    <Button Name="ReviewNextBtn" Classes="primary" Content="下一词" MinHeight="44" Width="200" HorizontalAlignment="Center" HorizontalContentAlignment="Center" IsVisible="False"/>
                   </Grid>
                 </Grid>
               </Border>
@@ -503,7 +500,7 @@
             </Border>
             <StackPanel Grid.Row="2" Spacing="8">
               <Button Name="ReviewRoundUndoBtn" Classes="secondary" Content="撤销上一次评价" HorizontalAlignment="Center" IsEnabled="False"/>
-              <TextBlock Text="Space 查看释义 · ← 忘记 · ↓ 模糊 · → 认识；模糊或忘记后需连续认识三次" Classes="muted" FontSize="11" TextAlignment="Center" TextWrapping="Wrap"/>
+              <TextBlock Name="ReviewShortcutHintText" Classes="muted" FontSize="11" TextAlignment="Center" TextWrapping="Wrap"/>
             </StackPanel>
           </Grid>
 
@@ -664,7 +661,7 @@
       <Border Grid.Row="2" Background="{DynamicResource TintBrush}" Padding="20,0">
         <Grid ColumnDefinitions="*,Auto">
           <TextBlock Name="GlobalStatusText" Text="本地查词不调用 AI。关闭窗口后可通过快捷键或托盘重新打开。" VerticalAlignment="Center" FontSize="11"/>
-          <TextBlock Grid.Column="1" Text="Lexi 1.2.4" Classes="muted" VerticalAlignment="Center" FontSize="11"/>
+          <TextBlock Grid.Column="1" Text="Lexi 3.3.1" Classes="muted" VerticalAlignment="Center" FontSize="11"/>
         </Grid>
       </Border>
     </Grid>
@@ -753,4 +750,3 @@
   </Grid>
   </Border>
 </Window>
-

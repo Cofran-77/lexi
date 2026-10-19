@@ -1,3 +1,5 @@
+using Lexi.Social;
+
 namespace Lexi;
 
 public partial class MainWindow
@@ -27,6 +29,8 @@ public partial class MainWindow
     private bool _planLastCommitted;
     private int _planStreakBefore;
     private bool _planRatingApplied;
+    // 计划词定稿后要等 daily-plans.json 落盘才向“一起学习”观察，避免把未持久化的事实当成完成。
+    private bool _socialPendingFirstLearning;
 
     private LearningMemoryCoordinator Memory()
     {
@@ -127,6 +131,7 @@ public partial class MainWindow
             }
         }
         catch { UndoReviewMemory(); throw; }
+        if (_reviewLastCommitted) SocialObserveSaved(QualificationCause.Correction);
         _reviewPresentation = null;
         PersistLearningSurface("review");
     }
@@ -150,7 +155,7 @@ public partial class MainWindow
         var cardKeys = store.GetMemoryCardKeys();
         var dueKeys = memory.QueryDue(DateTime.UtcNow, int.MaxValue)
             .Select(card => card.WordKey).ToHashSet(StringComparer.Ordinal);
-        var today = DateTime.Today.ToString("yyyy-MM-dd");
+        var today = LearningDay.TodayBjt(DateTime.UtcNow).ToString("yyyy-MM-dd");
         return _allWords.Where(word => word.Status == "learning" &&
             (dueKeys.Contains(WordKeyResolver.FromArchive(word).Key) ||
              (!cardKeys.Contains(WordKeyResolver.FromArchive(word).Key) && word.NextReviewDate != null &&
@@ -206,6 +211,7 @@ public partial class MainWindow
             }
         }
         catch { UndoFocusMemory(); throw; }
+        if (_focusLastCommitted) SocialObserveSaved(QualificationCause.Correction);
         _focusPresentation = null;
         PersistLearningSurface("focus");
     }
@@ -226,9 +232,9 @@ public partial class MainWindow
         var source = plan.Source == DailyStudyPlanSource.Ielts ? WordSource.Ielts : WordSource.Archive;
         TryTrainContext("plan-start");
         var memory = SurfaceMemory(ref _planMemory);
-        if (!RestoreLearningSurface("plan", plan.Id, memory))
+        if (!RestoreLearningSurface("plan", PlanSurfaceScope(plan, session.Mode), memory))
         {
-            memory.BeginSession(StudyMode.FirstLearn, source, plan.Id, session.Round.Total);
+            memory.BeginSession(session.Mode, source, plan.Id, session.Round.Total);
             _planPresentation = _planLastPresentation = null;
             _planLastCommitted = false;
         }
@@ -237,6 +243,9 @@ public partial class MainWindow
         session.OnRatingFailed = _ => { if (_planRatingApplied) UndoPlanMemory(); };
         session.OnUndoApplied = () => UndoPlanMemory(persistProgress: true);
     }
+
+    private static string PlanSurfaceScope(DailyStudyPlan plan, StudyMode mode) =>
+        $"{plan.Id}:{mode}";
 
     private void PresentPlanMemory(DailyStudyPlan plan, string wordId, StudyStep step)
     {
@@ -258,7 +267,8 @@ public partial class MainWindow
         _planLastCommitted = false;
         _planPresentation = null;
         SurfaceMemory(ref _planMemory).OnRated(presented.Key, presented.Id, rating, _planStreakBefore,
-            result.Streak, null, CaptureSurfaceCheckpoint("plan", result.Completed ? presented.Key : null, StudyMode.FirstLearn));
+            result.Streak, null, CaptureSurfaceCheckpoint("plan", result.Completed ? presented.Key : null,
+                _dailyLearningSession?.Mode ?? StudyMode.Review, presented.Identity));
     }
 
     private void CommitPlanMemory(string wordId)
@@ -266,10 +276,15 @@ public partial class MainWindow
         var presented = _planLastPresentation;
         if (presented == null || presented.Identity != wordId)
             throw new InvalidOperationException("计划词与最后一次作答不一致。");
+        var mode = _dailyLearningSession?.Mode ?? StudyMode.Review;
+        // A review rating only mutates ForgotWordIds; its snapshot must still be replayable
+        // when the sidecar save fails after SQLite has committed the canonical review.
         var mutation = CrossStoreJournal.CreateJsonSnapshot("daily-plans.json",
             System.Text.Json.JsonSerializer.Serialize(_learningPlans));
-        _ = SurfaceMemory(ref _planMemory).CommitWord(presented.Key, StudyMode.FirstLearn, outboxMutations: [mutation])
+        var result = SurfaceMemory(ref _planMemory).CommitWord(presented.Key, mode,
+                outboxMutations: [mutation])
             ?? throw new InvalidOperationException("计划词尚无有效回忆，无法完成。");
+        if (mode == StudyMode.FirstLearn && result.Applied) _socialPendingFirstLearning = true;
         _planLastCommitted = true;
         PersistLearningSurface("plan");
         if (_dailyLearningSession?.Round.IsFinished == true) NotifyMemoryRoundBoundary("plan-completed");
@@ -307,7 +322,7 @@ public partial class MainWindow
         if (_memoryJournal == null) return true;
         var result = _memoryJournal.Replay(DateTime.UtcNow);
         if (result.Succeeded) return true;
-        SetStatus("学习进度正在等待写回：" + result.Error);
+        SetStatus(UiText.Bilingual("学习进度正在等待写回：", "Learning progress is waiting to be written back: ") + result.Error);
         return false;
     }
 
